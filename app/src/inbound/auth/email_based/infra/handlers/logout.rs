@@ -1,6 +1,6 @@
 use axum::{
     extract::State,
-    http::{StatusCode, header::SET_COOKIE},
+    http::{HeaderMap, StatusCode, header::SET_COOKIE},
     response::{AppendHeaders, IntoResponse},
 };
 use axum_extra::extract::CookieJar;
@@ -15,13 +15,15 @@ use crate::inbound::{
 #[tracing::instrument(skip_all)]
 pub async fn logout<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
+    headers: HeaderMap,
     jar: CookieJar,
 ) -> impl IntoResponse {
     if let Some(cookie) = jar.get("session_token") {
         let _ = state.user_service.logout(&cookie.value().into()).await;
     }
 
-    let cookie = build_removal_cookie("session_token", &state.cookie_config);
+    let cookie_config = state.cookie_config.for_request(&headers);
+    let cookie = build_removal_cookie("session_token", &cookie_config);
     let headers = AppendHeaders([(SET_COOKIE, cookie.encoded().to_string())]);
     (headers, StatusCode::OK)
 }

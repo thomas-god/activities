@@ -114,14 +114,16 @@ where
 mod tests {
     use std::net::SocketAddr;
 
+    use axum::http::header::SET_COOKIE;
     use axum::{http::StatusCode, response::IntoResponse, routing::get};
+    use chrono::{TimeDelta, Utc};
     use reqwest::header::CONTENT_TYPE;
     use tokio::task::JoinHandle;
     use url::Url;
 
     use crate::inbound::auth::email_based::{
-        AuthLinkValidationResult, UserLoginResult, UserRegistrationResult,
-        test_utils::MockUserService,
+        AuthLinkValidationResult, GenerateSessionTokenResult, SessionToken, UserLoginResult,
+        UserRegistrationResult, test_utils::MockUserService,
     };
 
     use super::*;
@@ -342,5 +344,66 @@ mod tests {
             .await
             .expect("Should succeed");
         assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    #[tokio::test]
+    async fn test_login_does_not_mark_cookie_secure_over_plain_http() {
+        let mut user_service = MockUserService::new();
+        user_service.expect_login_user().returning(|_, _| {
+            UserLoginResult::Session(GenerateSessionTokenResult::new(
+                SessionToken::from("session-token"),
+                Utc::now() + TimeDelta::days(30),
+            ))
+        });
+        let app = TestApp::new(user_service, UserRegistration::Allowed).await;
+
+        let response = app
+            .post_json(
+                "/api/login",
+                serde_json::json!({"email": "test@mail.test", "password": "secret"}),
+            )
+            .send()
+            .await
+            .expect("Should succeed");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let set_cookie = response
+            .headers()
+            .get(SET_COOKIE)
+            .expect("expected a session cookie")
+            .to_str()
+            .unwrap();
+        assert!(!set_cookie.contains("Secure"), "got: {set_cookie}");
+    }
+
+    #[tokio::test]
+    async fn test_login_marks_cookie_secure_when_proxied_over_https() {
+        let mut user_service = MockUserService::new();
+        user_service.expect_login_user().returning(|_, _| {
+            UserLoginResult::Session(GenerateSessionTokenResult::new(
+                SessionToken::from("session-token"),
+                Utc::now() + TimeDelta::days(30),
+            ))
+        });
+        let app = TestApp::new(user_service, UserRegistration::Allowed).await;
+
+        let response = app
+            .post_json(
+                "/api/login",
+                serde_json::json!({"email": "test@mail.test", "password": "secret"}),
+            )
+            .header("X-Forwarded-Proto", "https")
+            .send()
+            .await
+            .expect("Should succeed");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let set_cookie = response
+            .headers()
+            .get(SET_COOKIE)
+            .expect("expected a session cookie")
+            .to_str()
+            .unwrap();
+        assert!(set_cookie.contains("Secure"), "got: {set_cookie}");
     }
 }

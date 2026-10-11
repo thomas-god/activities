@@ -1,7 +1,7 @@
 use axum::{
     Json,
     extract::State,
-    http::{StatusCode, header::SET_COOKIE},
+    http::{HeaderMap, StatusCode, header::SET_COOKIE},
     response::{AppendHeaders, IntoResponse},
 };
 use serde::Deserialize;
@@ -21,6 +21,7 @@ pub struct LoginUserBody {
 #[tracing::instrument(skip_all)]
 pub async fn login_user<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
+    headers: HeaderMap,
     Json(body): Json<LoginUserBody>,
 ) -> impl IntoResponse {
     let Ok(email) = EmailAddress::try_from(body.email) else {
@@ -34,7 +35,8 @@ pub async fn login_user<UR: IUserService>(
     match state.user_service.login_user(email, password).await {
         UserLoginResult::EmailSent => StatusCode::OK.into_response(),
         UserLoginResult::Session(session) => {
-            let Some(cookie) = build_session_cookie(&state.cookie_config, &session) else {
+            let cookie_config = state.cookie_config.for_request(&headers);
+            let Some(cookie) = build_session_cookie(&cookie_config, &session) else {
                 return StatusCode::INTERNAL_SERVER_ERROR.into_response();
             };
 
@@ -160,6 +162,47 @@ mod test {
             .get(SET_COOKIE)
             .expect("expected a session cookie");
         assert!(set_cookie.to_str().unwrap().contains("session-token"));
+    }
+
+    #[tokio::test]
+    async fn test_password_login_cookie_is_secure_only_over_https() {
+        let token = SessionToken::from("session-token");
+        let expire_at = Utc::now() + TimeDelta::days(30);
+        let mut user_service = MockUserService::new();
+        user_service.expect_login_user().returning(move |_, _| {
+            UserLoginResult::Session(GenerateSessionTokenResult::new(token.clone(), expire_at))
+        });
+        let server = build_test_server(user_service);
+
+        // Plain HTTP: the cookie must not be `Secure`, otherwise the browser silently drops it
+        // and every subsequent request answers 401 (e.g. password-only mode on a plain-HTTP host).
+        let response = server
+            .post("/login")
+            .json(&json!({"email": "test@mail.test", "password": "secret"}))
+            .await;
+        response.assert_status(StatusCode::OK);
+        let set_cookie = response
+            .headers()
+            .get(SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(!set_cookie.contains("Secure"), "got: {set_cookie}");
+
+        // Behind a TLS-terminating proxy reporting HTTPS: the cookie must be `Secure`.
+        let response = server
+            .post("/login")
+            .add_header("x-forwarded-proto", "https")
+            .json(&json!({"email": "test@mail.test", "password": "secret"}))
+            .await;
+        response.assert_status(StatusCode::OK);
+        let set_cookie = response
+            .headers()
+            .get(SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(set_cookie.contains("Secure"), "got: {set_cookie}");
     }
 
     #[tokio::test]

@@ -20,7 +20,10 @@ The application authentication flow can be configured in 3 different ways:
   login. One or both methods can be enabled, but at least one is required. By default anyone with a
   valid email address can register; set `ACTIVITIES_ALLOW_REGISTRATION=false` to restrict the
   instance to already-registered users only. The email-based method requires a valid **SMTP server**
-  for sending emails to users containing their authentication link and **HTTPS** for secure cookies.
+  for sending emails to users containing their authentication link. HTTPS is strongly recommended
+  (session cookies are only marked `Secure` when served over HTTPS), but the app also works over
+  plain HTTP when the traffic is already protected by another layer (e.g. a WireGuard or Tailscale
+  tunnel).
 - _single user, main password_: allows a single user to use the instance using a password set
   through an environment variable in your deployment. Does not require having an SMTP server nor
   having HTTPS (HTTP only might be fine for local deployment but HTTPS is still recommended as
@@ -71,15 +74,15 @@ volumes:
 The application will store all its data at the location pointed by `ACTIVITIES_DATA_PATH`, so use a
 docker volume to persist your data between restarts and to facilitate the backup process.
 
-### HTTPS is required once you enable email login
+### HTTPS is recommended, plain HTTP is possible on a trusted network
 
-The bundled image only serves plain HTTP and does not terminate TLS by itself. The _multi user_ mode
-protects the session with a cookie that only travels over HTTPS, so if you enable it you must put a
-TLS-terminating reverse proxy (e.g. [Caddy](https://caddyserver.com/) or
-[Traefik](https://traefik.io/)) in front of the container. Without one, the browser will silently
-refuse to keep the session cookie and login will appear to fail with no useful error. _The
-`single user, no password` and `single user, main password` modes don't set a secure cookie, so they
-work fine over plain HTTP._
+The bundled image only serves plain HTTP and does not terminate TLS by itself. Session cookies are
+marked `Secure` only when the request reaches the backend over HTTPS — as reported through the
+`X-Forwarded-Proto` header by a TLS-terminating reverse proxy (e.g.
+[Caddy](https://caddyserver.com/) or [Traefik](https://traefik.io/)). Over plain HTTP the cookie is
+still set, so login works, but it then travels in clear. Only run the _multi user_ (or _single user,
+main password_) modes over HTTP when the traffic is already protected by another layer, for example
+a [WireGuard](https://www.wireguard.com/) or [Tailscale](https://tailscale.com/) tunnel.
 
 A minimal `docker-compose.yaml` with Traefik handling TLS looks like:
 
@@ -146,15 +149,15 @@ Multi-user mode is enabled as soon as any multi-user environment variable below 
 **at least one authentication method** to be configured: either all the `ACTIVITIES_MAILER_*`
 variables (email-based auth) or `ACTIVITIES_PASSWORD_AUTH_ENABLED=true` (password-based auth).
 
-| Variable name                    | Required             | Purpose                                                                                                                                                                                            | Example                 |
-| -------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| ACTIVITIES_MAILER_FROM           | for email-based auth |                                                                                                                                                                                                    | no-reply@your.domain    |
-| ACTIVITIES_MAILER_USERNAME       | for email-based auth | SMTP username                                                                                                                                                                                      |                         |
-| ACTIVITIES_MAILER_PASSWORD       | for email-based auth | SMTP password                                                                                                                                                                                      |                         |
-| ACTIVITIES_MAILER_RELAY          | for email-based auth | SMTP server                                                                                                                                                                                        |                         |
-| ACTIVITIES_MAILER_DOMAIN         | for email-based auth | The domain on which your instance is hosted. Used to craft the auth link url. Can be a different domain than the one used by your SMTP server.                                                     | https://app.your.domain |
-| ACTIVITIES_PASSWORD_AUTH_ENABLED | no                   | Enable password-based authentication (`true`/`false`, defaults to `false`). Not implemented yet: enabled on its own (without the `ACTIVITIES_MAILER_*` variables), the application fails to start. | true                    |
-| ACTIVITIES_ALLOW_REGISTRATION    | no                   | Wether new users can register a new account. Set to `false` to only allow already-registered users to log in.                                                                                      | false                   |
+| Variable name                    | Required             | Purpose                                                                                                                                                                                                       | Example                 |
+| -------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| ACTIVITIES_MAILER_FROM           | for email-based auth |                                                                                                                                                                                                               | no-reply@your.domain    |
+| ACTIVITIES_MAILER_USERNAME       | for email-based auth | SMTP username                                                                                                                                                                                                 |                         |
+| ACTIVITIES_MAILER_PASSWORD       | for email-based auth | SMTP password                                                                                                                                                                                                 |                         |
+| ACTIVITIES_MAILER_RELAY          | for email-based auth | SMTP server                                                                                                                                                                                                   |                         |
+| ACTIVITIES_MAILER_DOMAIN         | for email-based auth | The domain on which your instance is hosted. Used to craft the auth link url. Can be a different domain than the one used by your SMTP server.                                                                | https://app.your.domain |
+| ACTIVITIES_PASSWORD_AUTH_ENABLED | no                   | Enable password-based authentication (`true`/`false`, defaults to `false`). Can be combined with email-based auth, or used on its own (password-only multi-user) without the `ACTIVITIES_MAILER_*` variables. | true                    |
+| ACTIVITIES_ALLOW_REGISTRATION    | no                   | Wether new users can register a new account. Set to `false` to only allow already-registered users to log in.                                                                                                 | false                   |
 
 _Notes:_
 

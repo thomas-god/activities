@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 use derive_more::{Constructor, From};
 use subtle::ConstantTimeEq;
@@ -6,7 +6,7 @@ use subtle::ConstantTimeEq;
 use crate::{
     config::{AppMode, SingleUserConfig},
     domain::models::UserId,
-    inbound::auth::email_based::infra::handlers::UserRegistration,
+    inbound::auth::email_based::{AuthMethods, infra::handlers::UserRegistration},
 };
 
 pub mod email_based;
@@ -48,7 +48,30 @@ impl Debug for SinglePassword {
 pub enum AuthStrategy {
     NoAuth,
     SinglePassword(SinglePassword),
-    EmailBased(UserRegistration),
+    MultiUser(MultiUserAuthStrategy),
+}
+
+#[derive(Clone, Debug)]
+pub struct MultiUserAuthStrategy {
+    auth_methods: AuthMethods,
+    registration: UserRegistration,
+}
+
+impl MultiUserAuthStrategy {
+    pub fn new(auth_methods: AuthMethods, registration: UserRegistration) -> Self {
+        Self {
+            auth_methods,
+            registration,
+        }
+    }
+
+    pub fn auth_methods(&self) -> &AuthMethods {
+        &self.auth_methods
+    }
+
+    pub fn registration(&self) -> &UserRegistration {
+        &self.registration
+    }
 }
 
 /// Manual impl of Debug to avoid leaking the value of [AuthStrategy::SinglePassword].
@@ -56,7 +79,18 @@ impl Debug for AuthStrategy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NoAuth => write!(f, "NoAuth"),
-            AuthStrategy::EmailBased(_) => write!(f, "EmailBased"),
+            AuthStrategy::MultiUser(strategy) => write!(f, "MultiUser with config: {:?}", strategy),
+            AuthStrategy::SinglePassword(_) => write!(f, "SinglePassword"),
+        }
+    }
+}
+
+/// Manual impl of Display to avoid leaking the value of [AuthStrategy::SinglePassword].
+impl Display for AuthStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoAuth => write!(f, "NoAuth"),
+            AuthStrategy::MultiUser(_) => write!(f, "MultiUser",),
             AuthStrategy::SinglePassword(_) => write!(f, "SinglePassword"),
         }
     }
@@ -65,9 +99,10 @@ impl Debug for AuthStrategy {
 impl From<&AppMode> for AuthStrategy {
     fn from(value: &AppMode) -> Self {
         match value {
-            AppMode::MultiUser(config) => {
-                AuthStrategy::EmailBased(UserRegistration::from(config.allow_registration))
-            }
+            AppMode::MultiUser(config) => AuthStrategy::MultiUser(MultiUserAuthStrategy::new(
+                AuthMethods::from(config),
+                UserRegistration::from(config.allow_registration),
+            )),
             AppMode::SingleUser(SingleUserConfig {
                 password: Some(pwd),
             }) => AuthStrategy::SinglePassword(SinglePassword::from(pwd.clone())),

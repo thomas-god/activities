@@ -63,6 +63,7 @@ where
     US: IUserService,
 {
     let jar = CookieJar::from_headers(request.headers());
+    let cookie_config = state.cookie_config.for_request(request.headers());
     let Some(cookie) = jar.get("session_token") else {
         return StatusCode::UNAUTHORIZED.into_response();
     };
@@ -81,7 +82,7 @@ where
     let mut response = next.run(request).await;
 
     if let Some(refreshed) = result.refreshed()
-        && let Some(new_cookie) = build_session_cookie(&state.cookie_config, refreshed)
+        && let Some(new_cookie) = build_session_cookie(&cookie_config, refreshed)
         && let Ok(header_value) = new_cookie.to_string().parse()
     {
         response.headers_mut().append(SET_COOKIE, header_value);
