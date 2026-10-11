@@ -1,7 +1,7 @@
 # Activities: self-hosted sport training journal
 
-Activities is a self-hosted platform to archive sport activities, manage your
-training journal and track your progress:
+Activities is a self-hosted platform to archive sport activities, manage your training journal and
+track your progress:
 
 - Import sport activities from `.tcx` and `.fit` files,
 - Keep a training journal with notes on workouts and training blocks,
@@ -10,26 +10,24 @@ training journal and track your progress:
 
 ## How to deploy
 
-Get the latest image available at `ghcr.io/thomas-god/activities:latest`. All
-images are available for both `amd64` and `arm64`.
+Get the latest image available at `ghcr.io/thomas-god/activities:latest`. All images are available
+for both `amd64` and `arm64`.
 
 The application authentication flow can be configured in 3 different ways:
 
-- _multi user_: allows multiple users to use your instance using an email-based,
-  password-less, authentication process. By default anyone with a valid email
-  address can register; set `ACTIVITIES_ALLOW_REGISTRATION=false` to restrict the
-  instance to already-registered users only. You will need a valid **SMTP server**
-  for sending emails to users containing their authentication link and **HTTPS**
-  for secure cookies.
-- _single user, main password_: allows a single user to use the instance using a
-  password set through an environment variable in your deployment. Does not
-  require having an SMTP server nor having HTTPS (HTTP only might be fine for
-  local deployment but HTTPS is still recommended as password and cookie will
-  travel in clear otherwise).
-- _single user, no password_: allows a single user to use the instance without
-  any form of authentication. Be careful where you plan to host it, as your
-  activities will be accessible to anyone that can reach your instance. Does not
-  require having an SMTP server nor having HTTPS.
+- _multi user_: allows multiple users to use your instance. Two authentication methods are
+  supported: email-based password-less login (authentication links sent by email) and password-based
+  login. One or both methods can be enabled, but at least one is required. By default anyone with a
+  valid email address can register; set `ACTIVITIES_ALLOW_REGISTRATION=false` to restrict the
+  instance to already-registered users only. The email-based method requires a valid **SMTP server**
+  for sending emails to users containing their authentication link and **HTTPS** for secure cookies.
+- _single user, main password_: allows a single user to use the instance using a password set
+  through an environment variable in your deployment. Does not require having an SMTP server nor
+  having HTTPS (HTTP only might be fine for local deployment but HTTPS is still recommended as
+  password and cookie will travel in clear otherwise).
+- _single user, no password_: allows a single user to use the instance without any form of
+  authentication. Be careful where you plan to host it, as your activities will be accessible to
+  anyone that can reach your instance. Does not require having an SMTP server nor having HTTPS.
 
 Beside the authentication process, all versions offer the same set of features.
 
@@ -43,9 +41,8 @@ docker run --rm -p 8080:80 \
   ghcr.io/thomas-god/activities:latest
 ```
 
-Then open http://localhost:8080 in your browser. Your data will be stored in an
-anonymous Docker volume and will be lost when you stop the container. To persist
-your data, add a volume mount:
+Then open http://localhost:8080 in your browser. Your data will be stored in an anonymous Docker
+volume and will be lost when you stop the container. To persist your data, add a volume mount:
 
 ```bash
 docker run --rm -p 8080:80 \
@@ -71,20 +68,18 @@ volumes:
   activities_data:
 ```
 
-The application will store all its data at the location pointed by
-`ACTIVITIES_DATA_PATH`, so use a docker volume to persist your data between
-restarts and to facilitate the backup process.
+The application will store all its data at the location pointed by `ACTIVITIES_DATA_PATH`, so use a
+docker volume to persist your data between restarts and to facilitate the backup process.
 
 ### HTTPS is required once you enable email login
 
-The bundled image only serves plain HTTP and does not terminate TLS by itself.
-The _multi user_ mode protects the session with a cookie that only travels over
-HTTPS, so if you enable it you must put a TLS-terminating reverse proxy (e.g.
-[Caddy](https://caddyserver.com/) or [Traefik](https://traefik.io/)) in front of
-the container. Without one, the browser will silently refuse to keep the session
-cookie and login will appear to fail with no useful error. _The
-`single user, no password` and `single user, main password` modes don't set a
-secure cookie, so they work fine over plain HTTP._
+The bundled image only serves plain HTTP and does not terminate TLS by itself. The _multi user_ mode
+protects the session with a cookie that only travels over HTTPS, so if you enable it you must put a
+TLS-terminating reverse proxy (e.g. [Caddy](https://caddyserver.com/) or
+[Traefik](https://traefik.io/)) in front of the container. Without one, the browser will silently
+refuse to keep the session cookie and login will appear to fail with no useful error. _The
+`single user, no password` and `single user, main password` modes don't set a secure cookie, so they
+work fine over plain HTTP._
 
 A minimal `docker-compose.yaml` with Traefik handling TLS looks like:
 
@@ -129,9 +124,8 @@ volumes:
 
 ### Configuration
 
-The application accept the following environment variables to be set. Each
-environment variable supports a `*_FILE` variant to load the variable content
-from a file
+The application accept the following environment variables to be set. Each environment variable
+supports a `*_FILE` variant to load the variable content from a file
 [instead](https://docs.docker.com/engine/swarm/secrets/#build-support-for-docker-secrets-into-your-images).
 
 #### All versions
@@ -148,30 +142,38 @@ from a file
 
 #### Multi-user version
 
-| Variable name                 | Required | Purpose                                                                                                                                                    | Example                 |
-| ----------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| ACTIVITIES_MAILER_FROM        | yes      |                                                                                                                                                            | no-reply@your.domain    |
-| ACTIVITIES_MAILER_USERNAME    | yes      | SMTP username                                                                                                                                              |                         |
-| ACTIVITIES_MAILER_PASSWORD    | yes      | SMTP password                                                                                                                                              |                         |
-| ACTIVITIES_MAILER_RELAY       | yes      | SMTP server                                                                                                                                                |                         |
-| ACTIVITIES_MAILER_DOMAIN      | yes      | The domain on which your instance is hosted. Used to craft the auth link url. Can be a different domain than the one used by your SMTP server.             | https://app.your.domain |
-| ACTIVITIES_ALLOW_REGISTRATION | no       | Wether new users can register a new account. Set to `false` to only allow already-registered users to log in.                                              | false                   |
+Multi-user mode is enabled as soon as any multi-user environment variable below is set, and requires
+**at least one authentication method** to be configured: either all the `ACTIVITIES_MAILER_*`
+variables (email-based auth) or `ACTIVITIES_PASSWORD_AUTH_ENABLED=true` (password-based auth).
 
-_Note: if any environment variables for the multi-user version is set but others
-are missing the application will fail to start, even if a valid single user
-configuration could be loaded._
+| Variable name                    | Required             | Purpose                                                                                                                                                                                            | Example                 |
+| -------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| ACTIVITIES_MAILER_FROM           | for email-based auth |                                                                                                                                                                                                    | no-reply@your.domain    |
+| ACTIVITIES_MAILER_USERNAME       | for email-based auth | SMTP username                                                                                                                                                                                      |                         |
+| ACTIVITIES_MAILER_PASSWORD       | for email-based auth | SMTP password                                                                                                                                                                                      |                         |
+| ACTIVITIES_MAILER_RELAY          | for email-based auth | SMTP server                                                                                                                                                                                        |                         |
+| ACTIVITIES_MAILER_DOMAIN         | for email-based auth | The domain on which your instance is hosted. Used to craft the auth link url. Can be a different domain than the one used by your SMTP server.                                                     | https://app.your.domain |
+| ACTIVITIES_PASSWORD_AUTH_ENABLED | no                   | Enable password-based authentication (`true`/`false`, defaults to `false`). Not implemented yet: enabled on its own (without the `ACTIVITIES_MAILER_*` variables), the application fails to start. | true                    |
+| ACTIVITIES_ALLOW_REGISTRATION    | no                   | Wether new users can register a new account. Set to `false` to only allow already-registered users to log in.                                                                                      | false                   |
+
+_Notes:_
+
+- _if any environment variables for the multi-user version is set but others are missing the
+  application will fail to start, even if a valid single user configuration could be loaded._
+- _setting `ACTIVITIES_PASSWORD_AUTH_ENABLED=false` does **not** disable authentication or fall back
+  to single-user mode: as soon as this variable is set, multi-user mode is selected and the
+  application requires at least one authentication method to be configured. If you intend to run
+  with no authentication at all (*single user, no password*), leave **all** multi-user variables
+  unset._
 
 #### Observability
 
-`OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_SERVICE_NAME` go through the
-application's own config loader like the variables above, so the `*_FILE`
-variant described above works for them too (e.g.
-`OTEL_EXPORTER_OTLP_ENDPOINT_FILE`). They keep the standard OpenTelemetry names
-(rather than an `ACTIVITIES_` prefix) for interoperability with
-collectors/dashboards that expect them. `RUST_LOG` is read directly by the
-`tracing` ecosystem instead, since it's a generic `tracing`/`log` convention
-rather than something specific to this app (the `*_FILE` variant does not apply
-to it).
+`OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_SERVICE_NAME` go through the application's own config loader
+like the variables above, so the `*_FILE` variant described above works for them too (e.g.
+`OTEL_EXPORTER_OTLP_ENDPOINT_FILE`). They keep the standard OpenTelemetry names (rather than an
+`ACTIVITIES_` prefix) for interoperability with collectors/dashboards that expect them. `RUST_LOG`
+is read directly by the `tracing` ecosystem instead, since it's a generic `tracing`/`log` convention
+rather than something specific to this app (the `*_FILE` variant does not apply to it).
 
 | Variable name               | Required | Purpose                                                                                                                                                                              | Example                    |
 | --------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- |
@@ -181,34 +183,30 @@ to it).
 
 ## Upload your training history
 
-Most device manufacturers and training platforms allow you to download your
-activities history:
+Most device manufacturers and training platforms allow you to download your activities history:
 
 - _Coros_: Training Hub > Activity List > Export Data
-- _Garmin Connect_: Account Settings > Account Information > Export all of your
-  Garmin data
+- _Garmin Connect_: Account Settings > Account Information > Export all of your Garmin data
 - _Strava_: Settings > My Account > Download or Delete Your Account
 
-They will usually send you a link by email to download an archive containing all
-your data. Depending on the archive format you should find an activities folder
-containing `.fit` and or `.tcx` files, often compressed in `.gz`.
+They will usually send you a link by email to download an archive containing all your data.
+Depending on the archive format you should find an activities folder containing `.fit` and or `.tcx`
+files, often compressed in `.gz`.
 
-Then simply upload those files (including compressed ones) using the upload
-form. It can take a few minutes depending of your history size but then you are
-good to go!
+Then simply upload those files (including compressed ones) using the upload form. It can take a few
+minutes depending of your history size but then you are good to go!
 
 ![history-upload](resources/history-upload.png)
 
 ## Intended scope and limitations
 
-- The application focuses on providing athletes with tools to track and analyze
-  their training: organizing activities into training periods, keeping training
-  notes, defining custom metrics, and visualizing performance trends. While
-  social features like friends, timeline, or sharing are not planned,
-  coaching-related features might be considered in the future.
-- Because the application is designed to be self-hosted, and since sport device
-  ecosystems are mostly closed, there is sadly no feature to automatically
-  import your activities from your devices.
+- The application focuses on providing athletes with tools to track and analyze their training:
+  organizing activities into training periods, keeping training notes, defining custom metrics, and
+  visualizing performance trends. While social features like friends, timeline, or sharing are not
+  planned, coaching-related features might be considered in the future.
+- Because the application is designed to be self-hosted, and since sport device ecosystems are
+  mostly closed, there is sadly no feature to automatically import your activities from your
+  devices.
 
 ## Design decisions
 
@@ -216,6 +214,5 @@ Key design decisions are documented [here](adr/README.md).
 
 ## Credits
 
-Favicon from [OpenMoji](https://openmoji.org/) – the open-source emoji
-and icon project. License:
+Favicon from [OpenMoji](https://openmoji.org/) – the open-source emoji and icon project. License:
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)

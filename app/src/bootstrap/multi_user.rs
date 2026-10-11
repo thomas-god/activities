@@ -210,7 +210,10 @@ async fn build_user_service(
         users_repository.clone(),
         EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,
     );
-    let mail_provider = Arc::new(build_mailer(&mode_config.email).await?);
+    let email_config = mode_config.email.as_ref().ok_or_else(|| {
+        anyhow!("Password-based multi-user authentication is not implemented yet; configure the mailer environment variables")
+    })?;
+    let mail_provider = Arc::new(build_mailer(email_config).await?);
     let auth_link_service = Arc::new(Mutex::new(AuthLinkService::new(
         users_repository.clone(),
         mail_provider,
