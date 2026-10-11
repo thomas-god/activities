@@ -1,7 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Ok, anyhow};
-use tokio::sync::Mutex;
 
 use crate::{
     clock::Clock,
@@ -197,9 +196,9 @@ async fn build_user_service(
     }
 
     let user_db = db_dir.clone().join("user.db");
-    let users_repository = Arc::new(Mutex::new(
+    let users_repository = Arc::new(
         SqliteUsersRepository::new(&format!("sqlite:{}", user_db.to_string_lossy())).await?,
-    ));
+    );
 
     // The auth-link service is only meaningful when email-based auth is enabled: password-only
     // mode has no mailer and never sends an email. Disabling it lets the application start without
@@ -218,18 +217,17 @@ async fn build_user_service(
         }
         None => MaybeAuthLinkService::Disabled(DisabledAuthLinkService::default()),
     };
-    let auth_link_service = Arc::new(Mutex::new(auth_link_service));
+    let auth_link_service = Arc::new(auth_link_service);
 
-    let session_repository = users_repository.lock().await.clone();
     spawn_expired_sessions_cleanup(
-        session_repository.clone(),
+        users_repository.clone(),
         EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,
     );
-    let session_service = SessionService::new(session_repository);
+    let session_service = SessionService::new(users_repository.clone());
     let auth_methods = AuthMethods::from(mode_config);
     let user_service = UserService::new(
         auth_link_service,
-        users_repository.clone(),
+        users_repository,
         session_service,
         auth_methods,
     );

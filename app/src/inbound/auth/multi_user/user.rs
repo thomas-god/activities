@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use derive_more::Constructor;
-use tokio::sync::Mutex;
 
 use crate::{
     domain::models::UserId,
@@ -15,8 +14,8 @@ use crate::{
 
 #[derive(Debug, Clone, Constructor)]
 pub struct UserService<MLS, UR, SS> {
-    auth_link_service: Arc<Mutex<MLS>>,
-    user_repository: Arc<Mutex<UR>>,
+    auth_link_service: Arc<MLS>,
+    user_repository: Arc<UR>,
     session_service: SS,
     auth_methods: AuthMethods,
 }
@@ -44,11 +43,13 @@ where
         };
 
         let email = req.email().clone();
-        let repo = self.user_repository.lock().await;
-        let user = match repo.get_user_by_email(&email).await {
+        let user = match self.user_repository.get_user_by_email(&email).await {
             Ok(None) => {
                 let user = UserId::new();
-                let store_res = repo.store_user(&user, &email, password_hash).await;
+                let store_res = self
+                    .user_repository
+                    .store_user(&user, &email, password_hash)
+                    .await;
                 if store_res.is_err() {
                     return UserRegistrationResult::Retry;
                 }
@@ -65,12 +66,7 @@ where
         }
 
         let req = GenerateAuthLinkRequest::new(user, email);
-        let res = self
-            .auth_link_service
-            .lock()
-            .await
-            .generate_auth_link(req)
-            .await;
+        let res = self.auth_link_service.generate_auth_link(req).await;
 
         match res {
             GenerateAuthLinkResult::Success => UserRegistrationResult::Success,
@@ -92,13 +88,7 @@ where
 
     #[tracing::instrument(skip_all, err(Debug))]
     async fn validate_auth_link(&self, token: AuthToken) -> Result<AuthLinkValidationResult, ()> {
-        let user = match self
-            .auth_link_service
-            .lock()
-            .await
-            .validate_auth_token(&token)
-            .await
-        {
+        let user = match self.auth_link_service.validate_auth_token(&token).await {
             Ok(Some(user)) => user,
             Ok(None) => return Ok(AuthLinkValidationResult::Invalid),
             _ => return Err(()),
@@ -129,13 +119,7 @@ where
 {
     #[tracing::instrument(skip_all)]
     async fn login_with_email_link(&self, email: EmailAddress) -> UserLoginResult {
-        let user = match self
-            .user_repository
-            .lock()
-            .await
-            .get_user_by_email(&email)
-            .await
-        {
+        let user = match self.user_repository.get_user_by_email(&email).await {
             Ok(Some((user, _))) => user,
             Ok(None) => {
                 AuthToken::decoy_hash();
@@ -146,13 +130,7 @@ where
         };
 
         let req = GenerateAuthLinkRequest::new(user, email);
-        match self
-            .auth_link_service
-            .lock()
-            .await
-            .generate_auth_link(req)
-            .await
-        {
+        match self.auth_link_service.generate_auth_link(req).await {
             GenerateAuthLinkResult::Success => UserLoginResult::EmailSent,
             GenerateAuthLinkResult::Retry => UserLoginResult::Retry,
         }
@@ -164,12 +142,7 @@ where
         email: EmailAddress,
         password: Password,
     ) -> UserLoginResult {
-        let fetched = self
-            .user_repository
-            .lock()
-            .await
-            .get_user_by_email(&email)
-            .await;
+        let fetched = self.user_repository.get_user_by_email(&email).await;
 
         let (user, password_hash) = match fetched {
             Ok(Some(found)) => found,
@@ -254,8 +227,8 @@ mod test_utils {
         session: MockSessionService,
     ) -> UserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
         UserService::new(
-            Arc::new(Mutex::new(auth_link)),
-            Arc::new(Mutex::new(user)),
+            Arc::new(auth_link),
+            Arc::new(user),
             session,
             AuthMethods::new(true, false),
         )
@@ -274,8 +247,8 @@ mod test_utils {
         session: MockSessionService,
     ) -> UserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
         UserService::new(
-            Arc::new(Mutex::new(auth_link)),
-            Arc::new(Mutex::new(user)),
+            Arc::new(auth_link),
+            Arc::new(user),
             session,
             AuthMethods::new(true, true),
         )
@@ -294,8 +267,8 @@ mod test_utils {
         session: MockSessionService,
     ) -> UserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
         UserService::new(
-            Arc::new(Mutex::new(auth_link)),
-            Arc::new(Mutex::new(user)),
+            Arc::new(auth_link),
+            Arc::new(user),
             session,
             AuthMethods::new(false, true),
         )
@@ -933,8 +906,8 @@ mod test_user_service_validate_auth_link {
             });
 
         let service = UserService::new(
-            Arc::new(Mutex::new(auth_link)),
-            Arc::new(Mutex::new(user)),
+            Arc::new(auth_link),
+            Arc::new(user),
             session,
             AuthMethods::new(true, false),
         );
@@ -961,8 +934,8 @@ mod test_user_service_validate_auth_link {
         session.expect_generate_session_token().times(0);
 
         let service = UserService::new(
-            Arc::new(Mutex::new(auth_link)),
-            Arc::new(Mutex::new(user)),
+            Arc::new(auth_link),
+            Arc::new(user),
             session,
             AuthMethods::new(true, false),
         );
@@ -987,8 +960,8 @@ mod test_user_service_validate_auth_link {
         session.expect_generate_session_token().times(0);
 
         let service = UserService::new(
-            Arc::new(Mutex::new(auth_link)),
-            Arc::new(Mutex::new(user)),
+            Arc::new(auth_link),
+            Arc::new(user),
             session,
             AuthMethods::new(true, false),
         );
@@ -1013,8 +986,8 @@ mod test_user_service_validate_auth_link {
             .returning(|_| Err(()));
 
         let service = UserService::new(
-            Arc::new(Mutex::new(auth_link)),
-            Arc::new(Mutex::new(user)),
+            Arc::new(auth_link),
+            Arc::new(user),
             session,
             AuthMethods::new(true, false),
         );
@@ -1045,8 +1018,8 @@ mod test_user_service_check_session_token {
             .returning(|_| Ok(CheckSessionResult::new(UserId::test_default(), None)));
 
         let service = UserService::new(
-            Arc::new(Mutex::new(MockAuthLinkService::new())),
-            Arc::new(Mutex::new(MockUserRepository::new())),
+            Arc::new(MockAuthLinkService::new()),
+            Arc::new(MockUserRepository::new()),
             session,
             AuthMethods::new(true, false),
         );
@@ -1066,8 +1039,8 @@ mod test_user_service_check_session_token {
         session.expect_check_session_token().returning(|_| Err(()));
 
         let service = UserService::new(
-            Arc::new(Mutex::new(MockAuthLinkService::new())),
-            Arc::new(Mutex::new(MockUserRepository::new())),
+            Arc::new(MockAuthLinkService::new()),
+            Arc::new(MockUserRepository::new()),
             session,
             AuthMethods::new(true, false),
         );

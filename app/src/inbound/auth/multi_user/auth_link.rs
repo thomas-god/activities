@@ -3,7 +3,6 @@ use std::sync::Arc;
 use chrono::{DateTime, TimeDelta, Utc};
 use derive_more::Constructor;
 use thiserror::Error;
-use tokio::sync::Mutex;
 
 use crate::inbound::auth::multi_user::{
     AuthLink, AuthToken, EmailAddress, GenerateAuthLinkRequest, GenerateAuthLinkResult,
@@ -16,7 +15,7 @@ where
     SR: AuthLinkRepository,
     MP: MailProvider,
 {
-    auth_link_repository: Arc<Mutex<SR>>,
+    auth_link_repository: Arc<SR>,
     mail_provider: Arc<MP>,
 }
 
@@ -37,9 +36,11 @@ where
             return GenerateAuthLinkResult::Retry;
         };
 
-        let repository = self.auth_link_repository.lock().await;
-
-        let Ok(()) = repository.store_auth_link(&hashed_auth_link).await else {
+        let Ok(()) = self
+            .auth_link_repository
+            .store_auth_link(&hashed_auth_link)
+            .await
+        else {
             return GenerateAuthLinkResult::Retry;
         };
 
@@ -56,8 +57,7 @@ where
                 .is_err()
             {
                 tracing::error!(%email, "Failed to send authentication link email");
-                let repository = auth_link_repository.lock().await;
-                let _ = repository
+                let _ = auth_link_repository
                     .delete_auth_link_by_hash(hashed_auth_link.hash())
                     .await;
             }
@@ -71,15 +71,17 @@ where
         &self,
         token: &AuthToken,
     ) -> Result<Option<crate::domain::models::UserId>, ()> {
-        let repository = self.auth_link_repository.lock().await;
-        let links = repository.get_all_auth_links().await;
+        let links = self.auth_link_repository.get_all_auth_links().await;
 
         let mut found = None;
 
         let now = Utc::now();
         for link in links {
             if link.is_expired(&now) {
-                let _ = repository.delete_auth_link_by_hash(link.hash()).await;
+                let _ = self
+                    .auth_link_repository
+                    .delete_auth_link_by_hash(link.hash())
+                    .await;
                 continue;
             }
             if link.hash().verify_token(token) {
@@ -88,7 +90,10 @@ where
         }
 
         if let Some(link) = &found {
-            let _ = repository.delete_auth_link_by_hash(link.hash()).await;
+            let _ = self
+                .auth_link_repository
+                .delete_auth_link_by_hash(link.hash())
+                .await;
         }
 
         Ok(found.map(|link| link.user().clone()))
@@ -175,7 +180,7 @@ pub trait AuthLinkRepository: Clone + Send + Sync + 'static {
 }
 
 pub fn spawn_expired_auth_links_cleanup<SR: AuthLinkRepository>(
-    repository: Arc<Mutex<SR>>,
+    repository: Arc<SR>,
     interval: std::time::Duration,
 ) {
     tokio::spawn(async move {
@@ -183,12 +188,7 @@ pub fn spawn_expired_auth_links_cleanup<SR: AuthLinkRepository>(
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             ticker.tick().await;
-            if let Err(err) = repository
-                .lock()
-                .await
-                .delete_expired_auth_links(Utc::now())
-                .await
-            {
+            if let Err(err) = repository.delete_expired_auth_links(Utc::now()).await {
                 tracing::warn!("Failed to clean up expired auth links: {err}");
             }
         }
@@ -274,8 +274,7 @@ mod test_auth_link_service_generate_auth_link {
             .returning(|_| Err(AuthLinkRepositoryError::Error));
         let mut email_provider = MockMailProvider::new();
         email_provider.expect_send_auth_link_email().times(0);
-        let service =
-            AuthLinkService::new(Arc::new(Mutex::new(repository)), Arc::new(email_provider));
+        let service = AuthLinkService::new(Arc::new(repository), Arc::new(email_provider));
 
         let req = GenerateAuthLinkRequest::new(
             UserId::test_default(),
@@ -302,8 +301,7 @@ mod test_auth_link_service_generate_auth_link {
             .expect_send_auth_link_email()
             .times(1)
             .returning(|_, _| Err(()));
-        let service =
-            AuthLinkService::new(Arc::new(Mutex::new(repository)), Arc::new(email_provider));
+        let service = AuthLinkService::new(Arc::new(repository), Arc::new(email_provider));
 
         let req = GenerateAuthLinkRequest::new(
             UserId::test_default(),
@@ -343,8 +341,7 @@ mod test_auth_link_service_generate_auth_link {
             })
             .returning(|_, _| Ok(()));
 
-        let service =
-            AuthLinkService::new(Arc::new(Mutex::new(repository)), Arc::new(email_provider));
+        let service = AuthLinkService::new(Arc::new(repository), Arc::new(email_provider));
 
         let req = GenerateAuthLinkRequest::new(
             UserId::test_default(),
@@ -394,10 +391,7 @@ mod test_auth_link_service_validate_auth_link {
             .withf(move |hash| hash.verify_token(&token_clone))
             .returning(|_| Ok(()));
 
-        let service = AuthLinkService::new(
-            Arc::new(Mutex::new(repository)),
-            Arc::new(MockMailProvider::new()),
-        );
+        let service = AuthLinkService::new(Arc::new(repository), Arc::new(MockMailProvider::new()));
 
         let res = service.validate_auth_token(&token).await;
 
@@ -412,10 +406,7 @@ mod test_auth_link_service_validate_auth_link {
         repository.expect_get_all_auth_links().returning(Vec::new);
         repository.expect_delete_auth_link_by_hash().times(0);
 
-        let service = AuthLinkService::new(
-            Arc::new(Mutex::new(repository)),
-            Arc::new(MockMailProvider::new()),
-        );
+        let service = AuthLinkService::new(Arc::new(repository), Arc::new(MockMailProvider::new()));
 
         let res = service.validate_auth_token(&token).await;
 
@@ -443,10 +434,7 @@ mod test_auth_link_service_validate_auth_link {
             .withf(move |hash| hash.verify_token(&token_clone))
             .returning(|_| Ok(()));
 
-        let service = AuthLinkService::new(
-            Arc::new(Mutex::new(repository)),
-            Arc::new(MockMailProvider::new()),
-        );
+        let service = AuthLinkService::new(Arc::new(repository), Arc::new(MockMailProvider::new()));
 
         let res = service.validate_auth_token(&token).await;
 
