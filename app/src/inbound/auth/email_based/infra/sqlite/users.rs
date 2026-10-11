@@ -114,10 +114,13 @@ impl UserRepository for SqliteUsersRepository {
     }
 
     #[tracing::instrument(skip_all, err(Debug))]
-    async fn get_user_by_email(&self, email: &EmailAddress) -> Result<Option<UserId>, ()> {
-        let res: Result<String, sqlx::Error> = sqlx::query_scalar(
+    async fn get_user_by_email(
+        &self,
+        email: &EmailAddress,
+    ) -> Result<Option<(UserId, Option<HashedPassword>)>, ()> {
+        let res: Result<(String, Option<String>), sqlx::Error> = sqlx::query_as(
             r#"
-        SELECT u.user_id
+        SELECT u.user_id, u.password_hash
         FROM t_users u
         JOIN t_emails e ON e.user = u.rowid
         WHERE e.email = ?1
@@ -127,7 +130,10 @@ impl UserRepository for SqliteUsersRepository {
         .fetch_one(&self.readers)
         .await;
         match res {
-            Ok(res) => Ok(Some(UserId::from(res))),
+            Ok((user_id, password_hash)) => Ok(Some((
+                UserId::from(user_id),
+                password_hash.map(HashedPassword::new),
+            ))),
             Err(sqlx::Error::RowNotFound) => Ok(None),
             Err(err) => {
                 tracing::warn!("Cannot fetch users from database");
@@ -441,8 +447,38 @@ mod test_sqlite_users_repository {
                 .get_user_by_email(&EmailAddress::try_from("test@mail.test").unwrap())
                 .await
                 .expect("Should not have err"),
-            Some(UserId::test_default())
+            Some((UserId::test_default(), None))
         );
+    }
+
+    #[tokio::test]
+    async fn test_get_user_returns_stored_password_hash() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let password = Password::try_from("secret-password".to_string()).unwrap();
+        let password_hash = password.as_hash().expect("hashing should succeed");
+        repository
+            .store_user(
+                &UserId::test_default(),
+                &test_email(),
+                Some(password_hash.clone()),
+            )
+            .await
+            .unwrap();
+
+        let (user, stored_hash) = repository
+            .get_user_by_email(&test_email())
+            .await
+            .expect("should not have err")
+            .expect("user should exist");
+
+        assert_eq!(user, UserId::test_default());
+        let stored_hash = stored_hash.expect("password hash should be returned");
+        assert_eq!(stored_hash, password_hash);
+        assert!(stored_hash.verify_password(&password));
     }
 
     #[tokio::test]
@@ -515,7 +551,7 @@ mod test_sqlite_users_repository {
                     .get_user_by_email(&EmailAddress::try_from(mail).unwrap())
                     .await
                     .expect("should not have err"),
-                Some(UserId::test_default())
+                Some((UserId::test_default(), None))
             );
         }
     }
@@ -1143,14 +1179,14 @@ mod test_sqlite_users_repository {
                 .get_user_by_email(&EmailAddress::try_from("a@mail.test").unwrap())
                 .await
                 .expect("should not have err"),
-            Some(UserId::from("user_a".to_string()))
+            Some((UserId::from("user_a".to_string()), None))
         );
         assert_eq!(
             repository
                 .get_user_by_email(&EmailAddress::try_from("b@mail.test").unwrap())
                 .await
                 .expect("should not have err"),
-            Some(UserId::from("user_b".to_string()))
+            Some((UserId::from("user_b".to_string()), None))
         );
 
         // Emails of existing users are migrated as verified.

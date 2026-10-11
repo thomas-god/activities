@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use argon2::{
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
     password_hash::{SaltString, rand_core::OsRng},
@@ -78,6 +80,14 @@ impl AuthToken {
 
     pub fn as_hash(&self) -> Option<HashedAuthToken> {
         argon2_hash(self.0.as_bytes()).map(HashedAuthToken::new)
+    }
+
+    /// Performs the same Argon2 hashing work as [`AuthToken::as_hash`] and discards the result.
+    ///
+    /// Used to equalize the work done for unknown users (which never generate an auth link) with
+    /// the found-user path, so their timing matches and cannot be used to enumerate accounts.
+    pub fn decoy_hash() {
+        let _ = AuthToken::new().as_hash();
     }
 }
 
@@ -224,7 +234,7 @@ impl HashedSession {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SessionToken(String);
 
 #[allow(clippy::new_without_default)]
@@ -309,6 +319,48 @@ impl std::fmt::Debug for Password {
 #[derive(Clone, Debug, Constructor, PartialEq)]
 pub struct HashedPassword(String);
 
+impl HashedPassword {
+    pub fn verify_password(&self, password: &Password) -> bool {
+        let Ok(hashed_password) = PasswordHash::new(&self.0) else {
+            return false;
+        };
+        let argon2 = Argon2::default();
+
+        argon2
+            .verify_password(password.0.as_bytes(), &hashed_password)
+            .is_ok()
+    }
+
+    /// A decoy hash, generated once at startup from random bytes.
+    ///
+    /// Its preimage is random and never stored, so no password is expected to verify against it.
+    /// Verifying still performs a full Argon2 verification though, matching the cost of checking a
+    /// real user hash. Used to equalize the work done for unknown users and users that have no
+    /// password stored, so their timing matches a genuine failed password check and cannot be used
+    /// to enumerate accounts or detect whether one has a password.
+    pub fn dummy() -> &'static Self {
+        static DUMMY: LazyLock<HashedPassword> = LazyLock::new(|| {
+            let mut rng = rand::rng();
+            let mut random_bytes = [0u8; 32];
+            rng.fill(&mut random_bytes);
+            HashedPassword::new(
+                argon2_hash(&random_bytes).expect("hashing random bytes should never fail"),
+            )
+        });
+        &DUMMY
+    }
+
+    /// Performs a full Argon2 verification against [`HashedPassword::dummy`].
+    ///
+    /// Always fails, but costs the same as verifying a real user hash, so callers can use it to
+    /// equalize timing between unknown users / users without a stored password and a genuine
+    /// wrong-password check. The always-failing outcome is discarded on purpose, so callers cannot
+    /// accidentally act on it.
+    pub fn decoy_verification(password: &Password) {
+        let _ = HashedPassword::dummy().verify_password(password);
+    }
+}
+
 impl std::fmt::Display for HashedPassword {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
@@ -358,7 +410,14 @@ impl AuthMethods {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum UserLoginResult {
-    Success,
+    /// Mail-based path: an auth link was (or would have been) sent; never reveals whether the
+    /// user exists.
+    EmailSent,
+    /// Password-based path: the password matched and a session was created.
+    Session(GenerateSessionTokenResult),
+    /// A single, uniform outcome for unknown user / wrong password / user without password.
+    Invalid,
+    /// Infrastructure failure (repo error, session creation error, hashing failure).
     Retry,
 }
 
@@ -374,7 +433,11 @@ pub trait IUserService: Clone + Send + Sync + 'static {
         req: UserRegistrationRequest,
     ) -> impl Future<Output = UserRegistrationResult> + Send;
 
-    fn login_user(&self, email: EmailAddress) -> impl Future<Output = UserLoginResult> + Send;
+    fn login_user(
+        &self,
+        email: EmailAddress,
+        password: Option<Password>,
+    ) -> impl Future<Output = UserLoginResult> + Send;
 
     fn validate_auth_link(
         &self,
@@ -429,7 +492,7 @@ pub trait IAuthLinkService: Clone + Send + Sync + 'static {
     ) -> impl Future<Output = Result<Option<UserId>, ()>> + Send;
 }
 
-#[derive(Clone, Debug, Constructor)]
+#[derive(Clone, Debug, Constructor, PartialEq)]
 pub struct GenerateSessionTokenResult {
     token: SessionToken,
     expire_at: DateTime<Utc>,
@@ -496,7 +559,8 @@ pub mod test_utils {
 
             async fn login_user(
                 &self,
-                email: EmailAddress
+                email: EmailAddress,
+                password: Option<Password>
             ) -> UserLoginResult;
 
             async fn validate_auth_link(
@@ -572,5 +636,37 @@ mod test {
         );
         assert!(link.is_expired(&(expire_at + TimeDelta::seconds(1))));
         assert!(!link.is_expired(&(expire_at - TimeDelta::seconds(1))));
+    }
+
+    #[test]
+    fn test_hashed_password_verify() {
+        let password = Password::try_from("secret".to_string()).unwrap();
+        let hash = password.as_hash().unwrap();
+
+        assert!(hash.verify_password(&password));
+        assert!(!hash.verify_password(&Password::try_from("wrong".to_string()).unwrap()));
+    }
+
+    #[test]
+    fn test_dummy_password_hash_never_verifies() {
+        let password = Password::try_from("secret".to_string()).unwrap();
+
+        assert!(!HashedPassword::dummy().verify_password(&password));
+    }
+
+    #[test]
+    fn test_decoy_verification_runs_for_any_password() {
+        // The wrapper discards the (always failing) outcome; it must be safe to call with any
+        // password, including one that used to match the old hardcoded decoy preimage.
+        HashedPassword::decoy_verification(&Password::try_from("secret".to_string()).unwrap());
+        HashedPassword::decoy_verification(
+            &Password::try_from("dummy-password-that-never-matches".to_string()).unwrap(),
+        );
+    }
+
+    #[test]
+    fn test_auth_token_decoy_hash_runs() {
+        // The wrapper discards the hash; it must be safe to call standalone.
+        AuthToken::decoy_hash();
     }
 }

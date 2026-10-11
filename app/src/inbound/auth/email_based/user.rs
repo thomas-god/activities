@@ -8,8 +8,8 @@ use crate::{
     inbound::auth::email_based::{
         AuthLinkValidationResult, AuthMethods, AuthToken, CheckSessionResult, EmailAddress,
         GenerateAuthLinkRequest, GenerateAuthLinkResult, HashedPassword, IAuthLinkService,
-        ISessionService, IUserService, SessionToken, UserLoginResult, UserRegistrationRequest,
-        UserRegistrationResult,
+        ISessionService, IUserService, Password, SessionToken, UserLoginResult,
+        UserRegistrationRequest, UserRegistrationResult,
     },
 };
 
@@ -55,7 +55,7 @@ where
                 user
             }
             // Existing users never get their password hash overwritten via the registration flow.
-            Ok(Some(user)) => user,
+            Ok(Some((user, _))) => user,
             Err(()) => return UserRegistrationResult::Retry,
         };
 
@@ -79,34 +79,14 @@ where
     }
 
     #[tracing::instrument(skip_all)]
-    async fn login_user(&self, email: EmailAddress) -> UserLoginResult {
-        let user = match self
-            .user_repository
-            .lock()
-            .await
-            .get_user_by_email(&email)
-            .await
-        {
-            Ok(Some(user)) => user,
-            Ok(None) => {
-                // Perform the same Argon2 hash the found-user path pays for in order to prevent
-                // information leak via timing attack.
-                let _ = AuthToken::new().as_hash();
-                return UserLoginResult::Success;
-            }
-            Err(()) => return UserLoginResult::Retry,
-        };
-
-        let req = GenerateAuthLinkRequest::new(user, email);
-        match self
-            .auth_link_service
-            .lock()
-            .await
-            .generate_auth_link(req)
-            .await
-        {
-            GenerateAuthLinkResult::Success => UserLoginResult::Success,
-            GenerateAuthLinkResult::Retry => UserLoginResult::Retry,
+    async fn login_user(&self, email: EmailAddress, password: Option<Password>) -> UserLoginResult {
+        match (self.auth_methods.password(), password) {
+            // Password active and supplied: verify it and issue a session on match.
+            (true, Some(password)) => self.login_with_password(email, password).await,
+            // Password-only mode without a password: no mail fallback is available.
+            (true, None) if !self.auth_methods.email() => UserLoginResult::Invalid,
+            // Mail active (with or without password): fall back to the authentication link flow.
+            _ => self.login_with_email_link(email).await,
         }
     }
 
@@ -141,11 +121,86 @@ where
     }
 }
 
+impl<MLS, UR, SS> UserService<MLS, UR, SS>
+where
+    MLS: IAuthLinkService,
+    UR: UserRepository,
+    SS: ISessionService,
+{
+    #[tracing::instrument(skip_all)]
+    async fn login_with_email_link(&self, email: EmailAddress) -> UserLoginResult {
+        let user = match self
+            .user_repository
+            .lock()
+            .await
+            .get_user_by_email(&email)
+            .await
+        {
+            Ok(Some((user, _))) => user,
+            Ok(None) => {
+                AuthToken::decoy_hash();
+                // Same return as the happy path to not leak email/user existence.
+                return UserLoginResult::EmailSent;
+            }
+            Err(()) => return UserLoginResult::Retry,
+        };
+
+        let req = GenerateAuthLinkRequest::new(user, email);
+        match self
+            .auth_link_service
+            .lock()
+            .await
+            .generate_auth_link(req)
+            .await
+        {
+            GenerateAuthLinkResult::Success => UserLoginResult::EmailSent,
+            GenerateAuthLinkResult::Retry => UserLoginResult::Retry,
+        }
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn login_with_password(
+        &self,
+        email: EmailAddress,
+        password: Password,
+    ) -> UserLoginResult {
+        let fetched = self
+            .user_repository
+            .lock()
+            .await
+            .get_user_by_email(&email)
+            .await;
+
+        let (user, password_hash) = match fetched {
+            Ok(Some(found)) => found,
+            Ok(None) => {
+                HashedPassword::decoy_verification(&password);
+                return UserLoginResult::Invalid;
+            }
+            Err(()) => return UserLoginResult::Retry,
+        };
+
+        let Some(password_hash) = password_hash else {
+            HashedPassword::decoy_verification(&password);
+            return UserLoginResult::Invalid;
+        };
+
+        if !password_hash.verify_password(&password) {
+            return UserLoginResult::Invalid;
+        }
+
+        match self.session_service.generate_session_token(&user).await {
+            Ok(session) => UserLoginResult::Session(session),
+            Err(()) => UserLoginResult::Retry,
+        }
+    }
+}
+
 pub trait UserRepository: Clone + Send + Sync + 'static {
     fn get_user_by_email(
         &self,
         email: &EmailAddress,
-    ) -> impl Future<Output = Result<Option<UserId>, ()>> + Send;
+    ) -> impl Future<Output = Result<Option<(UserId, Option<HashedPassword>)>, ()>> + Send;
 
     fn store_user(
         &self,
@@ -161,7 +216,6 @@ mod test_utils {
 
     use super::super::test_utils::{MockAuthLinkService, MockSessionService};
     use super::*;
-    use crate::inbound::auth::email_based::Password;
 
     mock! {
         pub UserRepository {}
@@ -174,7 +228,7 @@ mod test_utils {
             async fn get_user_by_email(
                 &self,
                 email: &EmailAddress
-            ) -> Result<Option<UserId>, ()>;
+            ) -> Result<Option<(UserId, Option<HashedPassword>)>, ()>;
 
             async fn store_user(
                 &self,
@@ -191,10 +245,18 @@ mod test_utils {
         auth_link: MockAuthLinkService,
         user: MockUserRepository,
     ) -> UserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
+        mail_only_service_with_session(auth_link, user, MockSessionService::new())
+    }
+
+    pub fn mail_only_service_with_session(
+        auth_link: MockAuthLinkService,
+        user: MockUserRepository,
+        session: MockSessionService,
+    ) -> UserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
         UserService::new(
             Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
-            MockSessionService::new(),
+            session,
             AuthMethods::new(true, false),
         )
     }
@@ -203,10 +265,18 @@ mod test_utils {
         auth_link: MockAuthLinkService,
         user: MockUserRepository,
     ) -> UserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
+        mail_and_password_service_with_session(auth_link, user, MockSessionService::new())
+    }
+
+    pub fn mail_and_password_service_with_session(
+        auth_link: MockAuthLinkService,
+        user: MockUserRepository,
+        session: MockSessionService,
+    ) -> UserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
         UserService::new(
             Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
-            MockSessionService::new(),
+            session,
             AuthMethods::new(true, true),
         )
     }
@@ -215,10 +285,18 @@ mod test_utils {
         auth_link: MockAuthLinkService,
         user: MockUserRepository,
     ) -> UserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
+        password_only_service_with_session(auth_link, user, MockSessionService::new())
+    }
+
+    pub fn password_only_service_with_session(
+        auth_link: MockAuthLinkService,
+        user: MockUserRepository,
+        session: MockSessionService,
+    ) -> UserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
         UserService::new(
             Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
-            MockSessionService::new(),
+            session,
             AuthMethods::new(false, true),
         )
     }
@@ -311,7 +389,7 @@ mod test_user_service_register_new_user {
     async fn test_user_already_exists() {
         let mut user = MockUserRepository::new();
         user.expect_get_user_by_email()
-            .returning(|_| Ok(Some(UserId::test_default())));
+            .returning(|_| Ok(Some((UserId::test_default(), None))));
         user.expect_store_user().times(0);
         let mut auth_link = MockAuthLinkService::new();
         auth_link
@@ -449,7 +527,7 @@ mod test_user_service_register_new_user {
     async fn test_password_only_with_existing_user_never_overwrites_password() {
         let mut user = MockUserRepository::new();
         user.expect_get_user_by_email()
-            .returning(|_| Ok(Some(UserId::test_default())));
+            .returning(|_| Ok(Some((UserId::test_default(), None))));
         user.expect_store_user().times(0);
         let mut auth_link = MockAuthLinkService::new();
         auth_link.expect_generate_auth_link().times(0);
@@ -467,7 +545,7 @@ mod test_user_service_register_new_user {
     async fn test_mail_only_with_existing_user_never_stores_password() {
         let mut user = MockUserRepository::new();
         user.expect_get_user_by_email()
-            .returning(|_| Ok(Some(UserId::test_default())));
+            .returning(|_| Ok(Some((UserId::test_default(), None))));
         user.expect_store_user().times(0);
         let mut auth_link = MockAuthLinkService::new();
         auth_link
@@ -487,36 +565,33 @@ mod test_user_service_register_new_user {
 
 #[cfg(test)]
 mod test_user_service_login_user {
+    use chrono::{TimeDelta, Utc};
+
     use crate::inbound::auth::email_based::{
-        test_utils::MockAuthLinkService,
-        user::test_utils::{MockUserRepository, mail_only_service},
+        GenerateSessionTokenResult, HashedPassword, Password, SessionToken,
+        test_utils::{MockAuthLinkService, MockSessionService},
+        user::test_utils::{
+            MockUserRepository, TEST_EMAIL, mail_and_password_service_with_session,
+            mail_only_service, password_only_service_with_session,
+        },
     };
 
     use super::*;
 
-    #[tokio::test]
-    async fn test_ok_path() {
-        let mut user = MockUserRepository::new();
-        user.expect_get_user_by_email()
-            .returning(|_| Ok(Some(UserId::test_default())));
-        let mut auth_link = MockAuthLinkService::new();
-        auth_link
-            .expect_generate_auth_link()
-            .times(1)
-            .withf(|link| link.email() == &"test@mail.test".try_into().unwrap())
-            .returning(|_| GenerateAuthLinkResult::Success);
+    fn email() -> EmailAddress {
+        EmailAddress::try_from(TEST_EMAIL).unwrap()
+    }
 
-        let service = mail_only_service(auth_link, user);
+    fn password(value: &str) -> Password {
+        Password::try_from(value.to_string()).unwrap()
+    }
 
-        let res = service
-            .login_user(EmailAddress("test@mail.test".to_string()))
-            .await;
-
-        assert_eq!(res, UserLoginResult::Success);
+    fn password_hash(value: &str) -> HashedPassword {
+        password(value).as_hash().expect("hashing should succeed")
     }
 
     #[tokio::test]
-    async fn test_user_does_not_exist() {
+    async fn test_mail_only_unknown_email_answers_email_sent() {
         let mut user = MockUserRepository::new();
         user.expect_get_user_by_email().returning(|_| Ok(None));
         let mut auth_link = MockAuthLinkService::new();
@@ -524,15 +599,13 @@ mod test_user_service_login_user {
 
         let service = mail_only_service(auth_link, user);
 
-        let res = service
-            .login_user(EmailAddress("test@mail.test".to_string()))
-            .await;
+        let res = service.login_user(email(), None).await;
 
-        assert_eq!(res, UserLoginResult::Success);
+        assert_eq!(res, UserLoginResult::EmailSent);
     }
 
     #[tokio::test]
-    async fn test_cannot_check_if_user_exist() {
+    async fn test_mail_only_repo_error_returns_retry() {
         let mut user = MockUserRepository::new();
         user.expect_get_user_by_email().returning(|_| Err(()));
         let mut auth_link = MockAuthLinkService::new();
@@ -540,30 +613,255 @@ mod test_user_service_login_user {
 
         let service = mail_only_service(auth_link, user);
 
-        let res = service
-            .login_user(EmailAddress("test@mail.test".to_string()))
-            .await;
+        let res = service.login_user(email(), None).await;
 
         assert_eq!(res, UserLoginResult::Retry);
     }
 
     #[tokio::test]
-    async fn test_when_auth_link_retry() {
+    async fn test_mail_only_found_user_generates_auth_link() {
         let mut user = MockUserRepository::new();
         user.expect_get_user_by_email()
-            .returning(|_| Ok(Some(UserId::test_default())));
+            .returning(|_| Ok(Some((UserId::test_default(), None))));
         let mut auth_link = MockAuthLinkService::new();
         auth_link
             .expect_generate_auth_link()
+            .times(1)
+            .withf(|link| link.email() == &email())
+            .returning(|_| GenerateAuthLinkResult::Success);
+
+        let service = mail_only_service(auth_link, user);
+
+        let res = service.login_user(email(), None).await;
+
+        assert_eq!(res, UserLoginResult::EmailSent);
+    }
+
+    #[tokio::test]
+    async fn test_mail_only_auth_link_retry_returns_retry() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_by_email()
+            .returning(|_| Ok(Some((UserId::test_default(), None))));
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link
+            .expect_generate_auth_link()
+            .times(1)
             .returning(|_| GenerateAuthLinkResult::Retry);
 
         let service = mail_only_service(auth_link, user);
 
-        let res = service
-            .login_user(EmailAddress("test@mail.test".to_string()))
-            .await;
+        let res = service.login_user(email(), None).await;
 
         assert_eq!(res, UserLoginResult::Retry);
+    }
+
+    #[tokio::test]
+    async fn test_mail_and_password_correct_password_creates_session() {
+        let hash = password_hash("secret");
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_by_email()
+            .returning(move |_| Ok(Some((UserId::test_default(), Some(hash.clone())))));
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link.expect_generate_auth_link().times(0);
+
+        let expected_token = SessionToken::from("session-token");
+        let token = expected_token.clone();
+        let mut session = MockSessionService::new();
+        session
+            .expect_generate_session_token()
+            .times(1)
+            .withf(|user| user == &UserId::test_default())
+            .returning(move |_| {
+                Ok(GenerateSessionTokenResult::new(
+                    token.clone(),
+                    Utc::now() + TimeDelta::days(30),
+                ))
+            });
+
+        let service = mail_and_password_service_with_session(auth_link, user, session);
+
+        let res = service.login_user(email(), Some(password("secret"))).await;
+
+        let UserLoginResult::Session(session) = res else {
+            panic!("expected a session, got {res:?}");
+        };
+        assert_eq!(session.token(), &expected_token);
+    }
+
+    #[tokio::test]
+    async fn test_mail_and_password_wrong_password_is_invalid() {
+        let hash = password_hash("secret");
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_by_email()
+            .returning(move |_| Ok(Some((UserId::test_default(), Some(hash.clone())))));
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link.expect_generate_auth_link().times(0);
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = mail_and_password_service_with_session(auth_link, user, session);
+
+        let res = service.login_user(email(), Some(password("wrong"))).await;
+
+        assert_eq!(res, UserLoginResult::Invalid);
+    }
+
+    #[tokio::test]
+    async fn test_mail_and_password_user_without_registered_password_is_invalid() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_by_email()
+            .returning(|_| Ok(Some((UserId::test_default(), None))));
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link.expect_generate_auth_link().times(0);
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = mail_and_password_service_with_session(auth_link, user, session);
+
+        let res = service.login_user(email(), Some(password("secret"))).await;
+
+        assert_eq!(res, UserLoginResult::Invalid);
+    }
+
+    #[tokio::test]
+    async fn test_mail_and_password_unknown_email_is_invalid() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_by_email().returning(|_| Ok(None));
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link.expect_generate_auth_link().times(0);
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = mail_and_password_service_with_session(auth_link, user, session);
+
+        let res = service.login_user(email(), Some(password("secret"))).await;
+
+        assert_eq!(res, UserLoginResult::Invalid);
+    }
+
+    #[tokio::test]
+    async fn test_mail_and_password_session_creation_failure_returns_retry() {
+        let hash = password_hash("secret");
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_by_email()
+            .returning(move |_| Ok(Some((UserId::test_default(), Some(hash.clone())))));
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link.expect_generate_auth_link().times(0);
+        let mut session = MockSessionService::new();
+        session
+            .expect_generate_session_token()
+            .times(1)
+            .returning(|_| Err(()));
+
+        let service = mail_and_password_service_with_session(auth_link, user, session);
+
+        let res = service.login_user(email(), Some(password("secret"))).await;
+
+        assert_eq!(res, UserLoginResult::Retry);
+    }
+
+    #[tokio::test]
+    async fn test_mail_and_password_without_password_falls_back_to_mail() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_by_email()
+            .returning(|_| Ok(Some((UserId::test_default(), None))));
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link
+            .expect_generate_auth_link()
+            .times(1)
+            .returning(|_| GenerateAuthLinkResult::Success);
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = mail_and_password_service_with_session(auth_link, user, session);
+
+        let res = service.login_user(email(), None).await;
+
+        assert_eq!(res, UserLoginResult::EmailSent);
+    }
+
+    #[tokio::test]
+    async fn test_password_only_correct_password_creates_session() {
+        let hash = password_hash("secret");
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_by_email()
+            .returning(move |_| Ok(Some((UserId::test_default(), Some(hash.clone())))));
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link.expect_generate_auth_link().times(0);
+
+        let expected_token = SessionToken::from("session-token");
+        let token = expected_token.clone();
+        let mut session = MockSessionService::new();
+        session
+            .expect_generate_session_token()
+            .times(1)
+            .withf(|user| user == &UserId::test_default())
+            .returning(move |_| {
+                Ok(GenerateSessionTokenResult::new(
+                    token.clone(),
+                    Utc::now() + TimeDelta::days(30),
+                ))
+            });
+
+        let service = password_only_service_with_session(auth_link, user, session);
+
+        let res = service.login_user(email(), Some(password("secret"))).await;
+
+        let UserLoginResult::Session(session) = res else {
+            panic!("expected a session, got {res:?}");
+        };
+        assert_eq!(session.token(), &expected_token);
+    }
+
+    #[tokio::test]
+    async fn test_password_only_wrong_password_is_invalid() {
+        let hash = password_hash("secret");
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_by_email()
+            .returning(move |_| Ok(Some((UserId::test_default(), Some(hash.clone())))));
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link.expect_generate_auth_link().times(0);
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = password_only_service_with_session(auth_link, user, session);
+
+        let res = service.login_user(email(), Some(password("wrong"))).await;
+
+        assert_eq!(res, UserLoginResult::Invalid);
+    }
+
+    #[tokio::test]
+    async fn test_password_only_missing_password_is_invalid() {
+        let mut user = MockUserRepository::new();
+        // Password-only mode must not even look the user up without a password.
+        user.expect_get_user_by_email().times(0);
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link.expect_generate_auth_link().times(0);
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = password_only_service_with_session(auth_link, user, session);
+
+        let res = service.login_user(email(), None).await;
+
+        assert_eq!(res, UserLoginResult::Invalid);
+    }
+
+    #[tokio::test]
+    async fn test_password_only_unknown_email_is_invalid() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_by_email().returning(|_| Ok(None));
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link.expect_generate_auth_link().times(0);
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = password_only_service_with_session(auth_link, user, session);
+
+        let res = service.login_user(email(), Some(password("secret"))).await;
+
+        assert_eq!(res, UserLoginResult::Invalid);
     }
 }
 
@@ -578,6 +876,7 @@ impl IUserService for DisabledUserService {
     async fn login_user(
         &self,
         _email: EmailAddress,
+        _password: Option<Password>,
     ) -> crate::inbound::auth::email_based::UserLoginResult {
         panic!("User service is disabled")
     }

@@ -62,6 +62,28 @@ authentication variables is set — previously the mode was implicitly selected 
 variables, which were mandatory in multi-user mode. This lifts that requirement, so a multi-user
 deployment can run password-only without any SMTP relay (not yet implemented at the service level).
 
+### Login flow
+
+`UserService::login_user` branches on the active methods and on whether the request carries a
+password:
+
+- **Email only**: the user is resolved from the email address and an authentication link is
+  generated and sent. The caller always observes the same "email sent" outcome, whether or not the
+  account exists; an unknown address still pays for a dummy Argon2 hash so the timing matches the
+  found-user path.
+- **Email and password**: when a password is supplied it is verified and, on match, a session token
+  is issued directly without an email round-trip. When no password is supplied (or the field is
+  empty), the flow falls back to the email path above.
+- **Password only**: a password is required. On match a session is issued; a missing password fails
+  without falling back to email.
+
+Password verification is uniform across all failing cases: unknown address, wrong password, and an
+account without a stored password (e.g. registered through the mail-only fallback in mail+password
+mode) all perform the same Argon2 verification — against a dummy hash for the first and third
+cases — and collapse into a single `Invalid` outcome that the HTTP layer renders as a generic
+`401 Unauthorized`. The result value, response and timing are therefore indistinguishable, so the
+endpoint leaks neither account existence nor password presence.
+
 ## Alternatives considered
 
 - **A `verified` column on `t_users` instead of a dedicated table.** Rejected: it would keep the
@@ -104,3 +126,7 @@ in multi-user mode rather than falling back to single-user. With both methods op
 must handle every combination (email-only, password-only, both): password-only registration cannot
 verify the email through a link, so accounts register with unverified email addresses until a
 verification flow exists, and email-only setups silently ignore a password supplied at registration.
+Handling every combination also means password verification must not reveal which combination a
+given account is in: collapsing unknown users, wrong passwords and accounts without a password into
+a single `Invalid` outcome (with a dummy Argon2 verification to equalize timing) keeps the endpoint
+uniform, at the cost of not being able to tell the user *why* a login failed.

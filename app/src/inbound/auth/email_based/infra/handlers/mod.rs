@@ -251,7 +251,7 @@ mod tests {
             .returning(|_| UserRegistrationResult::Success);
         user_service
             .expect_login_user()
-            .returning(|_| UserLoginResult::Success);
+            .returning(|_, _| UserLoginResult::EmailSent);
         let registration_mode = UserRegistration::Allowed;
         let app = TestApp::new(user_service, registration_mode).await;
 

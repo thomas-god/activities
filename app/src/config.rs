@@ -207,9 +207,9 @@ impl MultiUserConfig {
         let password = PasswordAuthConfig::try_from_env(env)?;
 
         if email.is_none() && password.is_none() {
-            return Err(format!(
+            return Err(
                 "Invalid multi-user configuration: at least one authentication method must be configured."
-            ));
+                .to_string());
         }
 
         Ok(MultiUserConfig {
