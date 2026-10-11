@@ -3,7 +3,7 @@ use std::time::Duration;
 use axum::{
     Json, Router,
     extract::{Request, State},
-    http::{StatusCode, header::SET_COOKIE},
+    http::{HeaderMap, StatusCode, header::SET_COOKIE},
     middleware::Next,
     response::{AppendHeaders, IntoResponse, Response},
     routing::post,
@@ -85,6 +85,7 @@ fn build_cookie<'a>(
         .map_err(|_| format!("Cannot build datetime offset form expiry {expiry:?}"))?;
     let mut builder = Cookie::build(("token", token))
         .expires(expire_at)
+        .secure(cookie_config.secure)
         .http_only(cookie_config.http_only)
         .same_site(cookie_config.same_site)
         .path("/");
@@ -146,6 +147,7 @@ pub struct LoginUserQuery {
 
 pub async fn login_user(
     State(state): State<SinglePasswordAuthState>,
+    headers: HeaderMap,
     Json(body): Json<LoginUserQuery>,
 ) -> impl IntoResponse {
     let pwd = SinglePassword::from(body.password);
@@ -155,7 +157,8 @@ pub async fn login_user(
     }
 
     let expiry = Utc::now() + TimeDelta::days(SESSION_DURATION);
-    let Ok(cookie) = build_cookie(&state.password, &expiry, &state.cookie_config) else {
+    let cookie_config = state.cookie_config.for_request(&headers);
+    let Ok(cookie) = build_cookie(&state.password, &expiry, &cookie_config) else {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     };
 
@@ -166,8 +169,12 @@ pub async fn login_user(
 /// Clears the auth cookie in this browser. There is no server-side session state in this mode
 /// (the token is a stateless HMAC), so this cannot revoke the credential itself — only rotating
 /// the password does that, which also logs out every other browser.
-pub async fn logout(State(state): State<SinglePasswordAuthState>) -> impl IntoResponse {
-    let cookie = build_removal_cookie("token", &state.cookie_config);
+pub async fn logout(
+    State(state): State<SinglePasswordAuthState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let cookie_config = state.cookie_config.for_request(&headers);
+    let cookie = build_removal_cookie("token", &cookie_config);
     let headers = AppendHeaders([(SET_COOKIE, cookie.encoded().to_string())]);
     (headers, StatusCode::OK)
 }
@@ -292,6 +299,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_login_cookie_is_secure_only_over_https() {
+        let password = SinglePassword::from("secret");
+        let app = TestApp::new(&password).await;
+
+        // Plain HTTP: the browser would drop a `Secure` cookie, so it must not be set.
+        let response = app
+            .post("/api/login")
+            .body(serde_json::json!({"password": "secret"}).to_string())
+            .header(CONTENT_TYPE, "application/json")
+            .send()
+            .await
+            .expect("Should succeed");
+        assert_eq!(response.status(), StatusCode::OK);
+        let set_cookie = response
+            .headers()
+            .get(SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(!set_cookie.contains("Secure"), "got: {set_cookie}");
+
+        // Behind a TLS-terminating proxy reporting HTTPS: the cookie must be `Secure`.
+        let response = app
+            .post("/api/login")
+            .body(serde_json::json!({"password": "secret"}).to_string())
+            .header(CONTENT_TYPE, "application/json")
+            .header("X-Forwarded-Proto", "https")
+            .send()
+            .await
+            .expect("Should succeed");
+        assert_eq!(response.status(), StatusCode::OK);
+        let set_cookie = response
+            .headers()
+            .get(SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(set_cookie.contains("Secure"), "got: {set_cookie}");
+    }
+
+    #[tokio::test]
     async fn test_login_user_rejects_wrong_password() {
         let password = SinglePassword::from("secret");
         let app = TestApp::new(&password).await;
@@ -403,6 +451,41 @@ mod tests {
             .unwrap();
         assert!(set_cookie.contains("token="));
         assert!(set_cookie.contains("1970"));
+    }
+
+    #[tokio::test]
+    async fn test_logout_cookie_is_secure_only_over_https() {
+        let password = SinglePassword::from("secret");
+        let app = TestApp::new(&password).await;
+
+        let response = app
+            .post("/api/logout")
+            .send()
+            .await
+            .expect("Should succeed");
+        assert_eq!(response.status(), StatusCode::OK);
+        let set_cookie = response
+            .headers()
+            .get(SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(!set_cookie.contains("Secure"), "got: {set_cookie}");
+
+        let response = app
+            .post("/api/logout")
+            .header("X-Forwarded-Proto", "https")
+            .send()
+            .await
+            .expect("Should succeed");
+        assert_eq!(response.status(), StatusCode::OK);
+        let set_cookie = response
+            .headers()
+            .get(SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(set_cookie.contains("Secure"), "got: {set_cookie}");
     }
 
     #[test]
