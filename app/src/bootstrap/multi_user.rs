@@ -5,7 +5,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     clock::Clock,
-    config::{AppMode, BaseConfig, MultiUserConfig, StdEnvironment},
+    config::{AppMode, BaseConfig, EmailAuthConfig, MultiUserConfig, StdEnvironment},
     domain::services::{
         activity::ActivityService, preferences::PreferencesService, search::SearchService,
         training::TrainingService,
@@ -112,13 +112,13 @@ pub async fn bootstrap_multi_user(
     ))
 }
 
-async fn build_mailer(config: &MultiUserConfig) -> anyhow::Result<SMTPEmailProvider> {
+async fn build_mailer(email: &EmailAuthConfig) -> anyhow::Result<SMTPEmailProvider> {
     let mailer = SMTPEmailProvider::new(
-        &config.mailer_from,
-        &config.mailer_username,
-        &config.mailer_password,
-        &config.mailer_relay,
-        &config.mailer_domain,
+        &email.from,
+        &email.username,
+        &email.password,
+        &email.relay,
+        &email.domain,
     )?;
 
     if let Err(err) = mailer.test_connection().await {
@@ -210,7 +210,7 @@ async fn build_user_service(
         users_repository.clone(),
         EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,
     );
-    let mail_provider = Arc::new(build_mailer(mode_config).await?);
+    let mail_provider = Arc::new(build_mailer(&mode_config.email).await?);
     let auth_link_service = Arc::new(Mutex::new(AuthLinkService::new(
         users_repository.clone(),
         mail_provider,

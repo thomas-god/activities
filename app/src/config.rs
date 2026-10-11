@@ -84,22 +84,73 @@ impl SingleUserConfig {
     }
 }
 
+/// Email-based (SMTP mailer) authentication configuration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EmailAuthConfig {
+    pub from: String,
+    pub username: String,
+    pub password: String,
+    pub relay: String,
+    pub domain: String,
+}
+
+impl EmailAuthConfig {
+    pub fn try_from_env<T: Environment>(env: &T) -> Result<Option<EmailAuthConfig>, String> {
+        let from = load_env(env, MULTI_USER_MAILER_FROM_KEY).as_string();
+        let username = load_env(env, MULTI_USER_MAILER_USERNAME_KEY).as_string();
+        let password = load_env(env, MULTI_USER_MAILER_PASSWORD_KEY).as_string();
+        let relay = load_env(env, MULTI_USER_MAILER_RELAY_KEY).as_string();
+        let domain = load_env(env, MULTI_USER_MAILER_DOMAIN_KEY).as_string();
+
+        match [from, username, password, relay, domain] {
+            [None, None, None, None, None] => Ok(None),
+            [
+                Some(from),
+                Some(username),
+                Some(password),
+                Some(relay),
+                Some(domain),
+            ] => Ok(Some(EmailAuthConfig {
+                from,
+                username,
+                password,
+                relay,
+                domain,
+            })),
+            [from, username, password, relay, domain] => {
+                let mut errs = Vec::new();
+                if from.is_none() {
+                    errs.push(MULTI_USER_MAILER_FROM_KEY);
+                }
+                if username.is_none() {
+                    errs.push(MULTI_USER_MAILER_USERNAME_KEY);
+                }
+                if password.is_none() {
+                    errs.push(MULTI_USER_MAILER_PASSWORD_KEY);
+                }
+                if relay.is_none() {
+                    errs.push(MULTI_USER_MAILER_RELAY_KEY);
+                }
+                if domain.is_none() {
+                    errs.push(MULTI_USER_MAILER_DOMAIN_KEY);
+                }
+
+                Err(format!(
+                    "Invalid email configuration, missing or invalid environment variables: {}",
+                    errs.join(", ")
+                ))
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct MultiUserConfig {
-    pub mailer_from: String,
-    pub mailer_username: String,
-    pub mailer_password: String,
-    pub mailer_relay: String,
-    pub mailer_domain: String,
+    pub email: EmailAuthConfig,
     pub allow_registration: bool,
 }
 impl MultiUserConfig {
     pub fn try_from_env<T: Environment>(env: &T) -> Result<Option<MultiUserConfig>, String> {
-        let mailer_from = load_env(env, MULTI_USER_MAILER_FROM_KEY).as_string();
-        let mailer_username = load_env(env, MULTI_USER_MAILER_USERNAME_KEY).as_string();
-        let mailer_password = load_env(env, MULTI_USER_MAILER_PASSWORD_KEY).as_string();
-        let mailer_relay = load_env(env, MULTI_USER_MAILER_RELAY_KEY).as_string();
-        let mailer_domain = load_env(env, MULTI_USER_MAILER_DOMAIN_KEY).as_string();
         let allow_registration = load_env(env, MULTI_USER_ALLOW_REGISTRATION_KEY).as_string();
 
         let allow_registration = match allow_registration {
@@ -115,57 +166,12 @@ impl MultiUserConfig {
             },
         };
 
-        match [
-            mailer_from,
-            mailer_username,
-            mailer_password,
-            mailer_relay,
-            mailer_domain,
-        ] {
-            [None, None, None, None, None] => Ok(None),
-            [
-                Some(mailer_from),
-                Some(mailer_username),
-                Some(mailer_password),
-                Some(mailer_relay),
-                Some(mailer_domain),
-            ] => Ok(Some(MultiUserConfig {
-                mailer_from,
-                mailer_username,
-                mailer_password,
-                mailer_relay,
-                mailer_domain,
+        match EmailAuthConfig::try_from_env(env)? {
+            None => Ok(None),
+            Some(email) => Ok(Some(MultiUserConfig {
+                email,
                 allow_registration,
             })),
-            [
-                mailer_from,
-                mailer_username,
-                mailer_password,
-                mailer_relay,
-                mailer_domain,
-            ] => {
-                let mut errs = Vec::new();
-                if mailer_from.is_none() {
-                    errs.push(MULTI_USER_MAILER_FROM_KEY);
-                }
-                if mailer_username.is_none() {
-                    errs.push(MULTI_USER_MAILER_USERNAME_KEY);
-                }
-                if mailer_password.is_none() {
-                    errs.push(MULTI_USER_MAILER_PASSWORD_KEY);
-                }
-                if mailer_relay.is_none() {
-                    errs.push(MULTI_USER_MAILER_RELAY_KEY);
-                }
-                if mailer_domain.is_none() {
-                    errs.push(MULTI_USER_MAILER_DOMAIN_KEY);
-                }
-
-                Err(format!(
-                    "Invalid multi-user configuration, missing or invalid environment variables: {}",
-                    errs.join(", ")
-                ))
-            }
         }
     }
 }
@@ -428,11 +434,11 @@ mod test_config {
 
         let config = MultiUserConfig::try_from_env(&env).unwrap().unwrap();
 
-        assert_eq!(config.mailer_from, "noreply@example.com");
-        assert_eq!(config.mailer_username, "mailer-user");
-        assert_eq!(config.mailer_password, "mailer-password");
-        assert_eq!(config.mailer_relay, "smtp.example.com");
-        assert_eq!(config.mailer_domain, "example.com");
+        assert_eq!(config.email.from, "noreply@example.com");
+        assert_eq!(config.email.username, "mailer-user");
+        assert_eq!(config.email.password, "mailer-password");
+        assert_eq!(config.email.relay, "smtp.example.com");
+        assert_eq!(config.email.domain, "example.com");
         assert!(config.allow_registration);
     }
 
