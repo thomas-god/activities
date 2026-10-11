@@ -14,7 +14,7 @@ use std::{marker::PhantomData, sync::Arc};
 use crate::inbound::{
     auth::{
         AuthenticatedUser,
-        email_based::{GenerateSessionTokenResult, IUserService, infra::handlers::AuthAppState},
+        multi_user::{GenerateSessionTokenResult, IUserService, infra::handlers::AuthAppState},
     },
     http::CookieConfig,
 };
@@ -124,7 +124,7 @@ mod test {
     use crate::{
         domain::models::UserId,
         inbound::{
-            auth::email_based::{
+            auth::multi_user::{
                 CheckSessionResult, GenerateSessionTokenResult, SessionToken,
                 infra::handlers::{
                     UserRegistration,

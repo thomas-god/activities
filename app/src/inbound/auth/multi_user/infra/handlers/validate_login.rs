@@ -6,7 +6,7 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::inbound::auth::email_based::{
+use crate::inbound::auth::multi_user::{
     AuthLinkValidationResult, AuthToken, IUserService,
     infra::handlers::{AuthAppState, extractor::build_session_cookie},
 };

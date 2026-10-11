@@ -6,7 +6,7 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::inbound::auth::email_based::{
+use crate::inbound::auth::multi_user::{
     EmailAddress, IUserService, Password, UserLoginResult,
     infra::handlers::{AuthAppState, extractor::build_session_cookie},
 };
@@ -58,7 +58,7 @@ mod test {
     use serde_json::json;
 
     use crate::inbound::{
-        auth::email_based::{
+        auth::multi_user::{
             GenerateSessionTokenResult, Password, SessionToken, UserLoginResult,
             infra::handlers::UserRegistration, test_utils::MockUserService,
         },

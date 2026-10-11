@@ -24,7 +24,7 @@ use crate::{
         },
     },
     inbound::{
-        auth::{AuthenticatedUser, email_based::IUserService},
+        auth::{AuthenticatedUser, multi_user::IUserService},
         http::{AppState, handlers::training::types::APITrainingMetricSource},
         parser::ParseFile,
     },

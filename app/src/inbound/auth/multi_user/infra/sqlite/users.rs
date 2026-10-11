@@ -8,7 +8,7 @@ use sqlx::{
 
 use crate::{
     domain::models::UserId,
-    inbound::auth::email_based::{
+    inbound::auth::multi_user::{
         EmailAddress, HashedAuthLink, HashedAuthToken, HashedPassword, HashedSession,
         HashedSessionToken,
         auth_link::{AuthLinkRepository, AuthLinkRepositoryError},
@@ -315,7 +315,7 @@ mod test_sqlite_users_repository {
 
     use crate::{
         domain::models::UserId,
-        inbound::auth::email_based::{
+        inbound::auth::multi_user::{
             AuthLink, AuthToken, EmailAddress, HashedSessionToken, Password, Session, SessionToken,
             auth_link::AuthLinkRepository, session::SessionRepository, user::UserRepository,
         },
@@ -1125,14 +1125,14 @@ mod test_sqlite_users_repository {
             .await
             .unwrap();
         sqlx::query(
-            "INSERT INTO t_auth_links (user, token_hash, expire_at) 
+            "INSERT INTO t_auth_links (user, token_hash, expire_at)
              VALUES (1, 'link_hash', '2030-01-01T00:00:00+00:00');",
         )
         .execute(&pool)
         .await
         .unwrap();
         sqlx::query(
-            "INSERT INTO t_sessions (user, token_hash, expire_at) 
+            "INSERT INTO t_sessions (user, token_hash, expire_at)
              VALUES (2, 'session_hash', '2030-01-01T00:00:00+00:00');",
         )
         .execute(&pool)
@@ -1156,7 +1156,7 @@ mod test_sqlite_users_repository {
         .unwrap();
         for migration in migrator.migrations.iter().take(3) {
             sqlx::query(
-                "INSERT INTO _sqlx_migrations (version, description, success, checksum, 
+                "INSERT INTO _sqlx_migrations (version, description, success, checksum,
                  execution_time) VALUES (?1, ?2, TRUE, ?3, 0);",
             )
             .bind(migration.version)

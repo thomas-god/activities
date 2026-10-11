@@ -21,8 +21,8 @@ use crate::domain::ports::{
 };
 
 use crate::inbound::auth::AuthStrategy;
-use crate::inbound::auth::email_based::IUserService;
 use crate::inbound::auth::infra::add_auth_router;
+use crate::inbound::auth::multi_user::IUserService;
 use crate::inbound::http::handlers::{
     get_default_activity_metrics, get_training_metric_templates, upload_bulk_weight_and_nutrition,
 };
@@ -41,9 +41,9 @@ use handlers::{
     update_training_period, upload_activities,
 };
 
-pub use crate::inbound::auth::email_based::infra::mailer::smtp::SMTPEmailProvider;
+pub use crate::inbound::auth::multi_user::infra::mailer::smtp::SMTPEmailProvider;
 
-pub use crate::inbound::auth::email_based::{
+pub use crate::inbound::auth::multi_user::{
     AuthLinkService, AuthMethods, DisabledAuthLinkService, DisabledUserService,
     MaybeAuthLinkService, SessionService, UserService,
     infra::{mailer::DoNothingMailProvider, sqlite::users::SqliteUsersRepository},
@@ -412,7 +412,7 @@ mod tests {
         },
     };
     use crate::inbound::{
-        auth::{SinglePassword, email_based::test_utils::MockUserService},
+        auth::{SinglePassword, multi_user::test_utils::MockUserService},
         parser::test_utils::MockFileParser,
     };
 

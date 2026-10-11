@@ -3,7 +3,7 @@ use derive_more::Constructor;
 
 use crate::{
     domain::models::UserId,
-    inbound::auth::email_based::{
+    inbound::auth::multi_user::{
         CheckSessionResult, GenerateSessionTokenResult, HashedSession, HashedSessionToken,
         ISessionService, Session, SessionToken,
     },
@@ -147,7 +147,7 @@ mod test_utils {
 
 #[cfg(test)]
 mod test_session_service_generate_session_token {
-    use crate::inbound::auth::email_based::session::test_utils::MockSessionRepository;
+    use crate::inbound::auth::multi_user::session::test_utils::MockSessionRepository;
 
     use super::*;
 
@@ -187,7 +187,7 @@ mod test_session_service_generate_session_token {
 #[cfg(test)]
 mod test_session_service_check_session_token {
 
-    use crate::inbound::auth::email_based::session::test_utils::MockSessionRepository;
+    use crate::inbound::auth::multi_user::session::test_utils::MockSessionRepository;
 
     use super::*;
 
@@ -254,7 +254,7 @@ mod test_session_service_check_session_token {
 
 #[cfg(test)]
 mod test_session_service_logout {
-    use crate::inbound::auth::email_based::session::test_utils::MockSessionRepository;
+    use crate::inbound::auth::multi_user::session::test_utils::MockSessionRepository;
 
     use super::*;
 

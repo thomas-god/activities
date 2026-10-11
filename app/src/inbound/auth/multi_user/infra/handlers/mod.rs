@@ -5,7 +5,7 @@ use axum::routing::post;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::inbound::auth::email_based::IUserService;
+use crate::inbound::auth::multi_user::IUserService;
 use crate::inbound::http::CookieConfig;
 use crate::inbound::http::middlewares::rate_limit::{IpRateLimitLayer, RateLimitStore};
 
@@ -64,7 +64,7 @@ where
     }
 }
 
-pub fn email_based_login_routes<US: IUserService, S>(
+pub fn multi_user_login_routes<US: IUserService, S>(
     mut base_router: Router<S>,
     user_service: US,
     registration_mode: UserRegistration,
@@ -121,7 +121,7 @@ mod tests {
     use tokio::task::JoinHandle;
     use url::Url;
 
-    use crate::inbound::auth::email_based::{
+    use crate::inbound::auth::multi_user::{
         AuthLinkValidationResult, GenerateSessionTokenResult, SessionToken, UserLoginResult,
         UserRegistrationResult, test_utils::MockUserService,
     };
@@ -144,7 +144,7 @@ mod tests {
             user_service: MockUserService,
             registration_mode: UserRegistration,
         ) -> TestApp {
-            let app = email_based_login_routes(
+            let app = multi_user_login_routes(
                 Router::new().route("/", get(protected_route)),
                 user_service,
                 registration_mode,

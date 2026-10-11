@@ -6,7 +6,7 @@ use axum::{
 use axum_extra::extract::CookieJar;
 
 use crate::inbound::{
-    auth::email_based::{IUserService, infra::handlers::AuthAppState},
+    auth::multi_user::{IUserService, infra::handlers::AuthAppState},
     http::build_removal_cookie,
 };
 
@@ -33,7 +33,7 @@ mod test {
     use axum::{Router, routing::post};
     use axum_test::TestServer;
 
-    use crate::inbound::auth::email_based::{
+    use crate::inbound::auth::multi_user::{
         infra::handlers::UserRegistration, test_utils::MockUserService,
     };
 

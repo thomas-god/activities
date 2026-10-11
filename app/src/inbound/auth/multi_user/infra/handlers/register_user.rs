@@ -1,7 +1,7 @@
 use axum::{Json, extract::State, http::StatusCode};
 use serde::Deserialize;
 
-use crate::inbound::auth::email_based::{
+use crate::inbound::auth::multi_user::{
     EmailAddress, IUserService, Password, UserRegistrationRequest, UserRegistrationResult,
     infra::handlers::{AuthAppState, UserRegistration},
 };
@@ -46,7 +46,7 @@ mod test {
     use axum_test::TestServer;
     use serde_json::json;
 
-    use crate::inbound::auth::email_based::{
+    use crate::inbound::auth::multi_user::{
         EmailAddress, Password, UserRegistrationResult, infra::handlers::UserRegistration,
         test_utils::MockUserService,
     };

@@ -6,11 +6,11 @@ use subtle::ConstantTimeEq;
 use crate::{
     config::{AppMode, SingleUserConfig},
     domain::models::UserId,
-    inbound::auth::email_based::{AuthMethods, infra::handlers::UserRegistration},
+    inbound::auth::multi_user::{AuthMethods, infra::handlers::UserRegistration},
 };
 
-pub mod email_based;
 pub mod infra;
+pub mod multi_user;
 pub mod no_auth;
 pub mod single_password;
 

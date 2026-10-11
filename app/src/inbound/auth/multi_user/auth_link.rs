@@ -5,7 +5,7 @@ use derive_more::Constructor;
 use thiserror::Error;
 use tokio::sync::Mutex;
 
-use crate::inbound::auth::email_based::{
+use crate::inbound::auth::multi_user::{
     AuthLink, AuthToken, EmailAddress, GenerateAuthLinkRequest, GenerateAuthLinkResult,
     HashedAuthLink, HashedAuthToken, IAuthLinkService,
 };
@@ -97,7 +97,7 @@ where
 
 /// A no-op [`IAuthLinkService`] used when email-based authentication is disabled.
 ///
-/// It exists so that [`crate::inbound::auth::email_based::UserService`] can be built in
+/// It exists so that [`crate::inbound::auth::multi_user::UserService`] can be built in
 /// password-only mode, where there is no SMTP provider. The mail flow is unreachable in that mode
 /// (the service returns early before generating an auth link); should it be reached anyway, the
 /// method reports [`GenerateAuthLinkResult::Retry`] rather than silently pretending an email was
@@ -258,7 +258,7 @@ mod test_auth_link_service_generate_auth_link {
 
     use crate::{
         domain::models::UserId,
-        inbound::auth::email_based::{
+        inbound::auth::multi_user::{
             GenerateAuthLinkRequest,
             auth_link::test_utils::{MockMailProvider, MockSessionRepository},
         },
@@ -367,7 +367,7 @@ mod test_auth_link_service_generate_auth_link {
 mod test_auth_link_service_validate_auth_link {
     use crate::{
         domain::models::UserId,
-        inbound::auth::email_based::auth_link::test_utils::{
+        inbound::auth::multi_user::auth_link::test_utils::{
             MockMailProvider, MockSessionRepository,
         },
     };

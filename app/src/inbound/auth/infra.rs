@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use crate::inbound::auth::{
     AuthStrategy,
-    email_based::{AuthMethods, IUserService, infra::handlers::email_based_login_routes},
+    multi_user::{AuthMethods, IUserService, infra::handlers::multi_user_login_routes},
     no_auth::no_auth_login_routes,
     single_password::single_password_login_routes,
 };
@@ -59,7 +59,7 @@ where
         // both password and mail flows, and `/api/register` accepts an optional password. Which
         // methods are active is advertised through `/api/auth_info`, not through the route set.
         AuthStrategy::MultiUser(multi_user) => {
-            email_based_login_routes(base_router, user_service, multi_user.registration().clone())
+            multi_user_login_routes(base_router, user_service, multi_user.registration().clone())
         }
     };
 
@@ -86,7 +86,7 @@ mod tests {
     use serde_json::json;
 
     use crate::config::{AppMode, EmailAuthConfig, MultiUserConfig, PasswordAuthConfig};
-    use crate::inbound::auth::email_based::test_utils::MockUserService;
+    use crate::inbound::auth::multi_user::test_utils::MockUserService;
 
     use super::*;
 
