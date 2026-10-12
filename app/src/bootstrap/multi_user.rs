@@ -10,11 +10,10 @@ use crate::{
         training::TrainingService,
     },
     inbound::{
+        auth::multi_user::{MaybeMailProvider, service::spawn_expired_auth_links_cleanup},
         http::{
-            AuthLinkService, AuthMethods, DisabledAuthLinkService, HttpServer,
-            MaybeAuthLinkService, MultiUserService, SMTPEmailProvider, SessionService,
-            SqliteUsersRepository, spawn_expired_auth_links_cleanup,
-            spawn_expired_sessions_cleanup,
+            AuthMethods, DoNothingMailProvider, HttpServer, MultiUserService, SMTPEmailProvider,
+            SessionService, SqliteUsersRepository, spawn_expired_sessions_cleanup,
         },
         parser::Parser,
     },
@@ -40,9 +39,9 @@ type ActualTrainingService = TrainingService<
     Clock,
 >;
 type ActualUserService = MultiUserService<
-    MaybeAuthLinkService<AuthLinkService<SqliteUsersRepository, SMTPEmailProvider>>,
     SqliteUsersRepository,
     SessionService<SqliteUsersRepository>,
+    MaybeMailProvider<SMTPEmailProvider>,
 >;
 type ActualSearchService =
     SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService, Clock>;
@@ -201,36 +200,30 @@ async fn build_user_service(
         SqliteUsersRepository::new(&format!("sqlite:{}", user_db.to_string_lossy())).await?,
     );
 
-    // The auth-link service is only meaningful when email-based auth is enabled: password-only
-    // mode has no mailer and never sends an email. Disabling it lets the application start without
-    // any SMTP configuration while keeping a single concrete `UserService` type.
-    let auth_link_service = match mode_config.email.as_ref() {
-        Some(email_config) => {
-            spawn_expired_auth_links_cleanup(
-                users_repository.clone(),
-                EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,
-            );
-            let mail_provider = Arc::new(build_mailer(email_config).await?);
-            MaybeAuthLinkService::Enabled(AuthLinkService::new(
-                users_repository.clone(),
-                mail_provider,
-            ))
-        }
-        None => MaybeAuthLinkService::Disabled(DisabledAuthLinkService::default()),
+    let mailer = match mode_config.email.as_ref() {
+        Some(email_config) => MaybeMailProvider::Enabled(build_mailer(email_config).await?),
+        None => MaybeMailProvider::Disabled(DoNothingMailProvider::new()),
     };
-    let auth_link_service = Arc::new(auth_link_service);
 
     spawn_expired_sessions_cleanup(
         users_repository.clone(),
         EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,
     );
+
+    if mode_config.email.is_some() {
+        spawn_expired_auth_links_cleanup(
+            users_repository.clone(),
+            EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,
+        );
+    }
+
     let session_service = SessionService::new(users_repository.clone());
     let auth_methods = AuthMethods::from(mode_config);
     let user_service = MultiUserService::new(
-        auth_link_service,
         users_repository,
         session_service,
         auth_methods,
+        Arc::new(mailer),
     );
 
     Ok(user_service)

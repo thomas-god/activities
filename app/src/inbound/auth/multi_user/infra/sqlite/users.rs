@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use anyhow::anyhow;
 use chrono::{DateTime, Utc};
 use sqlx::{
     ConnectOptions, SqlitePool,
@@ -10,17 +11,13 @@ use crate::{
     domain::models::UserId,
     inbound::auth::multi_user::{
         EmailAddress, HashedAuthLink, HashedAuthToken, HashedPassword, HashedSession,
-        HashedSessionToken,
-        auth_link::{AuthLinkRepository, AuthLinkRepositoryError},
-        service::UserRepository,
-        session::SessionRepository,
+        HashedSessionToken, service::UserRepository, session::SessionRepository,
     },
 };
 
 /// SQLite repository backed by the user database (`user.db`).
 ///
-/// It implements the [`UserRepository`], [`AuthLinkRepository`] and
-/// [`SessionRepository`] domain traits.
+/// It implements the [`UserRepository`], and [`SessionRepository`] domain traits.
 #[derive(Debug, Clone)]
 pub struct SqliteUsersRepository {
     writer: SqlitePool,
@@ -142,16 +139,14 @@ impl UserRepository for SqliteUsersRepository {
             }
         }
     }
-}
 
-impl AuthLinkRepository for SqliteUsersRepository {
     #[tracing::instrument(skip_all, err)]
-    async fn store_auth_link(&self, link: &HashedAuthLink) -> Result<(), AuthLinkRepositoryError> {
+    async fn store_auth_link(&self, link: &HashedAuthLink) -> Result<(), anyhow::Error> {
         let res = sqlx::query(
             r#"
-        INSERT INTO t_auth_links (user, token_hash, expire_at)
-        SELECT rowid, ?2, ?3 FROM t_users WHERE user_id = ?1
-        ;"#,
+           INSERT INTO t_auth_links (user, token_hash, expire_at)
+           SELECT rowid, ?2, ?3 FROM t_users WHERE user_id = ?1
+           ;"#,
         )
         .bind(link.user().to_string())
         .bind(link.hash().to_string())
@@ -161,12 +156,14 @@ impl AuthLinkRepository for SqliteUsersRepository {
         .map_err(|err| {
             tracing::warn!("Unable to insert auth link into database");
             tracing::warn!("{}", err);
-            AuthLinkRepositoryError::Error
+            anyhow!(err)
         })?;
 
         if res.rows_affected() == 0 {
             tracing::warn!("Unable to insert auth link into database: unknown user");
-            return Err(AuthLinkRepositoryError::Error);
+            return Err(anyhow!(
+                "Unable to insert auth link into database: unknown user"
+            ));
         }
 
         Ok(())
@@ -176,10 +173,10 @@ impl AuthLinkRepository for SqliteUsersRepository {
     async fn get_all_auth_links(&self) -> Vec<HashedAuthLink> {
         let res: Vec<(String, String, DateTime<Utc>)> = match sqlx::query_as(
             r#"
-        SELECT u.user_id, a.token_hash, a.expire_at
-        FROM t_auth_links a
-        JOIN t_users u ON u.rowid = a.user
-        ;"#,
+           SELECT u.user_id, a.token_hash, a.expire_at
+           FROM t_auth_links a
+           JOIN t_users u ON u.rowid = a.user
+           ;"#,
         )
         .fetch_all(&self.readers)
         .await
@@ -203,29 +200,26 @@ impl AuthLinkRepository for SqliteUsersRepository {
     }
 
     #[tracing::instrument(skip_all, err)]
-    async fn delete_auth_link_by_hash(
-        &self,
-        hash: &HashedAuthToken,
-    ) -> Result<(), AuthLinkRepositoryError> {
+    async fn delete_auth_link_by_hash(&self, hash: &HashedAuthToken) -> Result<(), anyhow::Error> {
         sqlx::query("DELETE FROM t_auth_links WHERE token_hash = ?1;")
             .bind(hash.to_string())
             .execute(&self.writer)
             .await
             .map(|_| ())
-            .map_err(|_| AuthLinkRepositoryError::Error)
+            .map_err(|err| anyhow!(err))
     }
 
     #[tracing::instrument(skip_all, err)]
     async fn delete_expired_auth_links(
         &self,
         reference: DateTime<Utc>,
-    ) -> Result<(), AuthLinkRepositoryError> {
+    ) -> Result<(), anyhow::Error> {
         sqlx::query("DELETE FROM t_auth_links WHERE expire_at <= ?1;")
             .bind(reference)
             .execute(&self.writer)
             .await
             .map(|_| ())
-            .map_err(|_| AuthLinkRepositoryError::Error)
+            .map_err(|err| anyhow!(err))
     }
 }
 
@@ -234,9 +228,9 @@ impl SessionRepository for SqliteUsersRepository {
     async fn store_session(&self, session: &HashedSession) -> Result<(), ()> {
         let res = sqlx::query(
             r#"
-        INSERT INTO t_sessions (user, token_hash, expire_at)
-        SELECT rowid, ?2, ?3 FROM t_users WHERE user_id = ?1
-        ;"#,
+           INSERT INTO t_sessions (user, token_hash, expire_at)
+           SELECT rowid, ?2, ?3 FROM t_users WHERE user_id = ?1
+           ;"#,
         )
         .bind(session.user().to_string())
         .bind(session.hash().to_string())
@@ -260,11 +254,11 @@ impl SessionRepository for SqliteUsersRepository {
     async fn get_session_by_hash(&self, hash: &HashedSessionToken) -> Option<HashedSession> {
         let res: Option<(String, String, DateTime<Utc>)> = match sqlx::query_as(
             r#"
-        SELECT u.user_id, s.token_hash, s.expire_at
-        FROM t_sessions s
-        JOIN t_users u ON u.rowid = s.user
-        WHERE s.token_hash = ?1
-        ;"#,
+           SELECT u.user_id, s.token_hash, s.expire_at
+           FROM t_sessions s
+           JOIN t_users u ON u.rowid = s.user
+           WHERE s.token_hash = ?1
+           ;"#,
         )
         .bind(hash.to_string())
         .fetch_optional(&self.readers)
@@ -317,7 +311,7 @@ mod test_sqlite_users_repository {
         domain::models::UserId,
         inbound::auth::multi_user::{
             AuthLink, AuthToken, EmailAddress, HashedSessionToken, Password, Session, SessionToken,
-            auth_link::AuthLinkRepository, service::UserRepository, session::SessionRepository,
+            service::UserRepository, session::SessionRepository,
         },
     };
 

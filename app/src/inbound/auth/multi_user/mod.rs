@@ -12,19 +12,16 @@ use email_address::EmailAddress as EmailAddressValidator;
 use rand::RngExt;
 use sha2::{Digest, Sha256};
 
-pub mod auth_link;
 pub mod infra;
 pub mod service;
 pub mod session;
 
-pub use auth_link::{
-    AuthLinkService, DisabledAuthLinkService, MaybeAuthLinkService,
-    spawn_expired_auth_links_cleanup,
-};
 pub use service::{DisabledUserService, MultiUserService};
 pub use session::{SessionService, spawn_expired_sessions_cleanup};
 
-use crate::{config::MultiUserConfig, domain::models::UserId};
+use crate::{
+    config::MultiUserConfig, domain::models::UserId, inbound::http::DoNothingMailProvider,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Display)]
 pub struct EmailAddress(String);
@@ -541,6 +538,37 @@ pub trait ISessionService: Clone + Send + Sync + 'static {
     fn logout(&self, token: &SessionToken) -> impl Future<Output = Result<(), ()>> + Send;
 }
 
+pub trait MailProvider: Clone + Send + Sync + 'static {
+    fn send_auth_link_email(
+        &self,
+        email: &EmailAddress,
+        auth_link: &AuthLink,
+    ) -> impl Future<Output = Result<(), ()>> + Send;
+}
+
+/// Runtime choice between an enabled and a disabled [`MailProvider`].
+#[derive(Debug, Clone)]
+pub enum MaybeMailProvider<Enabled> {
+    Enabled(Enabled),
+    Disabled(DoNothingMailProvider),
+}
+
+impl<Enabled> MailProvider for MaybeMailProvider<Enabled>
+where
+    Enabled: MailProvider,
+{
+    async fn send_auth_link_email(
+        &self,
+        email: &EmailAddress,
+        auth_link: &AuthLink,
+    ) -> Result<(), ()> {
+        match self {
+            Self::Enabled(service) => service.send_auth_link_email(email, auth_link).await,
+            Self::Disabled(service) => service.send_auth_link_email(email, auth_link).await,
+        }
+    }
+}
+
 #[cfg(test)]
 pub mod test_utils {
     use mockall::mock;
@@ -619,6 +647,22 @@ pub mod test_utils {
             ) -> Result<CheckSessionResult, ()>;
 
             async fn logout(&self, token: &SessionToken) -> Result<(), ()>;
+        }
+    }
+
+    mock! {
+        pub MailProvider {}
+
+        impl Clone for MailProvider {
+            fn clone(&self) -> Self;
+        }
+
+        impl MailProvider for MailProvider {
+            async fn send_auth_link_email(
+                &self,
+                email: &EmailAddress,
+                auth_link: &AuthLink,
+            ) -> Result<(), ()>;
         }
     }
 }

@@ -13,7 +13,7 @@ use lettre::{
 use serde_json::json;
 use thiserror::Error;
 
-use crate::inbound::auth::multi_user::{AuthLink, EmailAddress, auth_link::MailProvider};
+use crate::inbound::auth::multi_user::{AuthLink, EmailAddress, MailProvider};
 
 #[derive(Debug, Clone)]
 pub struct SMTPEmailProvider {
