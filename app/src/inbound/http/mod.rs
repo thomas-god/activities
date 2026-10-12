@@ -45,7 +45,7 @@ pub use crate::inbound::auth::multi_user::infra::mailer::smtp::SMTPEmailProvider
 
 pub use crate::inbound::auth::multi_user::{
     AuthMethods, DisabledUserService, MultiUserService, SessionService,
-    infra::{mailer::DoNothingMailProvider, sqlite::users::SqliteUsersRepository},
+    infra::{mailer::DoNothingMailProvider, sqlite::SqliteUsersRepository},
     spawn_expired_sessions_cleanup,
 };
 
