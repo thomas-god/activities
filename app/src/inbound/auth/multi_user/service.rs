@@ -7,11 +7,12 @@ use crate::{
     domain::models::UserId,
     inbound::auth::multi_user::{
         AuthLink, AuthLinkValidationResult, AuthMethods, AuthToken, CheckSessionResult,
-        EmailAddress, GenerateAuthLinkRequest, GenerateAuthLinkResult, HashedAuthLink,
-        HashedAuthToken, HashedPassword, IMultiUserService, ISessionService, MailProvider,
+        EmailAddress, EmailChangeFinalizeResult, EmailChangeToken, EmailChangeValidationResult,
+        GenerateAuthLinkRequest, GenerateAuthLinkResult, HashedAuthLink, HashedAuthToken,
+        HashedEmailChangeToken, HashedPassword, IMultiUserService, ISessionService, MailProvider,
         Password, RegisterPasswordRequest, RegisterPasswordResult, SessionToken,
-        UpdatePasswordRequest, UpdatePasswordResult, UserLoginResult, UserRegistrationRequest,
-        UserRegistrationResult,
+        UpdateEmailRequest, UpdateEmailResult, UpdatePasswordRequest, UpdatePasswordResult,
+        UserLoginResult, UserRegistrationRequest, UserRegistrationResult,
     },
 };
 
@@ -192,6 +193,51 @@ where
             Err(()) => UpdatePasswordResult::Retry,
         }
     }
+
+    #[tracing::instrument(skip_all)]
+    async fn update_email(&self, req: UpdateEmailRequest) -> UpdateEmailResult {
+        if !self.auth_methods.email() {
+            return self.change_email_unverified(req).await;
+        }
+        self.request_email_change(req).await
+    }
+
+    /// Consumes an email change verification token and swaps the user's email if it is still
+    /// free. Single-use: the token is consumed even when the target email is taken.
+    // TODO: reconsider whether an email change should invalidate existing sessions once session
+    // revocation is implemented.
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn validate_email_change(
+        &self,
+        token: AuthToken,
+    ) -> Result<EmailChangeValidationResult, ()> {
+        let tokens = self.user_repository.get_all_email_change_tokens().await;
+
+        let mut found = None;
+
+        let now = chrono::Utc::now();
+        for stored in tokens {
+            if stored.is_expired(&now) {
+                let _ = self
+                    .user_repository
+                    .delete_email_change_token_by_hash(stored.hash())
+                    .await;
+                continue;
+            }
+            if stored.hash().verify_token(&token) {
+                found = Some(stored);
+            }
+        }
+
+        let Some(found) = found else {
+            return Ok(EmailChangeValidationResult::Invalid);
+        };
+
+        self.user_repository
+            .finalize_email_change(found.user(), found.hash())
+            .await
+            .map(EmailChangeValidationResult::from)
+    }
 }
 
 impl<UR, SS, MP> MultiUserService<UR, SS, MP>
@@ -325,6 +371,117 @@ where
 
         Ok(found.map(|link| link.user().clone()))
     }
+
+    /// Applies an email change synchronously, without verification. The new email is marked
+    /// unverified; a later flow could re-verify it.
+    #[tracing::instrument(skip_all)]
+    async fn change_email_unverified(&self, req: UpdateEmailRequest) -> UpdateEmailResult {
+        match self
+            .check_email_changeable(req.user(), req.new_email())
+            .await
+        {
+            Ok(true) => {}
+            Ok(false) => return UpdateEmailResult::Changed,
+            Err(()) => return UpdateEmailResult::Retry,
+        }
+
+        match self
+            .user_repository
+            .update_user_email(req.user(), req.new_email(), false)
+            .await
+        {
+            Ok(()) => UpdateEmailResult::Changed,
+            Err(()) => UpdateEmailResult::Retry,
+        }
+    }
+
+    /// Stores an email change token and emails the verification link to the new address in the
+    /// background. The swap itself only happens on `validate_email_change`.
+    #[tracing::instrument(skip_all)]
+    async fn request_email_change(&self, req: UpdateEmailRequest) -> UpdateEmailResult {
+        match self
+            .check_email_changeable(req.user(), req.new_email())
+            .await
+        {
+            Ok(true) => {}
+            Ok(false) => return UpdateEmailResult::VerificationEmailSent,
+            Err(()) => return UpdateEmailResult::Retry,
+        }
+
+        let token = EmailChangeToken::new(
+            req.user().clone(),
+            req.new_email().clone(),
+            AuthToken::new(),
+            chrono::Utc::now() + TimeDelta::minutes(15),
+        );
+        let Some(hashed_token) = token.as_hash() else {
+            return UpdateEmailResult::Retry;
+        };
+
+        if self
+            .user_repository
+            .store_email_change_token(&hashed_token)
+            .await
+            .is_err()
+        {
+            return UpdateEmailResult::Retry;
+        }
+
+        let repository = self.user_repository.clone();
+        let mail_provider = self.mail_provider.clone();
+        tokio::spawn(async move {
+            if mail_provider
+                .send_email_change_email(token.new_email(), &token)
+                .await
+                .is_err()
+            {
+                tracing::error!(
+                    email = %token.new_email(),
+                    "Failed to send email change verification email"
+                );
+                let _ = repository
+                    .delete_email_change_token_by_hash(hashed_token.hash())
+                    .await;
+            }
+        });
+
+        UpdateEmailResult::VerificationEmailSent
+    }
+
+    /// Shared preconditions for both email change flows. Returns
+    /// - `Ok(true)` when the change can proceed,
+    /// - `Ok(false)` when the caller should answer success without doing anything to not leak,
+    /// - `Err(())` on repository failure, which callers must surface as a retryable error.
+    #[tracing::instrument(skip_all)]
+    async fn check_email_changeable(
+        &self,
+        user: &UserId,
+        new_email: &EmailAddress,
+    ) -> Result<bool, ()> {
+        match self.user_repository.get_user_email(user).await {
+            Ok(Some(current)) if current == *new_email => {
+                // Changing to the current email: nothing to do.
+                return Ok(false);
+            }
+            Ok(Some(_)) => {}
+            // The user has no email row: nothing we can act on.
+            Ok(None) => return Ok(false),
+            Err(()) => return Err(()),
+        }
+
+        match self.user_repository.get_user_by_email(new_email).await {
+            Ok(Some((owner, _))) if owner != *user => {
+                // The target email is already registered to another user: answer the same as a
+                // success to not leak that account's existence.
+                tracing::warn!(%user, new_email = %new_email, "Email change requested for an email already in use");
+                return Ok(false);
+            }
+            Ok(Some(_)) | Ok(None) => {}
+            Err(()) => return Err(()),
+        }
+
+        Ok(true)
+    }
 }
 
 pub trait UserRepository: Clone + Send + Sync + 'static {
@@ -374,6 +531,43 @@ pub trait UserRepository: Clone + Send + Sync + 'static {
         &self,
         reference: chrono::DateTime<chrono::Utc>,
     ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+
+    fn get_user_email(
+        &self,
+        user: &UserId,
+    ) -> impl Future<Output = Result<Option<EmailAddress>, ()>> + Send;
+
+    fn update_user_email(
+        &self,
+        user: &UserId,
+        new_email: &EmailAddress,
+        verified: bool,
+    ) -> impl Future<Output = Result<(), ()>> + Send;
+
+    fn store_email_change_token(
+        &self,
+        token: &HashedEmailChangeToken,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+
+    fn get_all_email_change_tokens(
+        &self,
+    ) -> impl Future<Output = Vec<HashedEmailChangeToken>> + Send;
+
+    fn delete_email_change_token_by_hash(
+        &self,
+        hash: &HashedAuthToken,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+
+    fn delete_expired_email_change_tokens(
+        &self,
+        reference: chrono::DateTime<chrono::Utc>,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+
+    fn finalize_email_change(
+        &self,
+        user: &UserId,
+        hash: &HashedAuthToken,
+    ) -> impl Future<Output = Result<EmailChangeFinalizeResult, ()>> + Send;
 }
 
 #[tracing::instrument(skip_all)]
@@ -391,6 +585,26 @@ pub fn spawn_expired_auth_links_cleanup<UR: UserRepository>(
                 .await
             {
                 tracing::warn!("Failed to clean up expired auth links: {err}");
+            }
+        }
+    });
+}
+
+#[tracing::instrument(skip_all)]
+pub fn spawn_expired_email_change_tokens_cleanup<UR: UserRepository>(
+    repository: Arc<UR>,
+    interval: std::time::Duration,
+) {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(interval);
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            ticker.tick().await;
+            if let Err(err) = repository
+                .delete_expired_email_change_tokens(chrono::Utc::now())
+                .await
+            {
+                tracing::warn!("Failed to clean up expired email change tokens: {err}");
             }
         }
     });
@@ -459,6 +673,38 @@ mod test_utils {
                 &self,
                 reference: chrono::DateTime<chrono::Utc>,
             ) -> Result<(), anyhow::Error>;
+
+            async fn get_user_email(&self, user: &UserId) -> Result<Option<EmailAddress>, ()>;
+
+            async fn update_user_email(
+                &self,
+                user: &UserId,
+                new_email: &EmailAddress,
+                verified: bool,
+            ) -> Result<(), ()>;
+
+            async fn store_email_change_token(
+                &self,
+                token: &HashedEmailChangeToken,
+            ) -> Result<(), anyhow::Error>;
+
+            async fn get_all_email_change_tokens(&self) -> Vec<HashedEmailChangeToken>;
+
+            async fn delete_email_change_token_by_hash(
+                &self,
+                hash: &HashedAuthToken,
+            ) -> Result<(), anyhow::Error>;
+
+            async fn delete_expired_email_change_tokens(
+                &self,
+                reference: chrono::DateTime<chrono::Utc>,
+            ) -> Result<(), anyhow::Error>;
+
+            async fn finalize_email_change(
+                &self,
+                user: &UserId,
+                hash: &HashedAuthToken,
+            ) -> Result<EmailChangeFinalizeResult, ()>;
         }
     }
 
@@ -1590,6 +1836,17 @@ impl IMultiUserService for DisabledUserService {
     async fn update_password(&self, _req: UpdatePasswordRequest) -> UpdatePasswordResult {
         panic!("User service is disabled")
     }
+
+    async fn update_email(&self, _req: UpdateEmailRequest) -> UpdateEmailResult {
+        panic!("User service is disabled")
+    }
+
+    async fn validate_email_change(
+        &self,
+        _token: AuthToken,
+    ) -> Result<EmailChangeValidationResult, ()> {
+        panic!("User service is disabled")
+    }
 }
 
 #[cfg(test)]
@@ -1879,5 +2136,505 @@ mod test_spawn_expired_auth_links_cleanup {
         tokio::time::sleep(std::time::Duration::from_millis(20)).await;
 
         assert!(calls.load(Ordering::SeqCst) >= 1);
+    }
+}
+#[cfg(test)]
+mod test_user_service_update_email {
+    use anyhow::anyhow;
+    use chrono::{TimeDelta, Utc};
+
+    use crate::inbound::auth::multi_user::{
+        EmailAddress, EmailChangeFinalizeResult, EmailChangeToken, EmailChangeValidationResult,
+        HashedEmailChangeToken,
+        service::test_utils::{
+            MockUserRepository, TEST_EMAIL, mail_only_service, mail_only_service_with_session,
+            password_only_service, registration_request,
+        },
+        test_utils::{MockMailProvider, MockSessionService},
+    };
+
+    use super::*;
+
+    fn email(value: &str) -> EmailAddress {
+        EmailAddress::try_from(value).unwrap()
+    }
+
+    fn current_email() -> EmailAddress {
+        email(TEST_EMAIL)
+    }
+
+    fn new_email() -> EmailAddress {
+        email("new@mail.test")
+    }
+
+    fn update_request(new_email: &str) -> UpdateEmailRequest {
+        UpdateEmailRequest::new(UserId::test_default(), email(new_email))
+    }
+
+    /// A stored token whose raw token value is [`RAW_TOKEN`] and whose target is [`new_email`].
+    fn stored_change_token(expire_at: chrono::DateTime<Utc>) -> HashedEmailChangeToken {
+        HashedEmailChangeToken::new(
+            UserId::test_default(),
+            new_email(),
+            raw_token().as_hash().expect("hashing should succeed"),
+            expire_at,
+        )
+    }
+
+    fn raw_token() -> AuthToken {
+        AuthToken::from("a very long and secure email change token".to_string())
+    }
+
+    /// Common expectations for a changeable email: the user has the current email and the target
+    /// is free.
+    fn expect_changeable(user: &mut MockUserRepository) {
+        user.expect_get_user_email()
+            .returning(|_| Ok(Some(current_email())));
+        user.expect_get_user_by_email().returning(|email| {
+            if email == &current_email() {
+                Ok(Some((UserId::test_default(), None)))
+            } else {
+                Ok(None)
+            }
+        });
+    }
+
+    #[tokio::test]
+    async fn test_mail_mode_stores_token_and_sends_verification_email() {
+        let mut mailer = MockMailProvider::new();
+        mailer
+            .expect_send_email_change_email()
+            .times(1)
+            .withf(|mail, token| mail == &new_email() && token.user() == &UserId::test_default())
+            .returning(|_, _| Ok(()));
+        let mut user = MockUserRepository::new();
+        expect_changeable(&mut user);
+        user.expect_store_email_change_token()
+            .times(1)
+            .withf(|token| {
+                token.user() == &UserId::test_default() && token.new_email() == &new_email()
+            })
+            .returning(|_| Ok(()));
+
+        let service = mail_only_service(user, mailer);
+
+        let res = service.update_email(update_request("new@mail.test")).await;
+
+        assert_eq!(res, UpdateEmailResult::VerificationEmailSent);
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+
+    #[tokio::test]
+    async fn test_mail_mode_silent_success_when_email_already_in_use() {
+        let mut mailer = MockMailProvider::new();
+        mailer.expect_send_email_change_email().times(0);
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_email()
+            .returning(|_| Ok(Some(current_email())));
+        // The target email belongs to another user.
+        user.expect_get_user_by_email()
+            .returning(|_| Ok(Some((UserId::from("other".to_string()), None))));
+        user.expect_store_email_change_token().times(0);
+
+        let service = mail_only_service(user, mailer);
+
+        let res = service.update_email(update_request("new@mail.test")).await;
+
+        // Same answer as the happy path, to not leak the other account's existence.
+        assert_eq!(res, UpdateEmailResult::VerificationEmailSent);
+    }
+
+    #[tokio::test]
+    async fn test_mail_mode_unchanged_email_is_a_no_op() {
+        let mut mailer = MockMailProvider::new();
+        mailer.expect_send_email_change_email().times(0);
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_email()
+            .returning(|_| Ok(Some(current_email())));
+        user.expect_get_user_by_email().times(0);
+        user.expect_store_email_change_token().times(0);
+
+        let service = mail_only_service(user, mailer);
+
+        let res = service.update_email(update_request(TEST_EMAIL)).await;
+
+        assert_eq!(res, UpdateEmailResult::VerificationEmailSent);
+    }
+
+    #[tokio::test]
+    async fn test_mail_mode_replaces_previous_pending_token() {
+        let mut mailer = MockMailProvider::new();
+        mailer
+            .expect_send_email_change_email()
+            .times(1)
+            .returning(|_, _| Ok(()));
+        let mut user = MockUserRepository::new();
+        expect_changeable(&mut user);
+        user.expect_store_email_change_token()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let service = mail_only_service(user, mailer);
+
+        let res = service.update_email(update_request("new@mail.test")).await;
+
+        assert_eq!(res, UpdateEmailResult::VerificationEmailSent);
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+
+    #[tokio::test]
+    async fn test_mail_mode_store_token_failure_returns_retry() {
+        let mut mailer = MockMailProvider::new();
+        mailer.expect_send_email_change_email().times(0);
+        let mut user = MockUserRepository::new();
+        expect_changeable(&mut user);
+        user.expect_store_email_change_token()
+            .returning(|_| Err(anyhow!("error")));
+
+        let service = mail_only_service(user, mailer);
+
+        let res = service.update_email(update_request("new@mail.test")).await;
+
+        assert_eq!(res, UpdateEmailResult::Retry);
+    }
+
+    #[tokio::test]
+    async fn test_mail_mode_deletes_token_if_background_email_fails() {
+        // The result is still VerificationEmailSent: the email failure is only handled in the
+        // background.
+        let mut mailer = MockMailProvider::new();
+        mailer
+            .expect_send_email_change_email()
+            .times(1)
+            .returning(|_, _| Err(()));
+        let mut user = MockUserRepository::new();
+        expect_changeable(&mut user);
+        user.expect_store_email_change_token().returning(|_| Ok(()));
+        user.expect_delete_email_change_token_by_hash()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let service = mail_only_service(user, mailer);
+
+        let res = service.update_email(update_request("new@mail.test")).await;
+
+        assert_eq!(res, UpdateEmailResult::VerificationEmailSent);
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+
+    #[tokio::test]
+    async fn test_mail_mode_repo_error_returns_retry() {
+        let mut mailer = MockMailProvider::new();
+        mailer.expect_send_email_change_email().times(0);
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_email().returning(|_| Err(()));
+
+        let service = mail_only_service(user, mailer);
+
+        let res = service.update_email(update_request("new@mail.test")).await;
+
+        assert_eq!(res, UpdateEmailResult::Retry);
+    }
+
+    #[tokio::test]
+    async fn test_password_mode_updates_email_synchronously_unverified() {
+        let mut mailer = MockMailProvider::new();
+        mailer.expect_send_email_change_email().times(0);
+        let mut user = MockUserRepository::new();
+        expect_changeable(&mut user);
+        user.expect_update_user_email()
+            .times(1)
+            .withf(|user, target, verified| {
+                user == &UserId::test_default() && target == &new_email() && !verified
+            })
+            .returning(|_, _, _| Ok(()));
+        user.expect_store_email_change_token().times(0);
+
+        let service = password_only_service(user, mailer);
+
+        let res = service.update_email(update_request("new@mail.test")).await;
+
+        assert_eq!(res, UpdateEmailResult::Changed);
+    }
+
+    #[tokio::test]
+    async fn test_password_mode_silent_success_when_email_already_in_use() {
+        let mut mailer = MockMailProvider::new();
+        mailer.expect_send_email_change_email().times(0);
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_email()
+            .returning(|_| Ok(Some(current_email())));
+        user.expect_get_user_by_email()
+            .returning(|_| Ok(Some((UserId::from("other".to_string()), None))));
+        user.expect_update_user_email().times(0);
+
+        let service = password_only_service(user, mailer);
+
+        let res = service.update_email(update_request("new@mail.test")).await;
+
+        assert_eq!(res, UpdateEmailResult::Changed);
+    }
+
+    #[tokio::test]
+    async fn test_password_mode_unchanged_email_is_a_no_op() {
+        let mut mailer = MockMailProvider::new();
+        mailer.expect_send_email_change_email().times(0);
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_email()
+            .returning(|_| Ok(Some(current_email())));
+        user.expect_get_user_by_email().times(0);
+        user.expect_update_user_email().times(0);
+
+        let service = password_only_service(user, mailer);
+
+        let res = service.update_email(update_request(TEST_EMAIL)).await;
+
+        assert_eq!(res, UpdateEmailResult::Changed);
+    }
+
+    #[tokio::test]
+    async fn test_password_mode_repo_error_returns_retry() {
+        let mut mailer = MockMailProvider::new();
+        mailer.expect_send_email_change_email().times(0);
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_email()
+            .returning(|_| Ok(Some(current_email())));
+        user.expect_get_user_by_email().returning(|_| Ok(None));
+        user.expect_update_user_email().returning(|_, _, _| Err(()));
+
+        let service = password_only_service(user, mailer);
+
+        let res = service.update_email(update_request("new@mail.test")).await;
+
+        assert_eq!(res, UpdateEmailResult::Retry);
+    }
+
+    #[tokio::test]
+    async fn test_validate_email_change_ok_path() {
+        let mut user = MockUserRepository::new();
+        let link = stored_change_token(Utc::now() + TimeDelta::minutes(5));
+        let link_clone = link.clone();
+        user.expect_get_all_email_change_tokens()
+            .returning(move || vec![link_clone.clone()]);
+        let token = raw_token();
+        let session = MockSessionService::new();
+
+        user.expect_finalize_email_change()
+            .times(1)
+            .withf(move |user, hash| user == &UserId::test_default() && hash.verify_token(&token))
+            .returning(|_, _| Ok(EmailChangeFinalizeResult::Swapped(new_email())));
+
+        let service = mail_only_service_with_session(user, session, MockMailProvider::new());
+
+        let res = service.validate_email_change(raw_token()).await;
+
+        let Ok(EmailChangeValidationResult::Success(swapped)) = res else {
+            panic!("expected Success, got {res:?}");
+        };
+        assert_eq!(swapped, new_email());
+    }
+
+    #[tokio::test]
+    async fn test_validate_email_change_reports_email_already_in_use() {
+        let mut user = MockUserRepository::new();
+        let link = stored_change_token(Utc::now() + TimeDelta::minutes(5));
+        user.expect_get_all_email_change_tokens()
+            .returning(move || vec![link.clone()]);
+        // Unlike the request step, the conflict is reported explicitly.
+        user.expect_finalize_email_change()
+            .times(1)
+            .returning(|_, _| Ok(EmailChangeFinalizeResult::EmailAlreadyInUse));
+
+        let service = mail_only_service_with_session(
+            user,
+            MockSessionService::new(),
+            MockMailProvider::new(),
+        );
+
+        let res = service.validate_email_change(raw_token()).await;
+
+        assert_eq!(res.unwrap(), EmailChangeValidationResult::EmailAlreadyInUse);
+    }
+
+    #[tokio::test]
+    async fn test_validate_email_change_rejected_for_unknown_token() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_all_email_change_tokens()
+            .returning(Vec::new);
+        user.expect_finalize_email_change().times(0);
+
+        let service = mail_only_service_with_session(
+            user,
+            MockSessionService::new(),
+            MockMailProvider::new(),
+        );
+
+        let res = service.validate_email_change(raw_token()).await;
+
+        assert_eq!(res.unwrap(), EmailChangeValidationResult::Invalid);
+    }
+
+    #[tokio::test]
+    async fn test_validate_email_change_expired_token_is_deleted_and_rejected() {
+        let mut user = MockUserRepository::new();
+        let link = stored_change_token(Utc::now() - TimeDelta::minutes(5));
+        user.expect_get_all_email_change_tokens()
+            .returning(move || vec![link.clone()]);
+        user.expect_delete_email_change_token_by_hash()
+            .times(1)
+            .returning(|_| Ok(()));
+        user.expect_finalize_email_change().times(0);
+
+        let service = mail_only_service_with_session(
+            user,
+            MockSessionService::new(),
+            MockMailProvider::new(),
+        );
+
+        let res = service.validate_email_change(raw_token()).await;
+
+        assert_eq!(res.unwrap(), EmailChangeValidationResult::Invalid);
+    }
+
+    #[tokio::test]
+    async fn test_validate_email_change_unknown_token_in_finalize_is_invalid() {
+        // Covers the concurrent-validation race: another request consumed the token between the
+        // scan and the finalization.
+        let mut user = MockUserRepository::new();
+        let link = stored_change_token(Utc::now() + TimeDelta::minutes(5));
+        user.expect_get_all_email_change_tokens()
+            .returning(move || vec![link.clone()]);
+        user.expect_finalize_email_change()
+            .times(1)
+            .returning(|_, _| Ok(EmailChangeFinalizeResult::UnknownToken));
+
+        let service = mail_only_service_with_session(
+            user,
+            MockSessionService::new(),
+            MockMailProvider::new(),
+        );
+
+        let res = service.validate_email_change(raw_token()).await;
+
+        assert_eq!(res.unwrap(), EmailChangeValidationResult::Invalid);
+    }
+
+    #[tokio::test]
+    async fn test_validate_email_change_repo_error_is_error() {
+        let mut user = MockUserRepository::new();
+        let link = stored_change_token(Utc::now() + TimeDelta::minutes(5));
+        user.expect_get_all_email_change_tokens()
+            .returning(move || vec![link.clone()]);
+        user.expect_finalize_email_change()
+            .times(1)
+            .returning(|_, _| Err(()));
+
+        let service = mail_only_service_with_session(
+            user,
+            MockSessionService::new(),
+            MockMailProvider::new(),
+        );
+
+        let res = service.validate_email_change(raw_token()).await;
+
+        assert!(res.is_err());
+    }
+
+    /// Sanity check on the shared preconditions helper: a changeable request passes, and the
+    /// no-op cases short-circuit.
+    #[tokio::test]
+    async fn test_check_email_changeable_returns_false_for_no_ops() {
+        let mut user = MockUserRepository::new();
+        expect_changeable(&mut user);
+
+        let service = mail_only_service(user, MockMailProvider::new());
+
+        // Same email: no-op.
+        assert_eq!(
+            service
+                .check_email_changeable(&UserId::test_default(), &current_email())
+                .await,
+            Ok(false)
+        );
+
+        // Email owned by another user: silent no-op.
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_email()
+            .returning(|_| Ok(Some(current_email())));
+        user.expect_get_user_by_email()
+            .returning(|_| Ok(Some((UserId::from("other".to_string()), None))));
+        let service = mail_only_service(user, MockMailProvider::new());
+        assert_eq!(
+            service
+                .check_email_changeable(&UserId::test_default(), &new_email())
+                .await,
+            Ok(false)
+        );
+    }
+
+    /// Sanity check on the shared preconditions helper: repository failures surface as `Err` so
+    /// callers return a retryable error instead of a silent success.
+    #[tokio::test]
+    async fn test_check_email_changeable_returns_err_on_repo_error() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_email().returning(|_| Err(()));
+        let service = mail_only_service(user, MockMailProvider::new());
+        assert_eq!(
+            service
+                .check_email_changeable(&UserId::test_default(), &new_email())
+                .await,
+            Err(())
+        );
+
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_email()
+            .returning(|_| Ok(Some(current_email())));
+        user.expect_get_user_by_email().returning(|_| Err(()));
+        let service = mail_only_service(user, MockMailProvider::new());
+        assert_eq!(
+            service
+                .check_email_changeable(&UserId::test_default(), &new_email())
+                .await,
+            Err(())
+        );
+    }
+
+    /// Registration still works after the trait extension (compile-time coverage that all mock
+    /// impls remain complete).
+    #[tokio::test]
+    async fn test_registration_still_works() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_by_email().returning(|_| Ok(None));
+        user.expect_store_user()
+            .times(1)
+            .returning(|_, _, _| Ok(()));
+        user.expect_store_auth_link().times(1).returning(|_| Ok(()));
+        let mut mailer = MockMailProvider::new();
+        mailer
+            .expect_send_auth_link_email()
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        let service = mail_only_service(user, mailer);
+
+        let res = service.register_user(registration_request(None)).await;
+
+        assert_eq!(res, UserRegistrationResult::Success);
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+
+    /// Keep the token type import used: verifies that a freshly built token carries the target
+    /// email through its hash.
+    #[test]
+    fn test_email_change_token_carries_target_email() {
+        let token = EmailChangeToken::new(
+            UserId::test_default(),
+            new_email(),
+            AuthToken::new(),
+            Utc::now() + TimeDelta::minutes(15),
+        );
+        let hashed = token.as_hash().unwrap();
+        assert_eq!(hashed.new_email(), &new_email());
+        assert_eq!(hashed.user(), &UserId::test_default());
     }
 }

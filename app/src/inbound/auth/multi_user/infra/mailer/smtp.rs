@@ -13,7 +13,7 @@ use lettre::{
 use serde_json::json;
 use thiserror::Error;
 
-use crate::inbound::auth::multi_user::{AuthLink, EmailAddress, MailProvider};
+use crate::inbound::auth::multi_user::{AuthLink, EmailAddress, EmailChangeToken, MailProvider};
 
 #[derive(Debug, Clone)]
 pub struct SMTPEmailProvider {
@@ -45,6 +45,12 @@ impl SMTPEmailProvider {
         let mut handlebars = Handlebars::new();
         handlebars
             .register_template_string("auth_link", include_str!("templates/auth_link_email.hbs"))
+            .map_err(|_| SMTPEmailProviderCreationError::TemplateFileError)?;
+        handlebars
+            .register_template_string(
+                "email_change",
+                include_str!("templates/email_change_email.hbs"),
+            )
             .map_err(|_| SMTPEmailProviderCreationError::TemplateFileError)?;
         handlebars.register_helper("link-helper", Box::new(link_helper));
 
@@ -81,9 +87,74 @@ impl SMTPEmailProvider {
         let rendered = self.handlebars.render("auth_link", &data).map_err(|_| ())?;
         Ok(rendered)
     }
+
+    fn render_email_change_template(
+        &self,
+        email_change_url: &str,
+        user_email: &str,
+    ) -> Result<String, ()> {
+        let data = json!({
+            "EMAIL_CHANGE_URL": email_change_url,
+            "USER_EMAIL": user_email,
+        });
+
+        let rendered = self
+            .handlebars
+            .render("email_change", &data)
+            .map_err(|_| ())?;
+        Ok(rendered)
+    }
 }
 
 impl MailProvider for SMTPEmailProvider {
+    /// Email carries a single-use link whose fragment is the verification token: fragments are
+    /// never sent to the server, so the token doesn't end up in the reverse proxy's access logs
+    /// (same rationale as [`MailProvider::send_auth_link_email`]).
+    async fn send_email_change_email(
+        &self,
+        email: &EmailAddress,
+        email_change_token: &EmailChangeToken,
+    ) -> Result<(), ()> {
+        let link = format!(
+            "{}/settings/email#{}",
+            self.domain,
+            email_change_token.token()
+        );
+
+        let text_body = format!(
+            "Hello!\n\nClick this link to confirm your new email address:\n{}\n\nThis link expires in 15 minutes.\n\nIf you didn't request this, you can ignore this email and your email address will remain unchanged.",
+            link
+        );
+
+        let html_body = self.render_email_change_template(&link, &email.to_string())?;
+
+        let email = Message::builder()
+            .from(Mailbox::new(None, self.from.clone()))
+            .to(Mailbox::new(None, email.value().parse().map_err(|_| ())?))
+            .subject("Confirm your new email address for activities.training")
+            .multipart(
+                MultiPart::alternative()
+                    .singlepart(
+                        SinglePart::builder()
+                            .header(header::ContentType::TEXT_PLAIN)
+                            .body(text_body),
+                    )
+                    .singlepart(
+                        SinglePart::builder()
+                            .header(header::ContentType::TEXT_HTML)
+                            .body(html_body),
+                    ),
+            )
+            .map_err(|_| ())?;
+
+        match self.mailer.send(email).await {
+            Ok(_) => Ok(()),
+            Err(err) => {
+                tracing::warn!("{err:?}");
+                Err(())
+            }
+        }
+    }
     async fn send_auth_link_email(
         &self,
         email: &EmailAddress,

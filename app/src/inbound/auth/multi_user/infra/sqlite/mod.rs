@@ -3,15 +3,16 @@ use std::str::FromStr;
 use anyhow::anyhow;
 use chrono::{DateTime, Utc};
 use sqlx::{
-    ConnectOptions, SqlitePool,
+    ConnectOptions, Sqlite, SqlitePool, Transaction,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
 };
 
 use crate::{
     domain::models::UserId,
     inbound::auth::multi_user::{
-        EmailAddress, HashedAuthLink, HashedAuthToken, HashedPassword, HashedSession,
-        HashedSessionToken, service::UserRepository, session::SessionRepository,
+        EmailAddress, EmailChangeFinalizeResult, HashedAuthLink, HashedAuthToken,
+        HashedEmailChangeToken, HashedPassword, HashedSession, HashedSessionToken,
+        service::UserRepository, session::SessionRepository,
     },
 };
 
@@ -52,6 +53,96 @@ impl SqliteUsersRepository {
             .await?;
 
         Ok(Self { writer, readers })
+    }
+}
+
+impl SqliteUsersRepository {
+    /// Deletes the pending email change token, returning the target email carried by the deleted
+    /// row (or `None` if token does not exist). Err if the token's email cannot be parsed.
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn delete_email_change_token(
+        tx: &mut Transaction<'_, Sqlite>,
+        user: &UserId,
+        hash: &HashedAuthToken,
+    ) -> Result<Option<EmailAddress>, ()> {
+        let deleted: Option<String> = sqlx::query_scalar(
+            r#"
+        DELETE FROM t_email_change_tokens
+        WHERE
+            token_hash = ?1
+            AND user = (SELECT rowid FROM t_users WHERE user_id = ?2)
+        RETURNING new_email
+        ;"#,
+        )
+        .bind(hash.to_string())
+        .bind(user.to_string())
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(|err| {
+            tracing::warn!("Unable to consume email change token in database: {}", err);
+        })?;
+
+        match deleted {
+            None => Ok(None),
+            Some(email) => match EmailAddress::try_from(email) {
+                Ok(email) => Ok(Some(email)),
+                Err(err) => {
+                    tracing::warn!(
+                        "Consumed email change token carries an invalid target email: {}",
+                        err
+                    );
+                    Err(())
+                }
+            },
+        }
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn is_email_unique(
+        tx: &mut Transaction<'_, Sqlite>,
+        user: &UserId,
+        email: &str,
+    ) -> Result<bool, sqlx::Error> {
+        let in_use: i64 = sqlx::query_scalar(
+            r#"
+        SELECT COUNT(*)
+        FROM t_emails e
+        WHERE e.email = ?1 AND e.user != (SELECT rowid FROM t_users WHERE user_id = ?2)
+        ;"#,
+        )
+        .bind(email)
+        .bind(user.to_string())
+        .fetch_one(&mut **tx)
+        .await?;
+        Ok(in_use == 0)
+    }
+
+    /// Swaps the user's email and marks it verified.
+    #[tracing::instrument(skip_all, err)]
+    async fn set_user_email_verified(
+        tx: &mut Transaction<'_, Sqlite>,
+        user: &UserId,
+        email: &str,
+    ) -> Result<(), anyhow::Error> {
+        let res = sqlx::query(
+            r#"
+        UPDATE t_emails
+        SET email = ?1, verified = TRUE
+        WHERE user = (SELECT rowid FROM t_users WHERE user_id = ?2)
+        ;"#,
+        )
+        .bind(email)
+        .bind(user.to_string())
+        .execute(&mut **tx)
+        .await
+        .map_err(|err| anyhow!(err))?;
+        if res.rows_affected() != 1 {
+            return Err(anyhow!(
+                "Not exactly one row affected: {}",
+                res.rows_affected()
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -295,6 +386,220 @@ impl UserRepository for SqliteUsersRepository {
             .map(|_| ())
             .map_err(|err| anyhow!(err))
     }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn get_user_email(&self, user: &UserId) -> Result<Option<EmailAddress>, ()> {
+        let res: Result<Option<String>, sqlx::Error> = sqlx::query_scalar(
+            r#"
+        SELECT e.email
+        FROM t_emails e
+        JOIN t_users u ON u.rowid = e.user
+        WHERE u.user_id = ?1
+        ;"#,
+        )
+        .bind(user.to_string())
+        .fetch_optional(&self.readers)
+        .await;
+        match res {
+            Ok(email) => Ok(match email {
+                Some(email) => match EmailAddress::try_from(email) {
+                    Ok(email) => Some(email),
+                    Err(err) => {
+                        tracing::warn!("Stored user email is not a valid email address: {}", err);
+                        return Err(());
+                    }
+                },
+                None => None,
+            }),
+            Err(err) => {
+                tracing::warn!("Cannot fetch user email from database: {}", err);
+                Err(())
+            }
+        }
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn update_user_email(
+        &self,
+        user: &UserId,
+        new_email: &EmailAddress,
+        verified: bool,
+    ) -> Result<(), ()> {
+        let res = sqlx::query(
+            r#"
+        UPDATE t_emails
+        SET email = ?2, verified = ?3
+        WHERE user = (SELECT rowid FROM t_users WHERE user_id = ?1)
+        ;"#,
+        )
+        .bind(user.to_string())
+        .bind(new_email.to_string())
+        .bind(verified)
+        .execute(&self.writer)
+        .await;
+        match res {
+            Ok(res) if res.rows_affected() == 1 => Ok(()),
+            Ok(res) => {
+                tracing::warn!(
+                    "Unable to update user email in database: not exactly one row affected ({})",
+                    res.rows_affected()
+                );
+                Err(())
+            }
+            Err(err) => {
+                tracing::warn!("Unable to update user email in database: {}", err);
+                Err(())
+            }
+        }
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn store_email_change_token(
+        &self,
+        token: &HashedEmailChangeToken,
+    ) -> Result<(), anyhow::Error> {
+        let res = sqlx::query(
+            r#"
+           INSERT INTO t_email_change_tokens (user, new_email, token_hash, expire_at)
+           SELECT rowid, ?2, ?3, ?4 FROM t_users WHERE user_id = ?1
+           ;"#,
+        )
+        .bind(token.user().to_string())
+        .bind(token.new_email().to_string())
+        .bind(token.hash().to_string())
+        .bind(token.expire_at())
+        .execute(&self.writer)
+        .await
+        .map_err(|err| {
+            tracing::warn!("Unable to insert email change token into database: {}", err);
+            anyhow!(err)
+        })?;
+
+        if res.rows_affected() != 1 {
+            tracing::warn!("Unable to insert email change token into database: unknown user");
+            return Err(anyhow!(
+                "Unable to insert email change token into database: unknown user"
+            ));
+        }
+
+        Ok(())
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn get_all_email_change_tokens(&self) -> Vec<HashedEmailChangeToken> {
+        let res: Vec<(String, String, String, DateTime<Utc>)> = match sqlx::query_as(
+            r#"
+           SELECT u.user_id, t.new_email, t.token_hash, t.expire_at
+           FROM t_email_change_tokens t
+           JOIN t_users u ON u.rowid = t.user
+           ;"#,
+        )
+        .fetch_all(&self.readers)
+        .await
+        {
+            Ok(res) => res,
+            Err(err) => {
+                tracing::warn!("Cannot fetch email change tokens from database: {}", err);
+                return Vec::new();
+            }
+        };
+        res.iter()
+            .map(|(user, new_email, token, expire_at)| {
+                let Ok(new_email) = EmailAddress::try_from(new_email.clone()) else {
+                    tracing::warn!(
+                        "Stored email change token has an invalid target email: {}",
+                        new_email
+                    );
+                    return None;
+                };
+                Some(HashedEmailChangeToken::new(
+                    UserId::from(user.clone()),
+                    new_email,
+                    HashedAuthToken::new(token.clone()),
+                    *expire_at,
+                ))
+            })
+            .collect::<Option<Vec<_>>>()
+            .unwrap_or_default()
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn delete_email_change_token_by_hash(
+        &self,
+        hash: &HashedAuthToken,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query("DELETE FROM t_email_change_tokens WHERE token_hash = ?1;")
+            .bind(hash.to_string())
+            .execute(&self.writer)
+            .await
+            .map(|_| ())
+            .map_err(|err| anyhow!(err))
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn delete_expired_email_change_tokens(
+        &self,
+        reference: DateTime<Utc>,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query("DELETE FROM t_email_change_tokens WHERE expire_at <= ?1;")
+            .bind(reference)
+            .execute(&self.writer)
+            .await
+            .map(|_| ())
+            .map_err(|err| anyhow!(err))
+    }
+
+    /// Consumes the token and swaps user's email in a single transaction, so the token can only be
+    /// used once even under concurrent validation attempts.
+    /// Domain logic voluntary leaks into the infra to ensure atomic compare-and-swap semantic.
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn finalize_email_change(
+        &self,
+        user: &UserId,
+        hash: &HashedAuthToken,
+    ) -> Result<EmailChangeFinalizeResult, ()> {
+        let mut tx = self.writer.begin().await.map_err(|err| {
+            tracing::warn!("Unable to start transaction to finalize email change");
+            tracing::warn!("{}", err);
+        })?;
+
+        let Some(new_email) = Self::delete_email_change_token(&mut tx, user, hash).await? else {
+            return Ok(EmailChangeFinalizeResult::UnknownToken);
+        };
+
+        let is_unique = Self::is_email_unique(&mut tx, user, new_email.value())
+            .await
+            .map_err(|err| {
+                tracing::warn!("Unable to check email availability in database");
+                tracing::warn!("{}", err);
+            })?;
+
+        if !is_unique {
+            // Token stays consumed: retrying with the same link is pointless.
+            tx.commit().await.map(|_| ()).map_err(|err| {
+                tracing::warn!(
+                    "Unable to commit email change finalization transaction: {}",
+                    err
+                );
+            })?;
+            return Ok(EmailChangeFinalizeResult::EmailAlreadyInUse);
+        }
+
+        Self::set_user_email_verified(&mut tx, user, new_email.value())
+            .await
+            .map_err(|err| {
+                tracing::warn!("Unable to update user email in database: {}", err);
+            })?;
+
+        tx.commit().await.map(|_| ()).map_err(|err| {
+            tracing::warn!(
+                "Unable to commit email change finalization transaction: {}",
+                err
+            );
+        })?;
+
+        Ok(EmailChangeFinalizeResult::Swapped(new_email))
+    }
 }
 
 impl SessionRepository for SqliteUsersRepository {
@@ -384,8 +689,9 @@ mod test_sqlite_users_repository {
     use crate::{
         domain::models::UserId,
         inbound::auth::multi_user::{
-            AuthLink, AuthToken, EmailAddress, HashedSessionToken, Password, Session, SessionToken,
-            service::UserRepository, session::SessionRepository,
+            AuthLink, AuthToken, EmailAddress, EmailChangeFinalizeResult, HashedEmailChangeToken,
+            HashedSessionToken, Password, Session, SessionToken, service::UserRepository,
+            session::SessionRepository,
         },
     };
 
@@ -1486,5 +1792,245 @@ mod test_sqlite_users_repository {
             .await
             .unwrap();
         assert!(!replaced, "no row exists, so nothing was replaced");
+    }
+
+    fn new_email() -> EmailAddress {
+        EmailAddress::try_from("new@mail.test").unwrap()
+    }
+
+    fn stored_email_change_token() -> HashedEmailChangeToken {
+        HashedEmailChangeToken::new(
+            UserId::test_default(),
+            new_email(),
+            AuthToken::new().as_hash().unwrap(),
+            Utc::now() + TimeDelta::minutes(15),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_get_user_email() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        let email = repository
+            .get_user_email(&UserId::test_default())
+            .await
+            .unwrap();
+        assert_eq!(email, Some(test_email()));
+
+        let missing = repository
+            .get_user_email(&UserId::from("unknown".to_string()))
+            .await
+            .unwrap();
+        assert_eq!(missing, None);
+    }
+
+    #[tokio::test]
+    async fn test_store_email_change_token() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let token = stored_email_change_token();
+
+        repository
+            .store_email_change_token(&token)
+            .await
+            .expect("store_email_change_token should have succeeded");
+
+        let tokens = repository.get_all_email_change_tokens().await;
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].user(), token.user());
+        assert_eq!(tokens[0].new_email(), token.new_email());
+        assert_eq!(tokens[0].hash(), token.hash());
+        assert_eq!(tokens[0].expire_at(), token.expire_at());
+    }
+
+    #[tokio::test]
+    async fn test_store_email_change_token_rejects_unknown_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let token = HashedEmailChangeToken::new(
+            UserId::test_default(),
+            new_email(),
+            AuthToken::new().as_hash().unwrap(),
+            Utc::now() + TimeDelta::minutes(15),
+        );
+        repository
+            .store_email_change_token(&token)
+            .await
+            .expect_err("unknown user should be rejected");
+    }
+
+    // #[tokio::test]
+    // async fn test_delete_email_change_tokens_for_user() {
+    //     let (_db_file, repository) = repository_with_test_user().await;
+    //     let token = stored_email_change_token();
+    //     repository.store_email_change_token(&token).await.unwrap();
+
+    //     // Deleting for another user is a no-op.
+    //     repository
+    //         .delete_email_change_tokens_for_user(&UserId::from("other".to_string()))
+    //         .await
+    //         .unwrap();
+    //     assert_eq!(repository.get_all_email_change_tokens().await.len(), 1);
+
+    //     repository
+    //         .delete_email_change_tokens_for_user(&UserId::test_default())
+    //         .await
+    //         .unwrap();
+    //     assert!(repository.get_all_email_change_tokens().await.is_empty());
+    // }
+
+    #[tokio::test]
+    async fn test_delete_email_change_token_by_hash_and_expiry() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let token = stored_email_change_token();
+        repository.store_email_change_token(&token).await.unwrap();
+
+        // Not expired yet: cleanup is a no-op.
+        repository
+            .delete_expired_email_change_tokens(Utc::now())
+            .await
+            .unwrap();
+        assert_eq!(repository.get_all_email_change_tokens().await.len(), 1);
+
+        repository
+            .delete_expired_email_change_tokens(*token.expire_at() + TimeDelta::seconds(1))
+            .await
+            .unwrap();
+        assert!(repository.get_all_email_change_tokens().await.is_empty());
+
+        // Store another token and delete it by hash.
+        let token = stored_email_change_token();
+        repository.store_email_change_token(&token).await.unwrap();
+        repository
+            .delete_email_change_token_by_hash(token.hash())
+            .await
+            .unwrap();
+        assert!(repository.get_all_email_change_tokens().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_update_user_email_marks_unverified_by_default() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        repository
+            .update_user_email(&UserId::test_default(), &new_email(), false)
+            .await
+            .expect("update_user_email should have succeeded");
+
+        // The new email is stored, marked unverified, and resolves to the same user.
+        let (user, _) = repository
+            .get_user_by_email(&new_email())
+            .await
+            .unwrap()
+            .expect("new email should resolve to the user");
+        assert_eq!(user, UserId::test_default());
+        let verified: bool = sqlx::query_scalar("SELECT verified FROM t_emails WHERE email = ?1")
+            .bind(new_email().to_string())
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap();
+        assert!(!verified);
+    }
+
+    #[tokio::test]
+    async fn test_update_user_email_rejects_unknown_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        repository
+            .update_user_email(&UserId::test_default(), &new_email(), false)
+            .await
+            .expect_err("unknown user should be rejected");
+    }
+
+    #[tokio::test]
+    async fn test_finalize_email_change_swaps_email_and_verifies() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let token = stored_email_change_token();
+        repository.store_email_change_token(&token).await.unwrap();
+
+        let res = repository
+            .finalize_email_change(token.user(), token.hash())
+            .await
+            .unwrap();
+        // The swapped email is the one carried by the consumed token row.
+        assert_eq!(res, EmailChangeFinalizeResult::Swapped(new_email()));
+
+        // Email swapped, marked verified, and the token was consumed.
+        let verified: bool = sqlx::query_scalar("SELECT verified FROM t_emails WHERE email = ?1")
+            .bind(new_email().to_string())
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap();
+        assert!(verified);
+        assert!(repository.get_all_email_change_tokens().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_finalize_email_change_consumes_token_even_if_email_taken() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let token = stored_email_change_token();
+        repository.store_email_change_token(&token).await.unwrap();
+
+        // Another user owns the target email.
+        let other = UserId::from("other_user".to_string());
+        repository
+            .store_user(&other, &new_email(), None)
+            .await
+            .unwrap();
+
+        let res = repository
+            .finalize_email_change(token.user(), token.hash())
+            .await
+            .unwrap();
+        assert_eq!(res, EmailChangeFinalizeResult::EmailAlreadyInUse);
+
+        // The token was consumed, and the requesting user kept their original email.
+        assert!(repository.get_all_email_change_tokens().await.is_empty());
+        assert_eq!(
+            repository
+                .get_user_email(&UserId::test_default())
+                .await
+                .unwrap(),
+            Some(test_email())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_finalize_email_change_unknown_token() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        let res = repository
+            .finalize_email_change(
+                &UserId::test_default(),
+                &AuthToken::new().as_hash().unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res, EmailChangeFinalizeResult::UnknownToken);
+    }
+
+    #[tokio::test]
+    async fn test_finalize_email_change_allows_keeping_unchanged_email() {
+        // Changing to the current email is a service-level no-op, but if it ever reaches the
+        // repository, the user's own row must not count as "in use".
+        let (_db_file, repository) = repository_with_test_user().await;
+        let token = HashedEmailChangeToken::new(
+            UserId::test_default(),
+            test_email(),
+            AuthToken::new().as_hash().unwrap(),
+            Utc::now() + TimeDelta::minutes(15),
+        );
+        repository.store_email_change_token(&token).await.unwrap();
+
+        let res = repository
+            .finalize_email_change(token.user(), token.hash())
+            .await
+            .unwrap();
+        assert_eq!(res, EmailChangeFinalizeResult::Swapped(test_email()));
     }
 }

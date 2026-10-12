@@ -10,7 +10,10 @@ use crate::{
         training::TrainingService,
     },
     inbound::{
-        auth::multi_user::{MaybeMailProvider, service::spawn_expired_auth_links_cleanup},
+        auth::multi_user::{
+            MaybeMailProvider,
+            service::{spawn_expired_auth_links_cleanup, spawn_expired_email_change_tokens_cleanup},
+        },
         http::{
             AuthMethods, DoNothingMailProvider, HttpServer, MultiUserService, SMTPEmailProvider,
             SessionService, SqliteUsersRepository, spawn_expired_sessions_cleanup,
@@ -212,6 +215,10 @@ async fn build_user_service(
 
     if mode_config.email.is_some() {
         spawn_expired_auth_links_cleanup(
+            users_repository.clone(),
+            EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,
+        );
+        spawn_expired_email_change_tokens_cleanup(
             users_repository.clone(),
             EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,
         );

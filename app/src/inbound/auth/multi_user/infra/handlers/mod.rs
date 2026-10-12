@@ -14,6 +14,7 @@ pub use login_user::login_user;
 pub use logout::logout;
 pub use register_user::register_user;
 pub use set_password::{register_password, update_password};
+pub use update_email::{update_email, validate_email_change};
 pub use validate_login::validate_login;
 
 pub mod extractor;
@@ -21,6 +22,7 @@ pub mod login_user;
 pub mod logout;
 pub mod register_user;
 pub mod set_password;
+pub mod update_email;
 pub mod validate_login;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -100,6 +102,7 @@ where
     // isn't realistic, but this still caps the cost of the Argon2 verification per IP.
     let validate_router = Router::new()
         .route("/login/validate", post(validate_login::<US>))
+        .route("/email/change/validate", post(validate_email_change::<US>))
         .route("/logout", post(logout::<US>))
         .route_layer(IpRateLimitLayer::new(
             RateLimitStore::new(),
@@ -114,6 +117,7 @@ where
     let account_router = Router::new()
         .route("/password", post(register_password::<US>))
         .route("/password/change", post(update_password::<US>))
+        .route("/account/email", post(update_email::<US>))
         .route_layer(axum::middleware::from_fn_with_state(
             auth_state.clone(),
             cookie_auth_middleware::<US>,

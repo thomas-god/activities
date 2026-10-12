@@ -43,12 +43,12 @@ impl TryFrom<&str> for EmailAddress {
 }
 
 impl TryFrom<String> for EmailAddress {
-    type Error = ();
+    type Error = String;
     fn try_from(value: String) -> Result<Self, Self::Error> {
         if EmailAddressValidator::is_valid(&value) {
             return Ok(Self(value));
         }
-        Err(())
+        Err(value)
     }
 }
 
@@ -178,6 +178,79 @@ impl HashedAuthLink {
     pub fn is_expired(&self, reference: &chrono::DateTime<Utc>) -> bool {
         reference >= &self.expire_at
     }
+}
+
+#[derive(Clone, Debug, Constructor)]
+pub struct EmailChangeToken {
+    user: UserId,
+    new_email: EmailAddress,
+    token: AuthToken,
+    expire_at: chrono::DateTime<Utc>,
+}
+
+impl EmailChangeToken {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn new_email(&self) -> &EmailAddress {
+        &self.new_email
+    }
+
+    pub fn token(&self) -> &AuthToken {
+        &self.token
+    }
+
+    pub fn expire_at(&self) -> &chrono::DateTime<Utc> {
+        &self.expire_at
+    }
+
+    pub fn as_hash(&self) -> Option<HashedEmailChangeToken> {
+        let hash = self.token().as_hash()?;
+        Some(HashedEmailChangeToken::new(
+            self.user().clone(),
+            self.new_email().clone(),
+            hash,
+            *self.expire_at(),
+        ))
+    }
+}
+
+#[derive(Clone, Debug, Constructor)]
+pub struct HashedEmailChangeToken {
+    user: UserId,
+    new_email: EmailAddress,
+    hash: HashedAuthToken,
+    expire_at: chrono::DateTime<Utc>,
+}
+
+impl HashedEmailChangeToken {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn new_email(&self) -> &EmailAddress {
+        &self.new_email
+    }
+
+    pub fn hash(&self) -> &HashedAuthToken {
+        &self.hash
+    }
+
+    pub fn expire_at(&self) -> &chrono::DateTime<Utc> {
+        &self.expire_at
+    }
+
+    pub fn is_expired(&self, reference: &chrono::DateTime<Utc>) -> bool {
+        reference >= &self.expire_at
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum EmailChangeFinalizeResult {
+    Swapped(EmailAddress),
+    EmailAlreadyInUse,
+    UnknownToken,
 }
 
 #[derive(Clone, Debug, Constructor)]
@@ -460,6 +533,45 @@ pub enum UpdatePasswordResult {
     Retry,
 }
 
+#[derive(Debug, Clone, Constructor)]
+pub struct UpdateEmailRequest {
+    user: UserId,
+    new_email: EmailAddress,
+}
+
+impl UpdateEmailRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+    pub fn new_email(&self) -> &EmailAddress {
+        &self.new_email
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UpdateEmailResult {
+    Changed,
+    VerificationEmailSent,
+    Retry,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum EmailChangeValidationResult {
+    Success(EmailAddress),
+    EmailAlreadyInUse,
+    Invalid,
+}
+
+impl From<EmailChangeFinalizeResult> for EmailChangeValidationResult {
+    fn from(value: EmailChangeFinalizeResult) -> Self {
+        match value {
+            EmailChangeFinalizeResult::Swapped(new_email) => Self::Success(new_email),
+            EmailChangeFinalizeResult::EmailAlreadyInUse => Self::EmailAlreadyInUse,
+            EmailChangeFinalizeResult::UnknownToken => Self::Invalid,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum UserLoginResult {
     /// Mail-based path: an auth link was (or would have been) sent; never reveals whether the
@@ -512,6 +624,16 @@ pub trait IMultiUserService: Clone + Send + Sync + 'static {
         &self,
         req: UpdatePasswordRequest,
     ) -> impl Future<Output = UpdatePasswordResult> + Send;
+
+    fn update_email(
+        &self,
+        req: UpdateEmailRequest,
+    ) -> impl Future<Output = UpdateEmailResult> + Send;
+
+    fn validate_email_change(
+        &self,
+        token: AuthToken,
+    ) -> impl Future<Output = Result<EmailChangeValidationResult, ()>> + Send;
 }
 
 #[derive(Debug, Clone, Constructor)]
@@ -606,6 +728,12 @@ pub trait MailProvider: Clone + Send + Sync + 'static {
         email: &EmailAddress,
         auth_link: &AuthLink,
     ) -> impl Future<Output = Result<(), ()>> + Send;
+
+    fn send_email_change_email(
+        &self,
+        email: &EmailAddress,
+        email_change_token: &EmailChangeToken,
+    ) -> impl Future<Output = Result<(), ()>> + Send;
 }
 
 /// Runtime choice between an enabled and a disabled [`MailProvider`].
@@ -627,6 +755,25 @@ where
         match self {
             Self::Enabled(service) => service.send_auth_link_email(email, auth_link).await,
             Self::Disabled(service) => service.send_auth_link_email(email, auth_link).await,
+        }
+    }
+
+    async fn send_email_change_email(
+        &self,
+        email: &EmailAddress,
+        email_change_token: &EmailChangeToken,
+    ) -> Result<(), ()> {
+        match self {
+            Self::Enabled(service) => {
+                service
+                    .send_email_change_email(email, email_change_token)
+                    .await
+            }
+            Self::Disabled(service) => {
+                service
+                    .send_email_change_email(email, email_change_token)
+                    .await
+            }
         }
     }
 }
@@ -677,6 +824,16 @@ pub mod test_utils {
                 &self,
                 req: UpdatePasswordRequest,
             ) -> UpdatePasswordResult;
+
+            async fn update_email(
+                &self,
+                req: UpdateEmailRequest,
+            ) -> UpdateEmailResult;
+
+            async fn validate_email_change(
+                &self,
+                token: AuthToken,
+            ) -> Result<EmailChangeValidationResult, ()>;
         }
     }
 
@@ -735,6 +892,12 @@ pub mod test_utils {
                 email: &EmailAddress,
                 auth_link: &AuthLink,
             ) -> Result<(), ()>;
+
+            async fn send_email_change_email(
+                &self,
+                email: &EmailAddress,
+                email_change_token: &EmailChangeToken,
+            ) -> Result<(), ()>;
         }
     }
 }
@@ -755,6 +918,19 @@ mod test {
         );
         assert!(link.is_expired(&(expire_at + TimeDelta::seconds(1))));
         assert!(!link.is_expired(&(expire_at - TimeDelta::seconds(1))));
+    }
+
+    #[test]
+    fn test_email_change_token_expiry() {
+        let expire_at = chrono::Utc::now();
+        let token = HashedEmailChangeToken::new(
+            UserId::test_default(),
+            EmailAddress::try_from("test@mail.test").unwrap(),
+            AuthToken::new().as_hash().unwrap(),
+            expire_at,
+        );
+        assert!(token.is_expired(&(expire_at + TimeDelta::seconds(1))));
+        assert!(!token.is_expired(&(expire_at - TimeDelta::seconds(1))));
     }
 
     #[test]
