@@ -42,6 +42,11 @@
 		isSome(authInfo) && authInfo.value !== undefined && authInfo.value.strategy !== 'NoAuth'
 	);
 
+	// Account management (email/password) only exists for the multi-user strategy.
+	let showAccount = $derived(
+		isSome(authInfo) && authInfo.value !== undefined && authInfo.value.strategy === 'MultiUser'
+	);
+
 	let theme = getTheme();
 	const toggleTheme = () => {
 		theme.variant = theme.variant === 'dark' ? 'light' : 'dark';
@@ -138,6 +143,12 @@
 			class={`btn shrink-0 btn-ghost px-1 text-[15px] font-medium xs:px-2 xs:text-[16px] sm:text-lg ${classPathStartWith('/training/period')}`}
 			href={resolve('training/periods')}>Periods</a
 		>
+		{#if showAccount}
+			<a
+				class={`btn shrink-0 btn-ghost px-1 text-[15px] font-medium xs:px-2 xs:text-[16px] sm:text-lg ${classExactPath('/settings/email')}`}
+				href={resolve('settings/email')}>Account</a
+			>
+		{/if}
 	</div>
 
 	<div class="flex shrink-0 items-center gap-0 min-[400px]:gap-2">

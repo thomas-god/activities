@@ -11,7 +11,7 @@ use crate::{
     domain::models::UserId,
     inbound::auth::multi_user::{
         EmailAddress, EmailChangeFinalizeResult, HashedAuthLink, HashedAuthToken,
-        HashedEmailChangeToken, HashedPassword, HashedSession, HashedSessionToken,
+        HashedEmailChangeToken, HashedPassword, HashedSession, HashedSessionToken, UserInfo,
         service::UserRepository, session::SessionRepository,
     },
 };
@@ -599,6 +599,39 @@ impl UserRepository for SqliteUsersRepository {
         })?;
 
         Ok(EmailChangeFinalizeResult::Swapped(new_email))
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn get_user_info(&self, user: &UserId) -> Result<Option<UserInfo>, ()> {
+        // LEFT JOIN: users registered without email-based auth also have a t_users row, but the
+        // result is only meaningful when the user has an email.
+        let res: Result<Option<(Option<String>, bool, bool)>, sqlx::Error> = sqlx::query_as(
+            r#"
+        SELECT e.email, e.verified, u.password_hash IS NOT NULL
+        FROM t_users u
+        LEFT JOIN t_emails e ON e.user = u.rowid
+        WHERE u.user_id = ?1
+        ;"#,
+        )
+        .bind(user.to_string())
+        .fetch_optional(&self.readers)
+        .await;
+        match res {
+            Ok(Some((Some(email), verified, has_password))) => {
+                let Ok(email) = EmailAddress::try_from(email) else {
+                    tracing::warn!("Stored user email is not a valid email address");
+                    return Err(());
+                };
+                Ok(Some(UserInfo::new(email, verified, has_password)))
+            }
+            // User unknown, or user without an email row.
+            Ok(_) => Ok(None),
+            Err(err) => {
+                tracing::warn!("Cannot fetch user info from database");
+                tracing::warn!("{}", err);
+                Err(())
+            }
+        }
     }
 }
 
@@ -2032,5 +2065,53 @@ mod test_sqlite_users_repository {
             .await
             .unwrap();
         assert_eq!(res, EmailChangeFinalizeResult::Swapped(test_email()));
+    }
+
+    #[tokio::test]
+    async fn test_get_user_info() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        // Freshly registered user: unverified email, no password.
+        let info = repository
+            .get_user_info(&UserId::test_default())
+            .await
+            .unwrap()
+            .expect("user should exist");
+        assert_eq!(info.email(), &test_email());
+        assert!(!info.verified());
+        assert!(!info.has_password());
+
+        // With a password and a verified email.
+        repository
+            .set_user_password_if_absent(&UserId::test_default(), &test_password_hash())
+            .await
+            .unwrap();
+        repository
+            .update_user_email(&UserId::test_default(), &test_email(), true)
+            .await
+            .unwrap();
+        let info = repository
+            .get_user_info(&UserId::test_default())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(info.verified());
+        assert!(info.has_password());
+    }
+
+    #[tokio::test]
+    async fn test_get_user_info_unknown_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        assert_eq!(
+            repository
+                .get_user_info(&UserId::test_default())
+                .await
+                .unwrap(),
+            None
+        );
     }
 }

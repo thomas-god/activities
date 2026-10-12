@@ -1,6 +1,6 @@
 use axum::Router;
 use axum::extract::FromRef;
-use axum::routing::post;
+use axum::routing::{get, post};
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -12,6 +12,7 @@ use crate::inbound::http::middlewares::rate_limit::{IpRateLimitLayer, RateLimitS
 pub use extractor::cookie_auth_middleware;
 pub use login_user::login_user;
 pub use logout::logout;
+pub use me::get_me;
 pub use register_user::register_user;
 pub use set_password::{register_password, update_password};
 pub use update_email::{update_email, validate_email_change};
@@ -20,6 +21,7 @@ pub use validate_login::validate_login;
 pub mod extractor;
 pub mod login_user;
 pub mod logout;
+pub mod me;
 pub mod register_user;
 pub mod set_password;
 pub mod update_email;
@@ -118,6 +120,7 @@ where
         .route("/password", post(register_password::<US>))
         .route("/password/change", post(update_password::<US>))
         .route("/account/email", post(update_email::<US>))
+        .route("/account/me", get(get_me::<US>))
         .route_layer(axum::middleware::from_fn_with_state(
             auth_state.clone(),
             cookie_auth_middleware::<US>,

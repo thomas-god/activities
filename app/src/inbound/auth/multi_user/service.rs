@@ -12,7 +12,7 @@ use crate::{
         HashedEmailChangeToken, HashedPassword, IMultiUserService, ISessionService, MailProvider,
         Password, RegisterPasswordRequest, RegisterPasswordResult, SessionToken,
         UpdateEmailRequest, UpdateEmailResult, UpdatePasswordRequest, UpdatePasswordResult,
-        UserLoginResult, UserRegistrationRequest, UserRegistrationResult,
+        UserInfo, UserInfoResult, UserLoginResult, UserRegistrationRequest, UserRegistrationResult,
     },
 };
 
@@ -237,6 +237,21 @@ where
             .finalize_email_change(found.user(), found.hash())
             .await
             .map(EmailChangeValidationResult::from)
+    }
+
+    /// Exposes the authenticated user's own account metadata (`GET /api/account/me`).
+    #[tracing::instrument(skip_all)]
+    async fn get_user_info(&self, user: &UserId) -> UserInfoResult {
+        match self.user_repository.get_user_info(user).await {
+            Ok(Some(info)) => UserInfoResult::Success(info),
+            // The user vanished under an existing session: treat as a retryable failure rather
+            // than inventing data.
+            Ok(None) => {
+                tracing::warn!(%user, "User info requested for an unknown or email-less user");
+                UserInfoResult::Retry
+            }
+            Err(()) => UserInfoResult::Retry,
+        }
     }
 }
 
@@ -568,6 +583,13 @@ pub trait UserRepository: Clone + Send + Sync + 'static {
         user: &UserId,
         hash: &HashedAuthToken,
     ) -> impl Future<Output = Result<EmailChangeFinalizeResult, ()>> + Send;
+
+    /// Returns the user's email, whether it is verified, and whether a password is registered.
+    /// `None` when the user is unknown or has no email row.
+    fn get_user_info(
+        &self,
+        user: &UserId,
+    ) -> impl Future<Output = Result<Option<UserInfo>, ()>> + Send;
 }
 
 #[tracing::instrument(skip_all)]
@@ -705,6 +727,8 @@ mod test_utils {
                 user: &UserId,
                 hash: &HashedAuthToken,
             ) -> Result<EmailChangeFinalizeResult, ()>;
+
+            async fn get_user_info(&self, user: &UserId) -> Result<Option<UserInfo>, ()>;
         }
     }
 
@@ -1847,6 +1871,10 @@ impl IMultiUserService for DisabledUserService {
     ) -> Result<EmailChangeValidationResult, ()> {
         panic!("User service is disabled")
     }
+
+    async fn get_user_info(&self, _user: &UserId) -> UserInfoResult {
+        panic!("User service is disabled")
+    }
 }
 
 #[cfg(test)]
@@ -2636,5 +2664,66 @@ mod test_user_service_update_email {
         let hashed = token.as_hash().unwrap();
         assert_eq!(hashed.new_email(), &new_email());
         assert_eq!(hashed.user(), &UserId::test_default());
+    }
+}
+
+#[cfg(test)]
+mod test_user_service_get_user_info {
+    use crate::inbound::auth::multi_user::{
+        EmailAddress, UserInfo,
+        service::test_utils::{MockUserRepository, TEST_EMAIL, mail_only_service},
+        test_utils::MockMailProvider,
+    };
+
+    use super::*;
+
+    fn email() -> EmailAddress {
+        EmailAddress::try_from(TEST_EMAIL).unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_get_user_info_success() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_info()
+            .times(1)
+            .withf(|user| user == &UserId::test_default())
+            .returning(|_| {
+                Ok(Some(UserInfo::new(email(), true, false)))
+            });
+
+        let service = mail_only_service(user, MockMailProvider::new());
+
+        let res = service.get_user_info(&UserId::test_default()).await;
+
+        let UserInfoResult::Success(info) = res else {
+            panic!("expected Success, got {res:?}");
+        };
+        assert_eq!(info.email(), &email());
+        assert!(info.verified());
+        assert!(!info.has_password());
+    }
+
+    #[tokio::test]
+    async fn test_get_user_info_unknown_user_is_retry() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_info().returning(|_| Ok(None));
+
+        let service = mail_only_service(user, MockMailProvider::new());
+
+        let res = service.get_user_info(&UserId::test_default()).await;
+
+        assert_eq!(res, UserInfoResult::Retry);
+    }
+
+    #[tokio::test]
+    async fn test_get_user_info_repo_error_is_retry() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_info().returning(|_| Err(()));
+
+        let service = mail_only_service(user, MockMailProvider::new());
+
+        let res = service.get_user_info(&UserId::test_default()).await;
+
+        assert_eq!(res, UserInfoResult::Retry);
     }
 }

@@ -572,6 +572,36 @@ impl From<EmailChangeFinalizeResult> for EmailChangeValidationResult {
     }
 }
 
+/// Information about the authenticated user, exposed at `GET /api/account/me`.
+#[derive(Debug, Clone, Constructor, PartialEq)]
+pub struct UserInfo {
+    email: EmailAddress,
+    verified: bool,
+    /// Whether the user has registered a password, so clients can offer `register_password` vs
+    /// `update_password`.
+    has_password: bool,
+}
+
+impl UserInfo {
+    pub fn email(&self) -> &EmailAddress {
+        &self.email
+    }
+
+    pub fn verified(&self) -> bool {
+        self.verified
+    }
+
+    pub fn has_password(&self) -> bool {
+        self.has_password
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UserInfoResult {
+    Success(UserInfo),
+    Retry,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum UserLoginResult {
     /// Mail-based path: an auth link was (or would have been) sent; never reveals whether the
@@ -634,6 +664,8 @@ pub trait IMultiUserService: Clone + Send + Sync + 'static {
         &self,
         token: AuthToken,
     ) -> impl Future<Output = Result<EmailChangeValidationResult, ()>> + Send;
+
+    fn get_user_info(&self, user: &UserId) -> impl Future<Output = UserInfoResult> + Send;
 }
 
 #[derive(Debug, Clone, Constructor)]
@@ -834,6 +866,8 @@ pub mod test_utils {
                 &self,
                 token: AuthToken,
             ) -> Result<EmailChangeValidationResult, ()>;
+
+            async fn get_user_info(&self, user: &UserId) -> UserInfoResult;
         }
     }
 

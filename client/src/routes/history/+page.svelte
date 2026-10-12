@@ -66,7 +66,7 @@
 		} else {
 			url.searchParams.set('view', mode);
 		}
-		 
+
 		goto(url, { replaceState: true, reset: false });
 	};
 
@@ -78,7 +78,7 @@
 		} else {
 			url.searchParams.set('month', month.format('YYYY-MM'));
 		}
-		 
+
 		goto(url, { replaceState: true, reset: false });
 	};
 
