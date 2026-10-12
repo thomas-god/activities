@@ -231,12 +231,21 @@
 
 			<div class="flex items-center justify-between gap-2">
 				<p class="text-sm font-bold">{userInfo.email}</p>
-				<span class={`badge badge-sm ${userInfo.verified ? 'badge-success' : 'badge-warning'}`}>
+				<span
+					class={`badge badge-sm ${
+						userInfo.verified ? 'badge-success' : emailAuthEnabled ? 'badge-warning' : 'badge-ghost'
+					}`}
+				>
 					{userInfo.verified ? 'Verified' : 'Unverified'}
 				</span>
 			</div>
 
-			{#if emailAuthEnabled && !userInfo.verified}
+			{#if !emailAuthEnabled}
+				<p class="mt-2 text-xs opacity-70">
+					Your email address is only used as your sign-in identifier, you won't received emails on
+					it.
+				</p>
+			{:else if !userInfo.verified}
 				<div class="mt-2 flex items-center gap-2">
 					<button
 						class="btn btn-primary btn-sm"
@@ -282,8 +291,6 @@
 					A verification link will be sent to the new address: the change only takes effect once you
 					open it.
 				</p>
-			{:else}
-				<p class="text-xs opacity-70">The new address will be marked as unverified.</p>
 			{/if}
 		</fieldset>
 

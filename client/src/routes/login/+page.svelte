@@ -128,7 +128,7 @@
 		const body: MultiUserAuthRequest = passwordAuthEnabled ? { email, password } : { email };
 		return submitMultiUser('/api/register', body, () => {
 			if (!emailAuthEnabled) {
-				multiUserLoginInfo = 'Account created, you can now log in.';
+				multiUserLoginInfo = 'Account created. You can now log in with your password.';
 			} else if (passwordAuthEnabled) {
 				multiUserLoginInfo =
 					'Account created. You can log in with your password, or use the link sent to your inbox.';
@@ -192,6 +192,12 @@
 				required
 				bind:value={email}
 			/>
+			{#if !emailAuthEnabled}
+				<p class="mt-1 text-xs opacity-70">
+					Your email address is only used as your sign-in identifier, you won't received emails on
+					it.
+				</p>
+			{/if}
 
 			{#if passwordAuthEnabled}
 				<label class="label" for="login-password">Password</label>
