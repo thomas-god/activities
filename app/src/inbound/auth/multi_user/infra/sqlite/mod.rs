@@ -140,6 +140,80 @@ impl UserRepository for SqliteUsersRepository {
         }
     }
 
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn get_user_password_hash(&self, user: &UserId) -> Result<Option<HashedPassword>, ()> {
+        // Double Option to avoid parsing NULL into Some("")
+        let res: Result<Option<Option<String>>, sqlx::Error> =
+            sqlx::query_scalar("SELECT password_hash FROM t_users WHERE user_id = ?1;")
+                .bind(user.to_string())
+                .fetch_optional(&self.readers)
+                .await;
+        match res {
+            Ok(maybe_hash) => Ok(maybe_hash.flatten().map(HashedPassword::new)),
+            Err(err) => {
+                tracing::warn!("Cannot fetch user password from database");
+                tracing::warn!("{}", err);
+                Err(())
+            }
+        }
+    }
+
+    /// Compare-and-set to avoid concurrent operations overwriting each other.
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn set_user_password_if_absent(
+        &self,
+        user: &UserId,
+        password_hash: &HashedPassword,
+    ) -> Result<bool, ()> {
+        let res = sqlx::query(
+            r#"
+        UPDATE t_users SET password_hash = ?2
+        WHERE user_id = ?1 AND password_hash IS NULL
+        ;"#,
+        )
+        .bind(user.to_string())
+        .bind(password_hash.to_string())
+        .execute(&self.writer)
+        .await;
+        match res {
+            Ok(res) => Ok(res.rows_affected() > 0),
+            Err(err) => {
+                tracing::warn!("Unable to store user password in database");
+                tracing::warn!("{}", err);
+                Err(())
+            }
+        }
+    }
+
+    /// Compare-and-set to avoid concurrent operations overwriting each other.
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn replace_user_password_if_matches(
+        &self,
+        user: &UserId,
+        current_hash: &HashedPassword,
+        new_hash: &HashedPassword,
+    ) -> Result<bool, ()> {
+        let res = sqlx::query(
+            r#"
+        UPDATE t_users SET password_hash = ?3
+        WHERE user_id = ?1 AND password_hash = ?2
+        ;"#,
+        )
+        .bind(user.to_string())
+        .bind(current_hash.to_string())
+        .bind(new_hash.to_string())
+        .execute(&self.writer)
+        .await;
+        match res {
+            Ok(res) => Ok(res.rows_affected() > 0),
+            Err(err) => {
+                tracing::warn!("Unable to update user password in database");
+                tracing::warn!("{}", err);
+                Err(())
+            }
+        }
+    }
+
     #[tracing::instrument(skip_all, err)]
     async fn store_auth_link(&self, link: &HashedAuthLink) -> Result<(), anyhow::Error> {
         let res = sqlx::query(
@@ -1213,5 +1287,204 @@ mod test_sqlite_users_repository {
                 .await
                 .unwrap();
         assert_eq!(password_hashes, [None, None]);
+    }
+
+    fn test_password_hash() -> HashedPassword {
+        Password::try_from("secret".to_string())
+            .unwrap()
+            .as_hash()
+            .unwrap()
+    }
+
+    fn other_test_password_hash() -> HashedPassword {
+        Password::try_from("another-secret".to_string())
+            .unwrap()
+            .as_hash()
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_get_user_password_returns_none_without_password() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        let password = repository
+            .get_user_password_hash(&UserId::test_default())
+            .await
+            .unwrap();
+        assert_eq!(password, None);
+    }
+
+    #[tokio::test]
+    async fn test_get_user_password_returns_unknown_user_as_none() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        let password = repository
+            .get_user_password_hash(&UserId::from("unknown_user".to_string()))
+            .await
+            .unwrap();
+        assert_eq!(password, None);
+    }
+
+    #[tokio::test]
+    async fn test_get_user_password_returns_stored_hash() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let hash = test_password_hash();
+        repository
+            .set_user_password_if_absent(&UserId::test_default(), &hash)
+            .await
+            .unwrap();
+
+        let stored = repository
+            .get_user_password_hash(&UserId::test_default())
+            .await
+            .unwrap();
+        assert_eq!(stored, Some(hash));
+    }
+
+    #[tokio::test]
+    async fn test_set_user_password_if_absent_sets_when_no_password() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let hash = test_password_hash();
+
+        let set = repository
+            .set_user_password_if_absent(&UserId::test_default(), &hash)
+            .await
+            .unwrap();
+
+        assert!(set);
+        let stored = repository
+            .get_user_password_hash(&UserId::test_default())
+            .await
+            .unwrap();
+        assert_eq!(stored, Some(hash));
+    }
+
+    #[tokio::test]
+    async fn test_set_user_password_if_absent_refuses_when_password_exists() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let first = test_password_hash();
+        repository
+            .set_user_password_if_absent(&UserId::test_default(), &first)
+            .await
+            .unwrap();
+
+        let second = other_test_password_hash();
+        let set = repository
+            .set_user_password_if_absent(&UserId::test_default(), &second)
+            .await
+            .unwrap();
+
+        assert!(!set, "the second registration must not overwrite the first");
+        let stored = repository
+            .get_user_password_hash(&UserId::test_default())
+            .await
+            .unwrap();
+        assert_eq!(stored, Some(first));
+    }
+
+    #[tokio::test]
+    async fn test_set_user_password_if_absent_fails_for_unknown_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let set = repository
+            .set_user_password_if_absent(&UserId::test_default(), &test_password_hash())
+            .await
+            .unwrap();
+        assert!(!set, "no row exists, so nothing was set");
+    }
+
+    #[tokio::test]
+    async fn test_replace_user_password_if_matches_replaces_on_match() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let first = test_password_hash();
+        repository
+            .set_user_password_if_absent(&UserId::test_default(), &first)
+            .await
+            .unwrap();
+        let second = other_test_password_hash();
+
+        let replaced = repository
+            .replace_user_password_if_matches(&UserId::test_default(), &first, &second)
+            .await
+            .unwrap();
+
+        assert!(replaced);
+        let stored = repository
+            .get_user_password_hash(&UserId::test_default())
+            .await
+            .unwrap();
+        assert_eq!(stored, Some(second));
+    }
+
+    #[tokio::test]
+    async fn test_replace_user_password_if_matches_refuses_on_stale_hash() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let first = test_password_hash();
+        repository
+            .set_user_password_if_absent(&UserId::test_default(), &first)
+            .await
+            .unwrap();
+        let second = other_test_password_hash();
+        repository
+            .replace_user_password_if_matches(&UserId::test_default(), &first, &second)
+            .await
+            .unwrap();
+
+        // The now-stale `first` hash must not be able to overwrite `second`.
+        let third = Password::try_from("third-secret".to_string())
+            .unwrap()
+            .as_hash()
+            .unwrap();
+        let replaced = repository
+            .replace_user_password_if_matches(&UserId::test_default(), &first, &third)
+            .await
+            .unwrap();
+
+        assert!(
+            !replaced,
+            "a stale current hash must not overwrite the new one"
+        );
+        let stored = repository
+            .get_user_password_hash(&UserId::test_default())
+            .await
+            .unwrap();
+        assert_eq!(stored, Some(second));
+    }
+
+    #[tokio::test]
+    async fn test_replace_user_password_if_matches_refuses_when_no_password() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        let replaced = repository
+            .replace_user_password_if_matches(
+                &UserId::test_default(),
+                &test_password_hash(),
+                &other_test_password_hash(),
+            )
+            .await
+            .unwrap();
+
+        assert!(!replaced, "no password is stored, so nothing was replaced");
+    }
+
+    #[tokio::test]
+    async fn test_replace_user_password_if_matches_refuses_for_unknown_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let replaced = repository
+            .replace_user_password_if_matches(
+                &UserId::test_default(),
+                &test_password_hash(),
+                &other_test_password_hash(),
+            )
+            .await
+            .unwrap();
+        assert!(!replaced, "no row exists, so nothing was replaced");
     }
 }

@@ -9,7 +9,9 @@ use crate::{
         AuthLink, AuthLinkValidationResult, AuthMethods, AuthToken, CheckSessionResult,
         EmailAddress, GenerateAuthLinkRequest, GenerateAuthLinkResult, HashedAuthLink,
         HashedAuthToken, HashedPassword, IMultiUserService, ISessionService, MailProvider,
-        Password, SessionToken, UserLoginResult, UserRegistrationRequest, UserRegistrationResult,
+        Password, RegisterPasswordRequest, RegisterPasswordResult, SessionToken,
+        UpdatePasswordRequest, UpdatePasswordResult, UserLoginResult, UserRegistrationRequest,
+        UserRegistrationResult,
     },
 };
 
@@ -109,6 +111,86 @@ where
     #[tracing::instrument(skip_all, err(Debug))]
     async fn logout(&self, token: &SessionToken) -> Result<(), ()> {
         self.session_service.logout(token).await
+    }
+
+    /// Allow an user to register a password if and only if there is no password already set (e.g.)
+    /// to avoid locking out users of their account when switching from email-based auth to
+    /// password-based auth. Fails if a password already exist, use `update_password` instead.
+    #[tracing::instrument(skip_all)]
+    async fn register_password(&self, req: RegisterPasswordRequest) -> RegisterPasswordResult {
+        if !self.auth_methods.password() {
+            return RegisterPasswordResult::PasswordAuthDisabled;
+        }
+
+        let Some(new_hash) = req.password().as_hash() else {
+            return RegisterPasswordResult::Retry;
+        };
+
+        match self
+            .user_repository
+            .set_user_password_if_absent(req.user(), &new_hash)
+            .await
+        {
+            Ok(true) => {}
+            Ok(false) => return RegisterPasswordResult::PasswordAlreadySet,
+            Err(()) => return RegisterPasswordResult::Retry,
+        }
+
+        match self
+            .session_service
+            .generate_session_token(req.user())
+            .await
+        {
+            Ok(session) => RegisterPasswordResult::Success(session),
+            Err(()) => RegisterPasswordResult::Retry,
+        }
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn update_password(&self, req: UpdatePasswordRequest) -> UpdatePasswordResult {
+        if !self.auth_methods.password() {
+            return UpdatePasswordResult::PasswordAuthDisabled;
+        }
+
+        let current_hash = match self
+            .user_repository
+            .get_user_password_hash(req.user())
+            .await
+        {
+            Ok(Some(hash)) => hash,
+            Ok(None) => {
+                HashedPassword::decoy_verification(req.current());
+                return UpdatePasswordResult::InvalidCurrentPassword;
+            }
+            Err(()) => return UpdatePasswordResult::Retry,
+        };
+
+        if !current_hash.verify_password(req.current()) {
+            return UpdatePasswordResult::InvalidCurrentPassword;
+        }
+
+        let Some(new_hash) = req.password().as_hash() else {
+            return UpdatePasswordResult::Retry;
+        };
+
+        match self
+            .user_repository
+            .replace_user_password_if_matches(req.user(), &current_hash, &new_hash)
+            .await
+        {
+            Ok(true) => {}
+            Ok(false) => return UpdatePasswordResult::InvalidCurrentPassword,
+            Err(()) => return UpdatePasswordResult::Retry,
+        }
+
+        match self
+            .session_service
+            .generate_session_token(req.user())
+            .await
+        {
+            Ok(session) => UpdatePasswordResult::Success(session),
+            Err(()) => UpdatePasswordResult::Retry,
+        }
     }
 }
 
@@ -258,6 +340,24 @@ pub trait UserRepository: Clone + Send + Sync + 'static {
         password_hash: Option<HashedPassword>,
     ) -> impl Future<Output = Result<(), ()>> + Send;
 
+    fn get_user_password_hash(
+        &self,
+        user: &UserId,
+    ) -> impl Future<Output = Result<Option<HashedPassword>, ()>> + Send;
+
+    fn set_user_password_if_absent(
+        &self,
+        user: &UserId,
+        password_hash: &HashedPassword,
+    ) -> impl Future<Output = Result<bool, ()>> + Send;
+
+    fn replace_user_password_if_matches(
+        &self,
+        user: &UserId,
+        current_hash: &HashedPassword,
+        new_hash: &HashedPassword,
+    ) -> impl Future<Output = Result<bool, ()>> + Send;
+
     fn store_auth_link(
         &self,
         link: &HashedAuthLink,
@@ -324,6 +424,24 @@ mod test_utils {
                 email: &EmailAddress,
                 password_hash: Option<HashedPassword>
             ) -> Result<(), ()>;
+
+            async fn get_user_password_hash(
+                &self,
+                user: &UserId,
+            ) -> Result<Option<HashedPassword>, ()>;
+
+            async fn set_user_password_if_absent(
+                &self,
+                user: &UserId,
+                password_hash: &HashedPassword,
+            ) -> Result<bool, ()>;
+
+            async fn replace_user_password_if_matches(
+                &self,
+                user: &UserId,
+                current_hash: &HashedPassword,
+                new_hash: &HashedPassword,
+            ) -> Result<bool, ()>;
 
             async fn store_auth_link(
                 &self,
@@ -1051,6 +1169,389 @@ mod test_user_service_login_user {
     }
 }
 
+#[cfg(test)]
+mod test_user_service_password_management {
+    use chrono::{TimeDelta, Utc};
+
+    use crate::inbound::auth::multi_user::{
+        GenerateSessionTokenResult, HashedPassword, Password, RegisterPasswordRequest,
+        RegisterPasswordResult, SessionToken, UpdatePasswordRequest, UpdatePasswordResult,
+        service::test_utils::{
+            MockUserRepository, mail_and_password_service_with_session, mail_only_service,
+            password_only_service_with_session,
+        },
+        test_utils::{MockMailProvider, MockSessionService},
+    };
+
+    use super::*;
+
+    fn password(value: &str) -> Password {
+        Password::try_from(value.to_string()).unwrap()
+    }
+
+    fn password_hash(value: &str) -> HashedPassword {
+        password(value).as_hash().expect("hashing should succeed")
+    }
+
+    fn register_request(new_password: &str) -> RegisterPasswordRequest {
+        RegisterPasswordRequest::new(UserId::test_default(), password(new_password))
+    }
+
+    fn update_request(current: &str, new: &str) -> UpdatePasswordRequest {
+        UpdatePasswordRequest::new(UserId::test_default(), password(current), password(new))
+    }
+
+    fn successful_session() -> GenerateSessionTokenResult {
+        GenerateSessionTokenResult::new(
+            SessionToken::from("new-session-token"),
+            Utc::now() + TimeDelta::days(30),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_register_password_disabled_when_password_auth_disabled() {
+        let mut user = MockUserRepository::new();
+        user.expect_set_user_password_if_absent().times(0);
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = mail_only_service(user, MockMailProvider::new());
+
+        let res = service
+            .register_password(register_request("new-secret"))
+            .await;
+
+        assert_eq!(res, RegisterPasswordResult::PasswordAuthDisabled);
+    }
+
+    #[tokio::test]
+    async fn test_register_password_success_stores_hash_and_creates_session() {
+        let mut user = MockUserRepository::new();
+        user.expect_set_user_password_if_absent()
+            .times(1)
+            .withf(move |user, hash| {
+                user == &UserId::test_default() && hash.verify_password(&password("new-secret"))
+            })
+            .returning(|_, _| Ok(true));
+        let expected_session = successful_session();
+        let expected_token = expected_session.token().clone();
+        let mut session = MockSessionService::new();
+        session
+            .expect_generate_session_token()
+            .times(1)
+            .withf(|user| user == &UserId::test_default())
+            .returning(move |_| Ok(expected_session.clone()));
+
+        let service = password_only_service_with_session(user, session, MockMailProvider::new());
+
+        let res = service
+            .register_password(register_request("new-secret"))
+            .await;
+
+        let RegisterPasswordResult::Success(session) = res else {
+            panic!("expected success, got {res:?}");
+        };
+        assert_eq!(session.token(), &expected_token);
+    }
+
+    #[tokio::test]
+    async fn test_register_password_fails_when_password_already_set() {
+        let mut user = MockUserRepository::new();
+        user.expect_set_user_password_if_absent()
+            .times(1)
+            .returning(|_, _| Ok(false));
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = password_only_service_with_session(user, session, MockMailProvider::new());
+
+        let res = service
+            .register_password(register_request("new-secret"))
+            .await;
+
+        assert_eq!(res, RegisterPasswordResult::PasswordAlreadySet);
+    }
+
+    #[tokio::test]
+    async fn test_register_password_repo_error_returns_retry() {
+        let mut user = MockUserRepository::new();
+        user.expect_set_user_password_if_absent()
+            .times(1)
+            .returning(|_, _| Err(()));
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = password_only_service_with_session(user, session, MockMailProvider::new());
+
+        let res = service
+            .register_password(register_request("new-secret"))
+            .await;
+
+        assert_eq!(res, RegisterPasswordResult::Retry);
+    }
+
+    #[tokio::test]
+    async fn test_register_password_session_error_returns_retry() {
+        let mut user = MockUserRepository::new();
+        user.expect_set_user_password_if_absent()
+            .times(1)
+            .returning(|_, _| Ok(true));
+        let mut session = MockSessionService::new();
+        session
+            .expect_generate_session_token()
+            .returning(|_| Err(()));
+
+        let service = password_only_service_with_session(user, session, MockMailProvider::new());
+
+        let res = service
+            .register_password(register_request("new-secret"))
+            .await;
+
+        assert_eq!(res, RegisterPasswordResult::Retry);
+    }
+
+    #[tokio::test]
+    async fn test_register_password_works_in_mail_and_password_mode() {
+        let mut user = MockUserRepository::new();
+        user.expect_set_user_password_if_absent()
+            .times(1)
+            .withf(move |_, hash| hash.verify_password(&password("new-secret")))
+            .returning(|_, _| Ok(true));
+        let expected_session = successful_session();
+        let mut session = MockSessionService::new();
+        session
+            .expect_generate_session_token()
+            .times(1)
+            .returning(move |_| Ok(expected_session.clone()));
+
+        let service =
+            mail_and_password_service_with_session(user, session, MockMailProvider::new());
+
+        let res = service
+            .register_password(register_request("new-secret"))
+            .await;
+
+        assert!(matches!(res, RegisterPasswordResult::Success(_)));
+    }
+
+    #[tokio::test]
+    async fn test_update_password_disabled_when_password_auth_disabled() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_password_hash().times(0);
+        user.expect_replace_user_password_if_matches().times(0);
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = mail_only_service(user, MockMailProvider::new());
+
+        let res = service
+            .update_password(update_request("current", "new-secret"))
+            .await;
+
+        assert_eq!(res, UpdatePasswordResult::PasswordAuthDisabled);
+    }
+
+    #[tokio::test]
+    async fn test_update_password_success_replaces_hash_and_creates_session() {
+        let current_hash = password_hash("current");
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_password_hash()
+            .times(1)
+            .withf(|user| user == &UserId::test_default())
+            .returning(move |_| Ok(Some(current_hash.clone())));
+        user.expect_replace_user_password_if_matches()
+            .times(1)
+            .withf(move |user, current, new| {
+                user == &UserId::test_default()
+                    && current.verify_password(&password("current"))
+                    && new.verify_password(&password("new-secret"))
+            })
+            .returning(|_, _, _| Ok(true));
+        let expected_session = successful_session();
+        let expected_token = expected_session.token().clone();
+        let mut session = MockSessionService::new();
+        session
+            .expect_generate_session_token()
+            .times(1)
+            .withf(|user| user == &UserId::test_default())
+            .returning(move |_| Ok(expected_session.clone()));
+
+        let service = password_only_service_with_session(user, session, MockMailProvider::new());
+
+        let res = service
+            .update_password(update_request("current", "new-secret"))
+            .await;
+
+        let UpdatePasswordResult::Success(session) = res else {
+            panic!("expected success, got {res:?}");
+        };
+        assert_eq!(session.token(), &expected_token);
+    }
+
+    #[tokio::test]
+    async fn test_update_password_wrong_current_password_is_invalid() {
+        let current_hash = password_hash("current");
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_password_hash()
+            .returning(move |_| Ok(Some(current_hash.clone())));
+        user.expect_replace_user_password_if_matches().times(0);
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = password_only_service_with_session(user, session, MockMailProvider::new());
+
+        let res = service
+            .update_password(update_request("wrong", "new-secret"))
+            .await;
+
+        assert_eq!(res, UpdatePasswordResult::InvalidCurrentPassword);
+    }
+
+    #[tokio::test]
+    async fn test_update_password_without_registered_password_is_invalid() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_password_hash()
+            .times(1)
+            .returning(|_| Ok(None));
+        user.expect_replace_user_password_if_matches().times(0);
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = password_only_service_with_session(user, session, MockMailProvider::new());
+
+        let res = service
+            .update_password(update_request("current", "new-secret"))
+            .await;
+
+        assert_eq!(res, UpdatePasswordResult::InvalidCurrentPassword);
+    }
+
+    #[tokio::test]
+    async fn test_update_password_concurrent_modification_returns_invalid() {
+        let current_hash = password_hash("current");
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_password_hash()
+            .returning(move |_| Ok(Some(current_hash.clone())));
+        // Another request replaced the password between the lookup and the CAS update.
+        user.expect_replace_user_password_if_matches()
+            .times(1)
+            .returning(|_, _, _| Ok(false));
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = password_only_service_with_session(user, session, MockMailProvider::new());
+
+        let res = service
+            .update_password(update_request("current", "new-secret"))
+            .await;
+
+        assert_eq!(res, UpdatePasswordResult::InvalidCurrentPassword);
+    }
+
+    #[tokio::test]
+    async fn test_update_password_repo_error_returns_retry() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_password_hash().returning(|_| Err(()));
+        user.expect_replace_user_password_if_matches().times(0);
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = password_only_service_with_session(user, session, MockMailProvider::new());
+
+        let res = service
+            .update_password(update_request("current", "new-secret"))
+            .await;
+
+        assert_eq!(res, UpdatePasswordResult::Retry);
+    }
+
+    #[tokio::test]
+    async fn test_update_password_store_error_returns_retry() {
+        let current_hash = password_hash("current");
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_password_hash()
+            .returning(move |_| Ok(Some(current_hash.clone())));
+        user.expect_replace_user_password_if_matches()
+            .times(1)
+            .returning(|_, _, _| Err(()));
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = password_only_service_with_session(user, session, MockMailProvider::new());
+
+        let res = service
+            .update_password(update_request("current", "new-secret"))
+            .await;
+
+        assert_eq!(res, UpdatePasswordResult::Retry);
+    }
+
+    #[tokio::test]
+    async fn test_update_password_session_error_returns_retry() {
+        let current_hash = password_hash("current");
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_password_hash()
+            .returning(move |_| Ok(Some(current_hash.clone())));
+        user.expect_replace_user_password_if_matches()
+            .times(1)
+            .returning(|_, _, _| Ok(true));
+        let mut session = MockSessionService::new();
+        session
+            .expect_generate_session_token()
+            .returning(|_| Err(()));
+
+        let service = password_only_service_with_session(user, session, MockMailProvider::new());
+
+        let res = service
+            .update_password(update_request("current", "new-secret"))
+            .await;
+
+        assert_eq!(res, UpdatePasswordResult::Retry);
+    }
+
+    #[tokio::test]
+    async fn test_update_password_works_in_mail_and_password_mode() {
+        let current_hash = password_hash("current");
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_password_hash()
+            .returning(move |_| Ok(Some(current_hash.clone())));
+        user.expect_replace_user_password_if_matches()
+            .times(1)
+            .returning(|_, _, _| Ok(true));
+        let expected_session = successful_session();
+        let mut session = MockSessionService::new();
+        session
+            .expect_generate_session_token()
+            .times(1)
+            .returning(move |_| Ok(expected_session.clone()));
+
+        let service =
+            mail_and_password_service_with_session(user, session, MockMailProvider::new());
+
+        let res = service
+            .update_password(update_request("current", "new-secret"))
+            .await;
+
+        assert!(matches!(res, UpdatePasswordResult::Success(_)));
+    }
+
+    #[tokio::test]
+    async fn test_update_password_unknown_user_is_invalid_without_telling_which_field_failed() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_password_hash().returning(|_| Err(()));
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = password_only_service_with_session(user, session, MockMailProvider::new());
+
+        let res = service
+            .update_password(update_request("current", "new-secret"))
+            .await;
+
+        assert_eq!(res, UpdatePasswordResult::Retry);
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct DisabledUserService {}
 
@@ -1079,6 +1580,14 @@ impl IMultiUserService for DisabledUserService {
     }
 
     async fn logout(&self, _token: &SessionToken) -> Result<(), ()> {
+        panic!("User service is disabled")
+    }
+
+    async fn register_password(&self, _req: RegisterPasswordRequest) -> RegisterPasswordResult {
+        panic!("User service is disabled")
+    }
+
+    async fn update_password(&self, _req: UpdatePasswordRequest) -> UpdatePasswordResult {
         panic!("User service is disabled")
     }
 }

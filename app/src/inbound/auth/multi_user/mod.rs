@@ -408,6 +408,58 @@ impl AuthMethods {
     }
 }
 
+/// Request to register the first password for a user (who has no password yet).
+#[derive(Debug, Clone, Constructor)]
+pub struct RegisterPasswordRequest {
+    user: UserId,
+    new: Password,
+}
+
+impl RegisterPasswordRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+    pub fn password(&self) -> &Password {
+        &self.new
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum RegisterPasswordResult {
+    Success(GenerateSessionTokenResult),
+    PasswordAlreadySet,
+    PasswordAuthDisabled,
+    Retry,
+}
+
+/// Request to replace an existing password, requiring the current one.
+#[derive(Debug, Clone, Constructor)]
+pub struct UpdatePasswordRequest {
+    user: UserId,
+    current: Password,
+    new: Password,
+}
+
+impl UpdatePasswordRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+    pub fn current(&self) -> &Password {
+        &self.current
+    }
+    pub fn password(&self) -> &Password {
+        &self.new
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UpdatePasswordResult {
+    Success(GenerateSessionTokenResult),
+    InvalidCurrentPassword,
+    PasswordAuthDisabled,
+    Retry,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum UserLoginResult {
     /// Mail-based path: an auth link was (or would have been) sent; never reveals whether the
@@ -450,6 +502,16 @@ pub trait IMultiUserService: Clone + Send + Sync + 'static {
     ) -> impl Future<Output = Result<CheckSessionResult, ()>> + Send;
 
     fn logout(&self, token: &SessionToken) -> impl Future<Output = Result<(), ()>> + Send;
+
+    fn register_password(
+        &self,
+        req: RegisterPasswordRequest,
+    ) -> impl Future<Output = RegisterPasswordResult> + Send;
+
+    fn update_password(
+        &self,
+        req: UpdatePasswordRequest,
+    ) -> impl Future<Output = UpdatePasswordResult> + Send;
 }
 
 #[derive(Debug, Clone, Constructor)]
@@ -605,6 +667,16 @@ pub mod test_utils {
             ) -> Result<CheckSessionResult, ()>;
 
             async fn logout(&self, token: &SessionToken) -> Result<(), ()>;
+
+            async fn register_password(
+                &self,
+                req: RegisterPasswordRequest,
+            ) -> RegisterPasswordResult;
+
+            async fn update_password(
+                &self,
+                req: UpdatePasswordRequest,
+            ) -> UpdatePasswordResult;
         }
     }
 
