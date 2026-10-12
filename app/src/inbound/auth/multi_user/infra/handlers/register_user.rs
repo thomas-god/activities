@@ -2,7 +2,7 @@ use axum::{Json, extract::State, http::StatusCode};
 use serde::Deserialize;
 
 use crate::inbound::auth::multi_user::{
-    EmailAddress, IUserService, Password, UserRegistrationRequest, UserRegistrationResult,
+    EmailAddress, IMultiUserService, Password, UserRegistrationRequest, UserRegistrationResult,
     infra::handlers::{AuthAppState, UserRegistration},
 };
 
@@ -13,7 +13,7 @@ pub struct RegisterUserBody {
 }
 
 #[tracing::instrument(skip_all)]
-pub async fn register_user<UR: IUserService>(
+pub async fn register_user<UR: IMultiUserService>(
     State(state): State<AuthAppState<UR>>,
     Json(body): Json<RegisterUserBody>,
 ) -> StatusCode {

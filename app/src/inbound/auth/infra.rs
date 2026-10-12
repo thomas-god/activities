@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use crate::inbound::auth::{
     AuthStrategy,
-    multi_user::{AuthMethods, IUserService, infra::handlers::multi_user_login_routes},
+    multi_user::{AuthMethods, IMultiUserService, infra::handlers::multi_user_login_routes},
     no_auth::no_auth_login_routes,
     single_password::single_password_login_routes,
 };
@@ -36,7 +36,7 @@ impl From<&AuthMethods> for AuthInfoMethods {
     }
 }
 
-pub fn add_auth_router<S, US: IUserService>(
+pub fn add_auth_router<S, US: IMultiUserService>(
     strategy: AuthStrategy,
     base_router: Router<S>,
     user_service: US,

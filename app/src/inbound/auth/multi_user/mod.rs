@@ -14,15 +14,15 @@ use sha2::{Digest, Sha256};
 
 pub mod auth_link;
 pub mod infra;
+pub mod service;
 pub mod session;
-pub mod user;
 
 pub use auth_link::{
     AuthLinkService, DisabledAuthLinkService, MaybeAuthLinkService,
     spawn_expired_auth_links_cleanup,
 };
+pub use service::{DisabledUserService, MultiUserService};
 pub use session::{SessionService, spawn_expired_sessions_cleanup};
-pub use user::{DisabledUserService, UserService};
 
 use crate::{config::MultiUserConfig, domain::models::UserId};
 
@@ -430,7 +430,7 @@ pub enum AuthLinkValidationResult {
     Invalid,
 }
 
-pub trait IUserService: Clone + Send + Sync + 'static {
+pub trait IMultiUserService: Clone + Send + Sync + 'static {
     fn register_user(
         &self,
         req: UserRegistrationRequest,
@@ -554,7 +554,7 @@ pub mod test_utils {
             fn clone(&self) -> Self;
         }
 
-        impl IUserService for UserService {
+        impl IMultiUserService for UserService {
             async fn register_user(
                 &self,
                 req: UserRegistrationRequest,

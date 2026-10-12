@@ -14,7 +14,9 @@ use std::{marker::PhantomData, sync::Arc};
 use crate::inbound::{
     auth::{
         AuthenticatedUser,
-        multi_user::{GenerateSessionTokenResult, IUserService, infra::handlers::AuthAppState},
+        multi_user::{
+            GenerateSessionTokenResult, IMultiUserService, infra::handlers::AuthAppState,
+        },
     },
     http::CookieConfig,
 };
@@ -26,7 +28,7 @@ pub struct CookieUserExtractor<US>(PhantomData<US>);
 impl<S, US> FromRequestParts<S> for CookieUserExtractor<US>
 where
     S: Send + Sync,
-    US: IUserService,
+    US: IMultiUserService,
     Arc<US>: FromRef<S>,
 {
     type Rejection = StatusCode;
@@ -60,7 +62,7 @@ pub async fn cookie_auth_middleware<US>(
     next: Next,
 ) -> Response
 where
-    US: IUserService,
+    US: IMultiUserService,
 {
     let jar = CookieJar::from_headers(request.headers());
     let cookie_config = state.cookie_config.for_request(request.headers());

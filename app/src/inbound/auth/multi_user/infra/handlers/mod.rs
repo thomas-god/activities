@@ -5,7 +5,7 @@ use axum::routing::post;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::inbound::auth::multi_user::IUserService;
+use crate::inbound::auth::multi_user::IMultiUserService;
 use crate::inbound::http::CookieConfig;
 use crate::inbound::http::middlewares::rate_limit::{IpRateLimitLayer, RateLimitStore};
 
@@ -49,7 +49,7 @@ impl From<&UserRegistration> for bool {
 }
 
 #[derive(Debug, Clone)]
-pub struct AuthAppState<UR: IUserService> {
+pub struct AuthAppState<UR: IMultiUserService> {
     user_service: Arc<UR>,
     cookie_config: Arc<CookieConfig>,
     registration_mode: UserRegistration,
@@ -57,14 +57,14 @@ pub struct AuthAppState<UR: IUserService> {
 
 impl<US> FromRef<AuthAppState<US>> for Arc<US>
 where
-    US: IUserService,
+    US: IMultiUserService,
 {
     fn from_ref(input: &AuthAppState<US>) -> Self {
         input.user_service.clone()
     }
 }
 
-pub fn multi_user_login_routes<US: IUserService, S>(
+pub fn multi_user_login_routes<US: IMultiUserService, S>(
     mut base_router: Router<S>,
     user_service: US,
     registration_mode: UserRegistration,

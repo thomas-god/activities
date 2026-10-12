@@ -12,8 +12,9 @@ use crate::{
     inbound::{
         http::{
             AuthLinkService, AuthMethods, DisabledAuthLinkService, HttpServer,
-            MaybeAuthLinkService, SMTPEmailProvider, SessionService, SqliteUsersRepository,
-            UserService, spawn_expired_auth_links_cleanup, spawn_expired_sessions_cleanup,
+            MaybeAuthLinkService, MultiUserService, SMTPEmailProvider, SessionService,
+            SqliteUsersRepository, spawn_expired_auth_links_cleanup,
+            spawn_expired_sessions_cleanup,
         },
         parser::Parser,
     },
@@ -38,7 +39,7 @@ type ActualTrainingService = TrainingService<
     >,
     Clock,
 >;
-type ActualUserService = UserService<
+type ActualUserService = MultiUserService<
     MaybeAuthLinkService<AuthLinkService<SqliteUsersRepository, SMTPEmailProvider>>,
     SqliteUsersRepository,
     SessionService<SqliteUsersRepository>,
@@ -225,7 +226,7 @@ async fn build_user_service(
     );
     let session_service = SessionService::new(users_repository.clone());
     let auth_methods = AuthMethods::from(mode_config);
-    let user_service = UserService::new(
+    let user_service = MultiUserService::new(
         auth_link_service,
         users_repository,
         session_service,

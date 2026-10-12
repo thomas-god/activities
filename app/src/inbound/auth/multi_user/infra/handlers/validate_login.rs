@@ -7,7 +7,7 @@ use axum::{
 use serde::Deserialize;
 
 use crate::inbound::auth::multi_user::{
-    AuthLinkValidationResult, AuthToken, IUserService,
+    AuthLinkValidationResult, AuthToken, IMultiUserService,
     infra::handlers::{AuthAppState, extractor::build_session_cookie},
 };
 
@@ -17,7 +17,7 @@ pub struct ValidateLoginBody {
 }
 
 #[tracing::instrument(skip_all)]
-pub async fn validate_login<UR: IUserService>(
+pub async fn validate_login<UR: IMultiUserService>(
     State(state): State<AuthAppState<UR>>,
     headers: HeaderMap,
     Json(body): Json<ValidateLoginBody>,

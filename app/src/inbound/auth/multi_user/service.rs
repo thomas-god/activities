@@ -7,20 +7,20 @@ use crate::{
     inbound::auth::multi_user::{
         AuthLinkValidationResult, AuthMethods, AuthToken, CheckSessionResult, EmailAddress,
         GenerateAuthLinkRequest, GenerateAuthLinkResult, HashedPassword, IAuthLinkService,
-        ISessionService, IUserService, Password, SessionToken, UserLoginResult,
+        IMultiUserService, ISessionService, Password, SessionToken, UserLoginResult,
         UserRegistrationRequest, UserRegistrationResult,
     },
 };
 
 #[derive(Debug, Clone, Constructor)]
-pub struct UserService<MLS, UR, SS> {
+pub struct MultiUserService<MLS, UR, SS> {
     auth_link_service: Arc<MLS>,
     user_repository: Arc<UR>,
     session_service: SS,
     auth_methods: AuthMethods,
 }
 
-impl<MLS, UR, SS> IUserService for UserService<MLS, UR, SS>
+impl<MLS, UR, SS> IMultiUserService for MultiUserService<MLS, UR, SS>
 where
     MLS: IAuthLinkService,
     UR: UserRepository,
@@ -111,7 +111,7 @@ where
     }
 }
 
-impl<MLS, UR, SS> UserService<MLS, UR, SS>
+impl<MLS, UR, SS> MultiUserService<MLS, UR, SS>
 where
     MLS: IAuthLinkService,
     UR: UserRepository,
@@ -217,7 +217,7 @@ mod test_utils {
     pub fn mail_only_service(
         auth_link: MockAuthLinkService,
         user: MockUserRepository,
-    ) -> UserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
+    ) -> MultiUserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
         mail_only_service_with_session(auth_link, user, MockSessionService::new())
     }
 
@@ -225,8 +225,8 @@ mod test_utils {
         auth_link: MockAuthLinkService,
         user: MockUserRepository,
         session: MockSessionService,
-    ) -> UserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
-        UserService::new(
+    ) -> MultiUserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
+        MultiUserService::new(
             Arc::new(auth_link),
             Arc::new(user),
             session,
@@ -237,7 +237,7 @@ mod test_utils {
     pub fn mail_and_password_service(
         auth_link: MockAuthLinkService,
         user: MockUserRepository,
-    ) -> UserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
+    ) -> MultiUserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
         mail_and_password_service_with_session(auth_link, user, MockSessionService::new())
     }
 
@@ -245,8 +245,8 @@ mod test_utils {
         auth_link: MockAuthLinkService,
         user: MockUserRepository,
         session: MockSessionService,
-    ) -> UserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
-        UserService::new(
+    ) -> MultiUserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
+        MultiUserService::new(
             Arc::new(auth_link),
             Arc::new(user),
             session,
@@ -257,7 +257,7 @@ mod test_utils {
     pub fn password_only_service(
         auth_link: MockAuthLinkService,
         user: MockUserRepository,
-    ) -> UserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
+    ) -> MultiUserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
         password_only_service_with_session(auth_link, user, MockSessionService::new())
     }
 
@@ -265,8 +265,8 @@ mod test_utils {
         auth_link: MockAuthLinkService,
         user: MockUserRepository,
         session: MockSessionService,
-    ) -> UserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
-        UserService::new(
+    ) -> MultiUserService<MockAuthLinkService, MockUserRepository, MockSessionService> {
+        MultiUserService::new(
             Arc::new(auth_link),
             Arc::new(user),
             session,
@@ -288,11 +288,11 @@ mod test_user_service_register_new_user {
         domain::models::UserId,
         inbound::auth::multi_user::{
             GenerateAuthLinkResult, UserRegistrationResult,
-            test_utils::MockAuthLinkService,
-            user::test_utils::{
+            service::test_utils::{
                 MockUserRepository, TEST_EMAIL, mail_and_password_service, mail_only_service,
                 password_only_service, registration_request,
             },
+            test_utils::MockAuthLinkService,
         },
     };
 
@@ -542,11 +542,11 @@ mod test_user_service_login_user {
 
     use crate::inbound::auth::multi_user::{
         GenerateSessionTokenResult, HashedPassword, Password, SessionToken,
-        test_utils::{MockAuthLinkService, MockSessionService},
-        user::test_utils::{
+        service::test_utils::{
             MockUserRepository, TEST_EMAIL, mail_and_password_service_with_session,
             mail_only_service, password_only_service_with_session,
         },
+        test_utils::{MockAuthLinkService, MockSessionService},
     };
 
     use super::*;
@@ -841,7 +841,7 @@ mod test_user_service_login_user {
 #[derive(Debug, Clone)]
 pub struct DisabledUserService {}
 
-impl IUserService for DisabledUserService {
+impl IMultiUserService for DisabledUserService {
     async fn check_session_token(&self, _token: &SessionToken) -> Result<CheckSessionResult, ()> {
         panic!("User service is disabled")
     }
@@ -876,8 +876,8 @@ mod test_user_service_validate_auth_link {
 
     use crate::inbound::auth::multi_user::{
         AuthLinkValidationResult, AuthToken, GenerateSessionTokenResult, SessionToken,
+        service::test_utils::MockUserRepository,
         test_utils::{MockAuthLinkService, MockSessionService},
-        user::test_utils::MockUserRepository,
     };
 
     use super::*;
@@ -905,7 +905,7 @@ mod test_user_service_validate_auth_link {
                 ))
             });
 
-        let service = UserService::new(
+        let service = MultiUserService::new(
             Arc::new(auth_link),
             Arc::new(user),
             session,
@@ -933,7 +933,7 @@ mod test_user_service_validate_auth_link {
         let mut session = MockSessionService::new();
         session.expect_generate_session_token().times(0);
 
-        let service = UserService::new(
+        let service = MultiUserService::new(
             Arc::new(auth_link),
             Arc::new(user),
             session,
@@ -959,7 +959,7 @@ mod test_user_service_validate_auth_link {
         let mut session = MockSessionService::new();
         session.expect_generate_session_token().times(0);
 
-        let service = UserService::new(
+        let service = MultiUserService::new(
             Arc::new(auth_link),
             Arc::new(user),
             session,
@@ -985,7 +985,7 @@ mod test_user_service_validate_auth_link {
             .expect_generate_session_token()
             .returning(|_| Err(()));
 
-        let service = UserService::new(
+        let service = MultiUserService::new(
             Arc::new(auth_link),
             Arc::new(user),
             session,
@@ -1004,8 +1004,8 @@ mod test_user_service_validate_auth_link {
 mod test_user_service_check_session_token {
     use crate::inbound::auth::multi_user::{
         SessionToken,
+        service::test_utils::MockUserRepository,
         test_utils::{MockAuthLinkService, MockSessionService},
-        user::test_utils::MockUserRepository,
     };
 
     use super::*;
@@ -1017,7 +1017,7 @@ mod test_user_service_check_session_token {
             .expect_check_session_token()
             .returning(|_| Ok(CheckSessionResult::new(UserId::test_default(), None)));
 
-        let service = UserService::new(
+        let service = MultiUserService::new(
             Arc::new(MockAuthLinkService::new()),
             Arc::new(MockUserRepository::new()),
             session,
@@ -1038,7 +1038,7 @@ mod test_user_service_check_session_token {
         let mut session = MockSessionService::new();
         session.expect_check_session_token().returning(|_| Err(()));
 
-        let service = UserService::new(
+        let service = MultiUserService::new(
             Arc::new(MockAuthLinkService::new()),
             Arc::new(MockUserRepository::new()),
             session,

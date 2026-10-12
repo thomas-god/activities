@@ -22,7 +22,7 @@ use crate::domain::ports::{
 
 use crate::inbound::auth::AuthStrategy;
 use crate::inbound::auth::infra::add_auth_router;
-use crate::inbound::auth::multi_user::IUserService;
+use crate::inbound::auth::multi_user::IMultiUserService;
 use crate::inbound::http::handlers::{
     get_default_activity_metrics, get_training_metric_templates, upload_bulk_weight_and_nutrition,
 };
@@ -45,7 +45,7 @@ pub use crate::inbound::auth::multi_user::infra::mailer::smtp::SMTPEmailProvider
 
 pub use crate::inbound::auth::multi_user::{
     AuthLinkService, AuthMethods, DisabledAuthLinkService, DisabledUserService,
-    MaybeAuthLinkService, SessionService, UserService,
+    MaybeAuthLinkService, MultiUserService, SessionService,
     infra::{mailer::DoNothingMailProvider, sqlite::users::SqliteUsersRepository},
     spawn_expired_auth_links_cleanup, spawn_expired_sessions_cleanup,
 };
@@ -142,7 +142,7 @@ impl<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    US: IUserService,
+    US: IMultiUserService,
     PS: IPreferencesService,
 > HttpServer<AS, PF, TMS, US, PS>
 {

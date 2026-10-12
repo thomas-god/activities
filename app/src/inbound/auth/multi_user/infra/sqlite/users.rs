@@ -12,8 +12,8 @@ use crate::{
         EmailAddress, HashedAuthLink, HashedAuthToken, HashedPassword, HashedSession,
         HashedSessionToken,
         auth_link::{AuthLinkRepository, AuthLinkRepositoryError},
+        service::UserRepository,
         session::SessionRepository,
-        user::UserRepository,
     },
 };
 
@@ -317,7 +317,7 @@ mod test_sqlite_users_repository {
         domain::models::UserId,
         inbound::auth::multi_user::{
             AuthLink, AuthToken, EmailAddress, HashedSessionToken, Password, Session, SessionToken,
-            auth_link::AuthLinkRepository, session::SessionRepository, user::UserRepository,
+            auth_link::AuthLinkRepository, service::UserRepository, session::SessionRepository,
         },
     };
 
