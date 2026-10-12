@@ -9,11 +9,11 @@ use crate::{
         AuthLink, AuthLinkValidationResult, AuthMethods, AuthToken, CheckSessionResult,
         EmailAddress, EmailChangeFinalizeResult, EmailChangeToken, EmailChangeValidationResult,
         EmailVerificationResult, GenerateAuthLinkRequest, GenerateAuthLinkResult, HashedAuthLink,
-        HashedAuthToken, HashedEmailChangeToken, HashedPassword, IMultiUserService,
-        ISessionService, MailProvider, Password, RegisterPasswordRequest, RegisterPasswordResult,
-        SessionToken, UpdateEmailRequest, UpdateEmailResult, UpdatePasswordRequest,
-        UpdatePasswordResult, UserInfo, UserInfoResult, UserLoginResult, UserRegistrationRequest,
-        UserRegistrationResult,
+        HashedAuthToken, HashedEmailChangeToken, HashedPassword, HashedSessionToken,
+        IMultiUserService, ISessionService, MailProvider, Password, RegisterPasswordRequest,
+        RegisterPasswordResult, RevokeSessionsResult, SessionToken, UpdateEmailRequest,
+        UpdateEmailResult, UpdatePasswordRequest, UpdatePasswordResult, UserInfo, UserInfoResult,
+        UserLoginResult, UserRegistrationRequest, UserRegistrationResult,
     },
 };
 
@@ -113,6 +113,30 @@ where
     #[tracing::instrument(skip_all, err(Debug))]
     async fn logout(&self, token: &SessionToken) -> Result<(), ()> {
         self.session_service.logout(token).await
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn revoke_other_sessions(
+        &self,
+        user: &UserId,
+        current: &HashedSessionToken,
+    ) -> RevokeSessionsResult {
+        match self
+            .session_service
+            .revoke_other_sessions(user, current)
+            .await
+        {
+            Ok(()) => RevokeSessionsResult::Success,
+            Err(()) => RevokeSessionsResult::Retry,
+        }
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn revoke_all_sessions(&self, user: &UserId) -> RevokeSessionsResult {
+        match self.session_service.revoke_all_sessions(user).await {
+            Ok(()) => RevokeSessionsResult::Success,
+            Err(()) => RevokeSessionsResult::Retry,
+        }
     }
 
     /// Allow an user to register a password if and only if there is no password already set (e.g.)
@@ -1895,6 +1919,21 @@ impl IMultiUserService for DisabledUserService {
         panic!("User service is disabled")
     }
 
+    async fn revoke_other_sessions(
+        &self,
+        _user: &UserId,
+        _current: &HashedSessionToken,
+    ) -> crate::inbound::auth::multi_user::RevokeSessionsResult {
+        panic!("User service is disabled")
+    }
+
+    async fn revoke_all_sessions(
+        &self,
+        _user: &UserId,
+    ) -> crate::inbound::auth::multi_user::RevokeSessionsResult {
+        panic!("User service is disabled")
+    }
+
     async fn register_password(&self, _req: RegisterPasswordRequest) -> RegisterPasswordResult {
         panic!("User service is disabled")
     }
@@ -2930,5 +2969,99 @@ mod test_user_service_request_email_verification {
             .await;
 
         assert_eq!(res, EmailVerificationResult::Retry);
+    }
+}
+
+#[cfg(test)]
+mod test_user_service_revoke_sessions {
+    use crate::inbound::auth::multi_user::{
+        RevokeSessionsResult, SessionToken,
+        service::test_utils::{MockUserRepository, mail_only_service_with_session},
+        test_utils::{MockMailProvider, MockSessionService},
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_revoke_other_sessions_delegates_and_maps_success() {
+        let mut session = MockSessionService::new();
+        let current = SessionToken::from("current".to_string()).as_hash();
+        let expected = current.clone();
+        session
+            .expect_revoke_other_sessions()
+            .times(1)
+            .withf(move |user, hash| user == &UserId::test_default() && hash == &expected)
+            .returning(|_, _| Ok(()));
+
+        let service = mail_only_service_with_session(
+            MockUserRepository::new(),
+            session,
+            MockMailProvider::new(),
+        );
+
+        let res = service
+            .revoke_other_sessions(&UserId::test_default(), &current)
+            .await;
+
+        assert_eq!(res, RevokeSessionsResult::Success);
+    }
+
+    #[tokio::test]
+    async fn test_revoke_other_sessions_maps_error_to_retry() {
+        let mut session = MockSessionService::new();
+        session
+            .expect_revoke_other_sessions()
+            .returning(|_, _| Err(()));
+
+        let service = mail_only_service_with_session(
+            MockUserRepository::new(),
+            session,
+            MockMailProvider::new(),
+        );
+
+        let res = service
+            .revoke_other_sessions(
+                &UserId::test_default(),
+                &SessionToken::from("current".to_string()).as_hash(),
+            )
+            .await;
+
+        assert_eq!(res, RevokeSessionsResult::Retry);
+    }
+
+    #[tokio::test]
+    async fn test_revoke_all_sessions_delegates_and_maps_success() {
+        let mut session = MockSessionService::new();
+        session
+            .expect_revoke_all_sessions()
+            .times(1)
+            .withf(|user| user == &UserId::test_default())
+            .returning(|_| Ok(()));
+
+        let service = mail_only_service_with_session(
+            MockUserRepository::new(),
+            session,
+            MockMailProvider::new(),
+        );
+
+        let res = service.revoke_all_sessions(&UserId::test_default()).await;
+
+        assert_eq!(res, RevokeSessionsResult::Success);
+    }
+
+    #[tokio::test]
+    async fn test_revoke_all_sessions_maps_error_to_retry() {
+        let mut session = MockSessionService::new();
+        session.expect_revoke_all_sessions().returning(|_| Err(()));
+
+        let service = mail_only_service_with_session(
+            MockUserRepository::new(),
+            session,
+            MockMailProvider::new(),
+        );
+
+        let res = service.revoke_all_sessions(&UserId::test_default()).await;
+
+        assert_eq!(res, RevokeSessionsResult::Retry);
     }
 }

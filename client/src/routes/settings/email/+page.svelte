@@ -11,6 +11,8 @@
 		registerPassword,
 		requestEmailChange,
 		requestEmailVerification,
+		revokeAllSessions,
+		revokeOtherSessions,
 		validateEmailChange,
 		type UserInfo
 	} from '#lib/api/index.js';
@@ -193,6 +195,67 @@
 			passwordPending = false;
 		}
 	};
+
+	// --- Sessions ---
+
+	let revokeOthersPending = $state(false);
+	let revokeAllPending = $state(false);
+	let sessionsError: string | null = $state(null);
+	let sessionsInfo: string | null = $state(null);
+
+	const submitRevokeOtherSessions = async (): Promise<void> => {
+		if (revokeOthersPending) {
+			return;
+		}
+		revokeOthersPending = true;
+		sessionsError = null;
+		sessionsInfo = null;
+		try {
+			const res = await revokeOtherSessions();
+			if (res.status === 200) {
+				sessionsInfo = 'Other devices have been signed out.';
+			} else if (res.status === 429) {
+				sessionsError = 'Too many attempts, retry later';
+			} else if (res.status === 503) {
+				sessionsError = 'Service unavailable, retry later';
+			} else {
+				sessionsError = 'Something went wrong, retry later';
+			}
+		} catch {
+			sessionsError = 'Something went wrong, retry later';
+		} finally {
+			revokeOthersPending = false;
+		}
+	};
+
+	const submitRevokeAllSessions = async (): Promise<void> => {
+		if (revokeAllPending) {
+			return;
+		}
+		if (!window.confirm('Sign out of all devices? You will need to log in again.')) {
+			return;
+		}
+		revokeAllPending = true;
+		sessionsError = null;
+		sessionsInfo = null;
+		try {
+			const res = await revokeAllSessions();
+			if (res.status === 200) {
+				// Every session is gone and the server cleared the cookie: back to the login page.
+				await goto(resolve('/login'));
+			} else if (res.status === 429) {
+				sessionsError = 'Too many attempts, retry later';
+			} else if (res.status === 503) {
+				sessionsError = 'Service unavailable, retry later';
+			} else {
+				sessionsError = 'Something went wrong, retry later';
+			}
+		} catch {
+			sessionsError = 'Something went wrong, retry later';
+		} finally {
+			revokeAllPending = false;
+		}
+	};
 </script>
 
 <Navbar />
@@ -347,5 +410,33 @@
 				{/if}
 			</fieldset>
 		{/if}
+
+		<fieldset class="mt-4 fieldset rounded-box border border-base-300 bg-base-100 p-4">
+			<legend class="fieldset-legend">Sessions</legend>
+
+			<p class="text-xs opacity-70">
+				Sign out other devices to revoke every session except this one. Sign out everywhere revokes
+				all sessions, including this one, and logs you out.
+			</p>
+
+			<div class="join mx-auto mt-4 join-horizontal gap-4">
+				<button
+					class="btn join-item rounded-xs btn-secondary btn-sm"
+					disabled={revokeOthersPending}
+					onclick={submitRevokeOtherSessions}>Sign out from other devices</button
+				>
+				<button
+					class="btn join-item rounded-xs btn-error btn-sm"
+					disabled={revokeAllPending}
+					onclick={submitRevokeAllSessions}>Sign out everywhere</button
+				>
+			</div>
+
+			{#if sessionsError}
+				<p class="text-error">{sessionsError}</p>
+			{:else if sessionsInfo}
+				<p class="text-info">{sessionsInfo}</p>
+			{/if}
+		</fieldset>
 	</div>
 {/if}

@@ -13,9 +13,10 @@ use std::{marker::PhantomData, sync::Arc};
 
 use crate::inbound::{
     auth::{
-        AuthenticatedUser,
+        AuthenticatedSession, AuthenticatedUser, SessionRevoked,
         multi_user::{
-            GenerateSessionTokenResult, IMultiUserService, infra::handlers::AuthAppState,
+            GenerateSessionTokenResult, IMultiUserService, SessionToken,
+            infra::handlers::AuthAppState,
         },
     },
     http::CookieConfig,
@@ -70,20 +71,31 @@ where
         return StatusCode::UNAUTHORIZED.into_response();
     };
 
-    let Ok(result) = state
-        .user_service
-        .check_session_token(&cookie.value().into())
-        .await
-    else {
+    let session_token: SessionToken = cookie.value().into();
+    let Ok(result) = state.user_service.check_session_token(&session_token).await else {
         return StatusCode::UNAUTHORIZED.into_response();
+    };
+
+    // The current session may have just been rotated by the check above: handlers that revoke the
+    // user's other sessions must exclude the *effective* session (the refreshed one), not the
+    // token that was sent in the request.
+    let current_hash = match result.refreshed() {
+        Some(refreshed) => refreshed.token().as_hash(),
+        None => session_token.as_hash(),
     };
 
     request
         .extensions_mut()
         .insert(AuthenticatedUser::new(result.user().clone()));
+    request
+        .extensions_mut()
+        .insert(AuthenticatedSession::new(current_hash));
     let mut response = next.run(request).await;
 
-    if let Some(refreshed) = result.refreshed()
+    // A handler that revoked the current session already cleared the cookie: do not append a
+    // rotated one on top of it, or the browser would keep a token pointing at a deleted session.
+    if response.extensions().get::<SessionRevoked>().is_none()
+        && let Some(refreshed) = result.refreshed()
         && let Some(new_cookie) = build_session_cookie(&cookie_config, refreshed)
         && let Ok(header_value) = new_cookie.to_string().parse()
     {
@@ -117,6 +129,7 @@ mod test {
         Extension, Router,
         http::header::SET_COOKIE,
         middleware::{from_extractor_with_state, from_fn_with_state},
+        response::IntoResponse,
         routing::get,
     };
     use axum_extra::extract::cookie::Cookie;
@@ -317,6 +330,120 @@ mod test {
         // User is still authenticated despite the refresh cookie failing to build
         response.assert_status(StatusCode::OK);
         assert_eq!(response.text(), UserId::from("a user").to_string());
+        assert!(response.headers().get(SET_COOKIE).is_none());
+    }
+
+    fn build_middleware_session_hash_server(session_service: MockUserService) -> TestServer {
+        let state = AuthAppState {
+            user_service: Arc::new(session_service),
+            cookie_config: Arc::new(CookieConfig::default()),
+            registration_mode: UserRegistration::Allowed,
+        };
+
+        async fn test_route(Extension(session): Extension<AuthenticatedSession>) -> String {
+            session.hash().to_string()
+        }
+
+        let app = Router::new()
+            .route("/", get(test_route))
+            .route_layer(from_fn_with_state(
+                state.clone(),
+                cookie_auth_middleware::<MockUserService>,
+            ))
+            .with_state(state);
+        TestServer::new(app)
+    }
+
+    #[tokio::test]
+    async fn test_cookie_auth_middleware_exposes_effective_session_without_refresh() {
+        let mut sessions = MockUserService::new();
+        sessions
+            .expect_check_session_token()
+            .returning(|_| Ok(CheckSessionResult::new(UserId::from("a user"), None)));
+        let server = build_middleware_session_hash_server(sessions);
+
+        let response = server
+            .get("/")
+            .add_cookie(Cookie::new("session_token", "a value"))
+            .await;
+
+        response.assert_status(StatusCode::OK);
+        assert_eq!(
+            response.text(),
+            SessionToken::from("a value").as_hash().to_string()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_cookie_auth_middleware_exposes_refreshed_session() {
+        let mut sessions = MockUserService::new();
+        sessions.expect_check_session_token().returning(|_| {
+            Ok(CheckSessionResult::new(
+                UserId::from("a user"),
+                Some(GenerateSessionTokenResult::new(
+                    SessionToken::from("new_token"),
+                    Utc::now() + TimeDelta::days(30),
+                )),
+            ))
+        });
+        let server = build_middleware_session_hash_server(sessions);
+
+        let response = server
+            .get("/")
+            .add_cookie(Cookie::new("session_token", "a value"))
+            .await;
+
+        response.assert_status(StatusCode::OK);
+        assert_eq!(
+            response.text(),
+            SessionToken::from("new_token").as_hash().to_string()
+        );
+    }
+
+    fn build_middleware_session_revoked_server(session_service: MockUserService) -> TestServer {
+        let state = AuthAppState {
+            user_service: Arc::new(session_service),
+            cookie_config: Arc::new(CookieConfig::default()),
+            registration_mode: UserRegistration::Allowed,
+        };
+
+        async fn test_route() -> axum::response::Response {
+            let mut response = StatusCode::OK.into_response();
+            response.extensions_mut().insert(SessionRevoked);
+            response
+        }
+
+        let app = Router::new()
+            .route("/", get(test_route))
+            .route_layer(from_fn_with_state(
+                state.clone(),
+                cookie_auth_middleware::<MockUserService>,
+            ))
+            .with_state(state);
+        TestServer::new(app)
+    }
+
+    #[tokio::test]
+    async fn test_cookie_auth_middleware_skips_refresh_when_session_revoked() {
+        let mut sessions = MockUserService::new();
+        sessions.expect_check_session_token().returning(|_| {
+            Ok(CheckSessionResult::new(
+                UserId::from("a user"),
+                Some(GenerateSessionTokenResult::new(
+                    SessionToken::from("new_token"),
+                    Utc::now() + TimeDelta::days(30),
+                )),
+            ))
+        });
+        let server = build_middleware_session_revoked_server(sessions);
+
+        let response = server
+            .get("/")
+            .add_cookie(Cookie::new("session_token", "a value"))
+            .await;
+
+        response.assert_status(StatusCode::OK);
+        // The handler revoked the session: no rotated cookie may be appended.
         assert!(response.headers().get(SET_COOKIE).is_none());
     }
 }

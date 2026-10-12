@@ -798,6 +798,43 @@ impl SessionRepository for SqliteUsersRepository {
             .map(|_| ())
             .map_err(|_| ())
     }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn delete_sessions_for_user(&self, user: &UserId) -> Result<(), ()> {
+        sqlx::query(
+            r#"
+        DELETE FROM t_sessions
+        WHERE user = (SELECT rowid FROM t_users WHERE user_id = ?1)
+        ;"#,
+        )
+        .bind(user.to_string())
+        .execute(&self.writer)
+        .await
+        .map(|_| ())
+        .map_err(|_| ())
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn delete_sessions_for_user_except(
+        &self,
+        user: &UserId,
+        hash: &HashedSessionToken,
+    ) -> Result<(), ()> {
+        sqlx::query(
+            r#"
+        DELETE FROM t_sessions
+        WHERE
+            user = (SELECT rowid FROM t_users WHERE user_id = ?1)
+            AND token_hash != ?2
+        ;"#,
+        )
+        .bind(user.to_string())
+        .bind(hash.to_string())
+        .execute(&self.writer)
+        .await
+        .map(|_| ())
+        .map_err(|_| ())
+    }
 }
 
 #[cfg(test)]
@@ -1718,6 +1755,96 @@ mod test_sqlite_users_repository {
                 .get_session_by_hash(&HashedSessionToken::new("test_token".to_string()))
                 .await
                 .is_none()
+        );
+    }
+
+    fn session_for(token: &str) -> HashedSession {
+        Session::new(
+            UserId::test_default(),
+            SessionToken::from(token.to_string()),
+            Utc::now() + TimeDelta::minutes(5),
+        )
+        .as_hash()
+    }
+
+    #[tokio::test]
+    async fn test_delete_sessions_for_user_removes_all() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let first = session_for("first");
+        let second = session_for("second");
+        repository.store_session(&first).await.unwrap();
+        repository.store_session(&second).await.unwrap();
+
+        repository
+            .delete_sessions_for_user(&UserId::test_default())
+            .await
+            .unwrap();
+
+        assert!(repository.get_session_by_hash(first.hash()).await.is_none());
+        assert!(
+            repository
+                .get_session_by_hash(second.hash())
+                .await
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_delete_sessions_for_user_except_keeps_current() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let current = session_for("current");
+        let other = session_for("other");
+        repository.store_session(&current).await.unwrap();
+        repository.store_session(&other).await.unwrap();
+
+        repository
+            .delete_sessions_for_user_except(&UserId::test_default(), current.hash())
+            .await
+            .unwrap();
+
+        assert!(
+            repository
+                .get_session_by_hash(current.hash())
+                .await
+                .is_some()
+        );
+        assert!(repository.get_session_by_hash(other.hash()).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_delete_sessions_for_user_does_not_touch_other_users() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let other_user = UserId::from("other_user".to_string());
+        repository
+            .store_user(
+                &other_user,
+                &EmailAddress::try_from("other@mail.test").unwrap(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        let mine = session_for("mine");
+        let theirs = Session::new(
+            other_user,
+            SessionToken::from("theirs".to_string()),
+            Utc::now() + TimeDelta::minutes(5),
+        )
+        .as_hash();
+        repository.store_session(&mine).await.unwrap();
+        repository.store_session(&theirs).await.unwrap();
+
+        repository
+            .delete_sessions_for_user(&UserId::test_default())
+            .await
+            .unwrap();
+
+        assert!(repository.get_session_by_hash(mine.hash()).await.is_none());
+        assert!(
+            repository
+                .get_session_by_hash(theirs.hash())
+                .await
+                .is_some()
         );
     }
 

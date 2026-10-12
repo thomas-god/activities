@@ -83,6 +83,22 @@ where
             .delete_session_by_hash(&token.as_hash())
             .await
     }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn revoke_other_sessions(
+        &self,
+        user: &UserId,
+        current: &HashedSessionToken,
+    ) -> Result<(), ()> {
+        self.session_repository
+            .delete_sessions_for_user_except(user, current)
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn revoke_all_sessions(&self, user: &UserId) -> Result<(), ()> {
+        self.session_repository.delete_sessions_for_user(user).await
+    }
 }
 
 pub trait SessionRepository: Clone + Send + Sync + 'static {
@@ -102,6 +118,17 @@ pub trait SessionRepository: Clone + Send + Sync + 'static {
     fn delete_expired_sessions(
         &self,
         reference: DateTime<Utc>,
+    ) -> impl Future<Output = Result<(), ()>> + Send;
+
+    fn delete_sessions_for_user(
+        &self,
+        user: &UserId,
+    ) -> impl Future<Output = Result<(), ()>> + Send;
+
+    fn delete_sessions_for_user_except(
+        &self,
+        user: &UserId,
+        hash: &HashedSessionToken,
     ) -> impl Future<Output = Result<(), ()>> + Send;
 }
 
@@ -143,6 +170,12 @@ mod test_utils {
             async fn get_session_by_hash(&self, hash: &HashedSessionToken) -> Option<HashedSession>;
             async fn delete_session_by_hash(&self, hash: &HashedSessionToken) -> Result<(), ()>;
             async fn delete_expired_sessions(&self, reference: DateTime<Utc>) -> Result<(), ()>;
+            async fn delete_sessions_for_user(&self, user: &UserId) -> Result<(), ()>;
+            async fn delete_sessions_for_user_except(
+                &self,
+                user: &UserId,
+                hash: &HashedSessionToken,
+            ) -> Result<(), ()>;
         }
     }
 }
@@ -292,5 +325,81 @@ mod test_session_service_logout {
         let res = service.logout(&token).await;
 
         assert!(res.is_ok());
+    }
+}
+
+#[cfg(test)]
+mod test_session_service_revoke {
+    use crate::inbound::auth::multi_user::session::test_utils::MockSessionRepository;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_revoke_other_sessions_deletes_everything_but_current() {
+        let mut repository = MockSessionRepository::new();
+        let current = SessionToken::new().as_hash();
+        let expected = current.clone();
+        repository
+            .expect_delete_sessions_for_user_except()
+            .times(1)
+            .withf(move |user, hash| user == &UserId::test_default() && hash == &expected)
+            .returning(|_, _| Ok(()));
+
+        let service = SessionService::new(Arc::new(repository));
+
+        let res = service
+            .revoke_other_sessions(&UserId::test_default(), &current)
+            .await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_revoke_other_sessions_propagates_error() {
+        let mut repository = MockSessionRepository::new();
+        repository
+            .expect_delete_sessions_for_user_except()
+            .returning(|_, _| Err(()));
+
+        let service = SessionService::new(Arc::new(repository));
+
+        let res = service
+            .revoke_other_sessions(
+                &UserId::test_default(),
+                &SessionToken::from("current".to_string()).as_hash(),
+            )
+            .await;
+
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_revoke_all_sessions_deletes_everything_for_user() {
+        let mut repository = MockSessionRepository::new();
+        repository
+            .expect_delete_sessions_for_user()
+            .times(1)
+            .withf(|user| user == &UserId::test_default())
+            .returning(|_| Ok(()));
+
+        let service = SessionService::new(Arc::new(repository));
+
+        let res = service.revoke_all_sessions(&UserId::test_default()).await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_revoke_all_sessions_propagates_error() {
+        let mut repository = MockSessionRepository::new();
+        repository
+            .expect_delete_sessions_for_user()
+            .returning(|_| Err(()));
+
+        let service = SessionService::new(Arc::new(repository));
+
+        let res = service.revoke_all_sessions(&UserId::test_default()).await;
+
+        assert!(res.is_err());
     }
 }

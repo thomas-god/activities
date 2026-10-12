@@ -668,6 +668,17 @@ pub trait IMultiUserService: Clone + Send + Sync + 'static {
 
     fn logout(&self, token: &SessionToken) -> impl Future<Output = Result<(), ()>> + Send;
 
+    fn revoke_other_sessions(
+        &self,
+        user: &UserId,
+        current: &HashedSessionToken,
+    ) -> impl Future<Output = RevokeSessionsResult> + Send;
+
+    fn revoke_all_sessions(
+        &self,
+        user: &UserId,
+    ) -> impl Future<Output = RevokeSessionsResult> + Send;
+
     fn register_password(
         &self,
         req: RegisterPasswordRequest,
@@ -768,6 +779,12 @@ impl CheckSessionResult {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum RevokeSessionsResult {
+    Success,
+    Retry,
+}
+
 pub trait ISessionService: Clone + Send + Sync + 'static {
     fn generate_session_token(
         &self,
@@ -780,6 +797,14 @@ pub trait ISessionService: Clone + Send + Sync + 'static {
     ) -> impl Future<Output = Result<CheckSessionResult, ()>> + Send;
 
     fn logout(&self, token: &SessionToken) -> impl Future<Output = Result<(), ()>> + Send;
+
+    fn revoke_other_sessions(
+        &self,
+        user: &UserId,
+        current: &HashedSessionToken,
+    ) -> impl Future<Output = Result<(), ()>> + Send;
+
+    fn revoke_all_sessions(&self, user: &UserId) -> impl Future<Output = Result<(), ()>> + Send;
 }
 
 pub trait MailProvider: Clone + Send + Sync + 'static {
@@ -875,6 +900,17 @@ pub mod test_utils {
 
             async fn logout(&self, token: &SessionToken) -> Result<(), ()>;
 
+            async fn revoke_other_sessions(
+                &self,
+                user: &UserId,
+                current: &HashedSessionToken,
+            ) -> RevokeSessionsResult;
+
+            async fn revoke_all_sessions(
+                &self,
+                user: &UserId,
+            ) -> RevokeSessionsResult;
+
             async fn register_password(
                 &self,
                 req: RegisterPasswordRequest,
@@ -943,6 +979,14 @@ pub mod test_utils {
             ) -> Result<CheckSessionResult, ()>;
 
             async fn logout(&self, token: &SessionToken) -> Result<(), ()>;
+
+            async fn revoke_other_sessions(
+                &self,
+                user: &UserId,
+                current: &HashedSessionToken,
+            ) -> Result<(), ()>;
+
+            async fn revoke_all_sessions(&self, user: &UserId) -> Result<(), ()>;
         }
     }
 

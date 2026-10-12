@@ -15,6 +15,7 @@ pub use logout::logout;
 pub use me::get_me;
 pub use register_user::register_user;
 pub use request_email_verification::request_email_verification;
+pub use revoke_sessions::{revoke_all_sessions, revoke_other_sessions};
 pub use set_password::{register_password, update_password};
 pub use update_email::{update_email, validate_email_change};
 pub use validate_login::validate_login;
@@ -25,6 +26,7 @@ pub mod logout;
 pub mod me;
 pub mod register_user;
 pub mod request_email_verification;
+pub mod revoke_sessions;
 pub mod set_password;
 pub mod update_email;
 pub mod validate_login;
@@ -127,6 +129,14 @@ where
             post(request_email_verification::<US>),
         )
         .route("/account/me", get(get_me::<US>))
+        .route(
+            "/account/sessions/revoke-others",
+            post(revoke_other_sessions::<US>),
+        )
+        .route(
+            "/account/sessions/revoke-all",
+            post(revoke_all_sessions::<US>),
+        )
         .route_layer(axum::middleware::from_fn_with_state(
             auth_state.clone(),
             cookie_auth_middleware::<US>,

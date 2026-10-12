@@ -6,7 +6,9 @@ use subtle::ConstantTimeEq;
 use crate::{
     config::{AppMode, SingleUserConfig},
     domain::models::UserId,
-    inbound::auth::multi_user::{AuthMethods, infra::handlers::UserRegistration},
+    inbound::auth::multi_user::{
+        AuthMethods, HashedSessionToken, infra::handlers::UserRegistration,
+    },
 };
 
 pub mod infra;
@@ -119,6 +121,21 @@ impl AuthenticatedUser {
         &self.0
     }
 }
+
+#[derive(Debug, Clone, Constructor)]
+pub struct AuthenticatedSession(HashedSessionToken);
+
+impl AuthenticatedSession {
+    pub fn hash(&self) -> &HashedSessionToken {
+        &self.0
+    }
+}
+
+/// Marker inserted on a response by a handler that has already revoked the current session. The
+/// cookie middleware must then not append a freshly rotated session cookie, which would override
+/// the handler's session-cookie removal with a cookie pointing at a deleted session.
+#[derive(Debug, Clone, Copy)]
+pub struct SessionRevoked;
 
 #[cfg(test)]
 mod test_auth {

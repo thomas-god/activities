@@ -174,7 +174,24 @@ admin role may provide a stronger remedy.
 ### Sessions
 
 Neither an email change nor a password change invalidates existing sessions; they remain valid until
-their normal expiry. A separate feature will later allow closing existing sessions.
+their normal expiry. Revocation is strictly manual instead: an authenticated user can **sign out
+other devices** (`POST /api/account/sessions/revoke-others`), which deletes every session except the
+one used for the request, or **sign out everywhere** (`POST /api/account/sessions/revoke-all`), which
+deletes every session and clears the session cookie.
+
+The current session is identified by the hash of the *effective* session token, recorded on the
+request by the cookie middleware: `check_session_token` may have just rotated the token, in which
+case the request cookie still carries the old (now deleted) one. Revoking others must exclude the
+refreshed session, not the cookie's, or it would log the caller out. Conversely, a handler that
+revokes the current session (`revoke-all`) clears the cookie and marks the response so the
+middleware does not append a rotated cookie over the removal.
+
+**Residual risk and alternative considered**: keeping revocation manual means a user who changes
+their password does not automatically cut off a session an attacker may already hold; they have to
+remember to sign out other devices. A plausible future default is to automatically revoke *other*
+sessions on password change (keeping the current one, hence no surprise logout) while leaving email
+changes manual. It was deliberately left out to keep revocation entirely user-triggered, but the
+`revoke_other_sessions` primitive already supports it.
 
 ### Email verification
 

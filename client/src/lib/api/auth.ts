@@ -113,6 +113,17 @@ export const validateEmailChange = (token: string): Promise<Response> =>
 export const requestEmailVerification = (): Promise<Response> =>
 	postJson('/api/account/email/verify', {});
 
+/** Revokes every session of the authenticated user except the current one. */
+export const revokeOtherSessions = (): Promise<Response> =>
+	postJson('/api/account/sessions/revoke-others', {});
+
+/**
+ * Revokes every session of the authenticated user, including the current one: the server also
+ * clears the session cookie, so the caller is signed out everywhere.
+ */
+export const revokeAllSessions = (): Promise<Response> =>
+	postJson('/api/account/sessions/revoke-all', {});
+
 /** Registers the first password for the authenticated user. `409 Conflict` if one is already set. */
 export const registerPassword = (newPassword: string): Promise<Response> =>
 	postJson('/api/password', { new_password: newPassword });
