@@ -10,6 +10,7 @@
 		fetchUserInfo,
 		registerPassword,
 		requestEmailChange,
+		requestEmailVerification,
 		validateEmailChange,
 		type UserInfo
 	} from '#lib/api/index.js';
@@ -80,6 +81,42 @@
 			emailChangeError = 'Something went wrong, retry later';
 		} finally {
 			emailChangePending = false;
+		}
+	};
+
+	// --- Manual email verification ---
+
+	let verifyEmailPending = $state(false);
+	let verifyEmailError: string | null = $state(null);
+	let verifyEmailInfo: string | null = $state(null);
+
+	const submitEmailVerification = async (): Promise<void> => {
+		if (verifyEmailPending) {
+			return;
+		}
+		verifyEmailPending = true;
+		verifyEmailError = null;
+		verifyEmailInfo = null;
+		try {
+			const res = await requestEmailVerification();
+			if (res.status === 202) {
+				verifyEmailInfo = `A verification link was sent to ${userInfo?.email ?? 'your email address'}. Open it to confirm this address.`;
+			} else if (res.status === 200) {
+				// Already verified: refresh so the badge and button reflect it.
+				await refreshUserInfo();
+			} else if (res.status === 403) {
+				verifyEmailError = 'Email verification is not enabled on this instance';
+			} else if (res.status === 429) {
+				verifyEmailError = 'Too many attempts, retry later';
+			} else if (res.status === 503) {
+				verifyEmailError = 'Service unavailable, retry later';
+			} else {
+				verifyEmailError = 'Something went wrong, retry later';
+			}
+		} catch {
+			verifyEmailError = 'Something went wrong, retry later';
+		} finally {
+			verifyEmailPending = false;
 		}
 	};
 
@@ -198,6 +235,25 @@
 					{userInfo.verified ? 'Verified' : 'Unverified'}
 				</span>
 			</div>
+
+			{#if emailAuthEnabled && !userInfo.verified}
+				<div class="mt-2 flex items-center gap-2">
+					<button
+						class="btn btn-primary btn-sm"
+						disabled={verifyEmailPending}
+						onclick={submitEmailVerification}>Verify email</button
+					>
+				</div>
+				{#if verifyEmailError}
+					<p class="text-error">{verifyEmailError}</p>
+				{:else if verifyEmailInfo}
+					<p class="text-info">{verifyEmailInfo}</p>
+				{:else}
+					<p class="text-xs opacity-70">
+						A verification link will be sent to this address; open it to confirm you own it.
+					</p>
+				{/if}
+			{/if}
 
 			<label class="label mt-4" for="settings-new-email">New email</label>
 			<input

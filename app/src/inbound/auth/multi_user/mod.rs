@@ -128,6 +128,7 @@ impl std::fmt::Display for HashedAuthToken {
 #[derive(Clone, Debug, Constructor)]
 pub struct AuthLink {
     user: UserId,
+    email: EmailAddress,
     token: AuthToken,
     expire_at: chrono::DateTime<Utc>,
 }
@@ -135,6 +136,10 @@ pub struct AuthLink {
 impl AuthLink {
     pub fn user(&self) -> &UserId {
         &self.user
+    }
+
+    pub fn email(&self) -> &EmailAddress {
+        &self.email
     }
 
     pub fn token(&self) -> &AuthToken {
@@ -149,6 +154,7 @@ impl AuthLink {
         let hash = self.token().as_hash()?;
         Some(HashedAuthLink::new(
             self.user().clone(),
+            Some(self.email().clone()),
             hash,
             *self.expire_at(),
         ))
@@ -158,6 +164,7 @@ impl AuthLink {
 #[derive(Clone, Debug, Constructor)]
 pub struct HashedAuthLink {
     user: UserId,
+    email: Option<EmailAddress>,
     hash: HashedAuthToken,
     expire_at: chrono::DateTime<Utc>,
 }
@@ -165,6 +172,14 @@ pub struct HashedAuthLink {
 impl HashedAuthLink {
     pub fn user(&self) -> &UserId {
         &self.user
+    }
+
+    /// The address the link was sent to, when known. Opening the link proves control of this
+    /// address, so it is the only one that may be marked verified when the link is consumed. It is
+    /// `None` for links created before the address was tracked: those are consumed without
+    /// verifying anything.
+    pub fn email(&self) -> Option<&EmailAddress> {
+        self.email.as_ref()
     }
 
     pub fn hash(&self) -> &HashedAuthToken {
@@ -556,6 +571,14 @@ pub enum UpdateEmailResult {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum EmailVerificationResult {
+    EmailSent,
+    AlreadyVerified,
+    EmailAuthDisabled,
+    Retry,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum EmailChangeValidationResult {
     Success(EmailAddress),
     EmailAlreadyInUse,
@@ -659,6 +682,11 @@ pub trait IMultiUserService: Clone + Send + Sync + 'static {
         &self,
         req: UpdateEmailRequest,
     ) -> impl Future<Output = UpdateEmailResult> + Send;
+
+    fn request_email_verification(
+        &self,
+        user: &UserId,
+    ) -> impl Future<Output = EmailVerificationResult> + Send;
 
     fn validate_email_change(
         &self,
@@ -862,6 +890,11 @@ pub mod test_utils {
                 req: UpdateEmailRequest,
             ) -> UpdateEmailResult;
 
+            async fn request_email_verification(
+                &self,
+                user: &UserId,
+            ) -> EmailVerificationResult;
+
             async fn validate_email_change(
                 &self,
                 token: AuthToken,
@@ -947,6 +980,7 @@ mod test {
         let expire_at = chrono::Utc::now();
         let link = HashedAuthLink::new(
             UserId::test_default(),
+            Some(EmailAddress::try_from("test@mail.test").unwrap()),
             AuthToken::new().as_hash().unwrap(),
             expire_at,
         );

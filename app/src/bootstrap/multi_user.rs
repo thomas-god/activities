@@ -12,7 +12,9 @@ use crate::{
     inbound::{
         auth::multi_user::{
             MaybeMailProvider,
-            service::{spawn_expired_auth_links_cleanup, spawn_expired_email_change_tokens_cleanup},
+            service::{
+                spawn_expired_auth_links_cleanup, spawn_expired_email_change_tokens_cleanup,
+            },
         },
         http::{
             AuthMethods, DoNothingMailProvider, HttpServer, MultiUserService, SMTPEmailProvider,

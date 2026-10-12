@@ -102,6 +102,17 @@ export const requestEmailChange = (newEmail: string): Promise<Response> =>
 export const validateEmailChange = (token: string): Promise<Response> =>
 	postJson('/api/email/change/validate', { token });
 
+/**
+ * Requests a fresh verification link for the authenticated user's current email. Following the
+ * link uses the standard auth-link machinery, which marks the address as verified.
+ *
+ * Statuses: `202 Accepted` (link sent), `200 OK` (already verified, nothing to do), `403
+ * Forbidden` (email-based authentication is disabled), `429 Too Many Requests`, `503 Service
+ * Unavailable`.
+ */
+export const requestEmailVerification = (): Promise<Response> =>
+	postJson('/api/account/email/verify', {});
+
 /** Registers the first password for the authenticated user. `409 Conflict` if one is already set. */
 export const registerPassword = (newPassword: string): Promise<Response> =>
 	postJson('/api/password', { new_password: newPassword });

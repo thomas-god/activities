@@ -8,11 +8,12 @@ use crate::{
     inbound::auth::multi_user::{
         AuthLink, AuthLinkValidationResult, AuthMethods, AuthToken, CheckSessionResult,
         EmailAddress, EmailChangeFinalizeResult, EmailChangeToken, EmailChangeValidationResult,
-        GenerateAuthLinkRequest, GenerateAuthLinkResult, HashedAuthLink, HashedAuthToken,
-        HashedEmailChangeToken, HashedPassword, IMultiUserService, ISessionService, MailProvider,
-        Password, RegisterPasswordRequest, RegisterPasswordResult, SessionToken,
-        UpdateEmailRequest, UpdateEmailResult, UpdatePasswordRequest, UpdatePasswordResult,
-        UserInfo, UserInfoResult, UserLoginResult, UserRegistrationRequest, UserRegistrationResult,
+        EmailVerificationResult, GenerateAuthLinkRequest, GenerateAuthLinkResult, HashedAuthLink,
+        HashedAuthToken, HashedEmailChangeToken, HashedPassword, IMultiUserService,
+        ISessionService, MailProvider, Password, RegisterPasswordRequest, RegisterPasswordResult,
+        SessionToken, UpdateEmailRequest, UpdateEmailResult, UpdatePasswordRequest,
+        UpdatePasswordResult, UserInfo, UserInfoResult, UserLoginResult, UserRegistrationRequest,
+        UserRegistrationResult,
     },
 };
 
@@ -202,6 +203,29 @@ where
         self.request_email_change(req).await
     }
 
+    #[tracing::instrument(skip_all)]
+    async fn request_email_verification(&self, user: &UserId) -> EmailVerificationResult {
+        if !self.auth_methods.email() {
+            return EmailVerificationResult::EmailAuthDisabled;
+        }
+
+        let email = match self.get_user_info(user).await {
+            UserInfoResult::Success(info) if info.verified() => {
+                return EmailVerificationResult::AlreadyVerified;
+            }
+            UserInfoResult::Success(info) => info.email().clone(),
+            UserInfoResult::Retry => return EmailVerificationResult::Retry,
+        };
+
+        match self
+            .generate_auth_link(GenerateAuthLinkRequest::new(user.clone(), email))
+            .await
+        {
+            GenerateAuthLinkResult::Success => EmailVerificationResult::EmailSent,
+            GenerateAuthLinkResult::Retry => EmailVerificationResult::Retry,
+        }
+    }
+
     /// Consumes an email change verification token and swaps the user's email if it is still
     /// free. Single-use: the token is consumed even when the target email is taken.
     // TODO: reconsider whether an email change should invalidate existing sessions once session
@@ -317,6 +341,7 @@ where
         let auth_token = AuthToken::new();
         let auth_link = AuthLink::new(
             req.user().clone(),
+            req.email().clone(),
             auth_token.clone(),
             chrono::Utc::now() + TimeDelta::minutes(15),
         );
@@ -377,14 +402,19 @@ where
             }
         }
 
-        if let Some(link) = &found {
-            let _ = self
-                .user_repository
-                .delete_auth_link_by_hash(link.hash())
-                .await;
-        }
+        let Some(link) = found else {
+            return Ok(None);
+        };
 
-        Ok(found.map(|link| link.user().clone()))
+        match self
+            .user_repository
+            .consume_auth_link(link.user(), link.hash())
+            .await
+        {
+            Ok(true) => Ok(Some(link.user().clone())),
+            Ok(false) => Ok(None),
+            Err(()) => Err(()),
+        }
     }
 
     /// Applies an email change synchronously, without verification. The new email is marked
@@ -542,6 +572,12 @@ pub trait UserRepository: Clone + Send + Sync + 'static {
         hash: &HashedAuthToken,
     ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 
+    fn consume_auth_link(
+        &self,
+        user: &UserId,
+        hash: &HashedAuthToken,
+    ) -> impl Future<Output = Result<bool, ()>> + Send;
+
     fn delete_expired_auth_links(
         &self,
         reference: chrono::DateTime<chrono::Utc>,
@@ -690,6 +726,12 @@ mod test_utils {
                 &self,
                 hash: &HashedAuthToken,
             ) -> Result<(), anyhow::Error>;
+
+            async fn consume_auth_link(
+                &self,
+                user: &UserId,
+                hash: &HashedAuthToken,
+            ) -> Result<bool, ()>;
 
             async fn delete_expired_auth_links(
                 &self,
@@ -1865,6 +1907,13 @@ impl IMultiUserService for DisabledUserService {
         panic!("User service is disabled")
     }
 
+    async fn request_email_verification(
+        &self,
+        _user: &UserId,
+    ) -> crate::inbound::auth::multi_user::EmailVerificationResult {
+        panic!("User service is disabled")
+    }
+
     async fn validate_email_change(
         &self,
         _token: AuthToken,
@@ -1896,10 +1945,15 @@ mod test_user_service_validate_auth_link {
         AuthToken::from(RAW_AUTH_TOKEN.to_string())
     }
 
+    fn bound_email() -> EmailAddress {
+        EmailAddress::try_from("test@mail.test").unwrap()
+    }
+
     /// A stored auth link whose hash matches [`auth_token`].
     fn stored_auth_link(expire_at: chrono::DateTime<Utc>) -> HashedAuthLink {
         HashedAuthLink::new(
             UserId::test_default(),
+            Some(bound_email()),
             auth_token().as_hash().expect("hashing should succeed"),
             expire_at,
         )
@@ -1920,10 +1974,10 @@ mod test_user_service_validate_auth_link {
         user.expect_get_all_auth_links()
             .returning(move || vec![link_clone.clone()]);
         let token = auth_token();
-        user.expect_delete_auth_link_by_hash()
+        user.expect_consume_auth_link()
             .times(1)
-            .withf(move |hash| hash.verify_token(&token))
-            .returning(|_| Ok(()));
+            .withf(move |user, hash| user == &UserId::test_default() && hash.verify_token(&token))
+            .returning(|_, _| Ok(true));
         let mut session = MockSessionService::new();
         let session_token = SessionToken::new();
         let expire_at = Utc::now() + TimeDelta::minutes(5);
@@ -1999,6 +2053,7 @@ mod test_user_service_validate_auth_link {
         let other_token = AuthToken::new();
         let other = HashedAuthLink::new(
             UserId::test_default(),
+            Some(bound_email()),
             other_token.as_hash().expect("hashing should succeed"),
             Utc::now() + TimeDelta::minutes(5),
         );
@@ -2006,11 +2061,11 @@ mod test_user_service_validate_auth_link {
         user.expect_get_all_auth_links()
             .returning(move || vec![matching_clone.clone(), other.clone()]);
         let token = auth_token();
-        // Only the link matching the provided token must be deleted; the other one stays.
-        user.expect_delete_auth_link_by_hash()
+        // Only the link matching the provided token must be consumed; the other one stays.
+        user.expect_consume_auth_link()
             .times(1)
-            .withf(move |hash| hash.verify_token(&token))
-            .returning(|_| Ok(()));
+            .withf(move |user, hash| user == &UserId::test_default() && hash.verify_token(&token))
+            .returning(|_, _| Ok(true));
         let mut session = MockSessionService::new();
         session
             .expect_generate_session_token()
@@ -2036,11 +2091,50 @@ mod test_user_service_validate_auth_link {
         let link_clone = link.clone();
         user.expect_get_all_auth_links()
             .returning(move || vec![link_clone.clone()]);
-        user.expect_delete_auth_link_by_hash().returning(|_| Ok(()));
+        user.expect_consume_auth_link().returning(|_, _| Ok(true));
         let mut session = MockSessionService::new();
         session
             .expect_generate_session_token()
             .returning(|_| Err(()));
+
+        let service = new_service(user, session);
+
+        let res = service.validate_auth_link(auth_token()).await;
+
+        assert!(res.is_err())
+    }
+
+    #[tokio::test]
+    async fn test_link_consumed_concurrently_is_invalid() {
+        let mut user = MockUserRepository::new();
+        let link = stored_auth_link(Utc::now() + TimeDelta::minutes(5));
+        let link_clone = link.clone();
+        user.expect_get_all_auth_links()
+            .returning(move || vec![link_clone.clone()]);
+        // Another request consumed the same link first.
+        user.expect_consume_auth_link().returning(|_, _| Ok(false));
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
+
+        let service = new_service(user, session);
+
+        let res = service.validate_auth_link(auth_token()).await;
+
+        let Ok(AuthLinkValidationResult::Invalid) = res else {
+            unreachable!("Should have return a Ok(AuthLinkValidationResult::Invalid)")
+        };
+    }
+
+    #[tokio::test]
+    async fn test_consume_auth_link_error_is_error() {
+        let mut user = MockUserRepository::new();
+        let link = stored_auth_link(Utc::now() + TimeDelta::minutes(5));
+        let link_clone = link.clone();
+        user.expect_get_all_auth_links()
+            .returning(move || vec![link_clone.clone()]);
+        user.expect_consume_auth_link().returning(|_, _| Err(()));
+        let mut session = MockSessionService::new();
+        session.expect_generate_session_token().times(0);
 
         let service = new_service(user, session);
 
@@ -2687,9 +2781,7 @@ mod test_user_service_get_user_info {
         user.expect_get_user_info()
             .times(1)
             .withf(|user| user == &UserId::test_default())
-            .returning(|_| {
-                Ok(Some(UserInfo::new(email(), true, false)))
-            });
+            .returning(|_| Ok(Some(UserInfo::new(email(), true, false))));
 
         let service = mail_only_service(user, MockMailProvider::new());
 
@@ -2725,5 +2817,118 @@ mod test_user_service_get_user_info {
         let res = service.get_user_info(&UserId::test_default()).await;
 
         assert_eq!(res, UserInfoResult::Retry);
+    }
+}
+
+#[cfg(test)]
+mod test_user_service_request_email_verification {
+    use crate::inbound::auth::multi_user::{
+        EmailAddress, EmailVerificationResult, UserInfo,
+        service::test_utils::{
+            MockUserRepository, TEST_EMAIL, mail_only_service, password_only_service,
+        },
+        test_utils::MockMailProvider,
+    };
+
+    use super::*;
+
+    fn email() -> EmailAddress {
+        EmailAddress::try_from(TEST_EMAIL).unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_request_email_verification_disabled_when_email_auth_disabled() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_info().times(0);
+        user.expect_store_auth_link().times(0);
+
+        let service = password_only_service(user, MockMailProvider::new());
+
+        let res = service
+            .request_email_verification(&UserId::test_default())
+            .await;
+
+        assert_eq!(res, EmailVerificationResult::EmailAuthDisabled);
+    }
+
+    #[tokio::test]
+    async fn test_request_email_verification_already_verified_is_noop() {
+        let mut mailer = MockMailProvider::new();
+        mailer.expect_send_auth_link_email().times(0);
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_info()
+            .times(1)
+            .returning(|_| Ok(Some(UserInfo::new(email(), true, false))));
+        user.expect_store_auth_link().times(0);
+
+        let service = mail_only_service(user, mailer);
+
+        let res = service
+            .request_email_verification(&UserId::test_default())
+            .await;
+
+        assert_eq!(res, EmailVerificationResult::AlreadyVerified);
+    }
+
+    #[tokio::test]
+    async fn test_request_email_verification_sends_auth_link() {
+        let mut mailer = MockMailProvider::new();
+        mailer
+            .expect_send_auth_link_email()
+            .times(1)
+            .withf(|mail, _| mail == &email())
+            .returning(|_, _| Ok(()));
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_info()
+            .times(1)
+            .returning(|_| Ok(Some(UserInfo::new(email(), false, false))));
+        user.expect_store_auth_link()
+            .times(1)
+            .withf(|link| link.user() == &UserId::test_default())
+            .returning(|_| Ok(()));
+
+        let service = mail_only_service(user, mailer);
+
+        let res = service
+            .request_email_verification(&UserId::test_default())
+            .await;
+
+        assert_eq!(res, EmailVerificationResult::EmailSent);
+        // Let the background email send run before the test ends.
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+
+    #[tokio::test]
+    async fn test_request_email_verification_user_info_error_is_retry() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_info().returning(|_| Err(()));
+        user.expect_store_auth_link().times(0);
+
+        let service = mail_only_service(user, MockMailProvider::new());
+
+        let res = service
+            .request_email_verification(&UserId::test_default())
+            .await;
+
+        assert_eq!(res, EmailVerificationResult::Retry);
+    }
+
+    #[tokio::test]
+    async fn test_request_email_verification_store_auth_link_err_returns_retry() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_info()
+            .times(1)
+            .returning(|_| Ok(Some(UserInfo::new(email(), false, false))));
+        user.expect_store_auth_link()
+            .times(1)
+            .returning(|_| Err(anyhow::anyhow!("boom")));
+
+        let service = mail_only_service(user, MockMailProvider::new());
+
+        let res = service
+            .request_email_verification(&UserId::test_default())
+            .await;
+
+        assert_eq!(res, EmailVerificationResult::Retry);
     }
 }

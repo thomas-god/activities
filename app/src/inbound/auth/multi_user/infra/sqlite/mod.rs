@@ -309,11 +309,12 @@ impl UserRepository for SqliteUsersRepository {
     async fn store_auth_link(&self, link: &HashedAuthLink) -> Result<(), anyhow::Error> {
         let res = sqlx::query(
             r#"
-           INSERT INTO t_auth_links (user, token_hash, expire_at)
-           SELECT rowid, ?2, ?3 FROM t_users WHERE user_id = ?1
+           INSERT INTO t_auth_links (user, email, token_hash, expire_at)
+           SELECT rowid, ?2, ?3, ?4 FROM t_users WHERE user_id = ?1
            ;"#,
         )
         .bind(link.user().to_string())
+        .bind(link.email().map(|email| email.to_string()))
         .bind(link.hash().to_string())
         .bind(link.expire_at())
         .execute(&self.writer)
@@ -336,9 +337,9 @@ impl UserRepository for SqliteUsersRepository {
 
     #[tracing::instrument(skip_all)]
     async fn get_all_auth_links(&self) -> Vec<HashedAuthLink> {
-        let res: Vec<(String, String, DateTime<Utc>)> = match sqlx::query_as(
+        let res: Vec<(String, Option<String>, String, DateTime<Utc>)> = match sqlx::query_as(
             r#"
-           SELECT u.user_id, a.token_hash, a.expire_at
+           SELECT u.user_id, a.email, a.token_hash, a.expire_at
            FROM t_auth_links a
            JOIN t_users u ON u.rowid = a.user
            ;"#,
@@ -354,9 +355,24 @@ impl UserRepository for SqliteUsersRepository {
             }
         };
         res.iter()
-            .map(|(user, token, expire_at)| {
+            .map(|(user, email, token, expire_at)| {
+                let email = match email {
+                    None => None,
+                    Some(email) => match EmailAddress::try_from(email.clone()) {
+                        Ok(email) => Some(email),
+                        Err(err) => {
+                            tracing::warn!(
+                                "Stored auth link has an invalid target email ({}): it will not \
+                                 verify any address",
+                                err
+                            );
+                            None
+                        }
+                    },
+                };
                 HashedAuthLink::new(
                     UserId::from(user.clone()),
+                    email,
                     HashedAuthToken::new(token.clone()),
                     *expire_at,
                 )
@@ -451,6 +467,77 @@ impl UserRepository for SqliteUsersRepository {
                 Err(())
             }
         }
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn consume_auth_link(&self, user: &UserId, hash: &HashedAuthToken) -> Result<bool, ()> {
+        let mut tx = self.writer.begin().await.map_err(|err| {
+            tracing::warn!("Unable to start transaction to consume auth link: {}", err);
+        })?;
+
+        let deleted: Option<Option<String>> = sqlx::query_scalar(
+            r#"
+        DELETE FROM t_auth_links
+        WHERE
+            token_hash = ?1
+            AND user = (SELECT rowid FROM t_users WHERE user_id = ?2)
+        RETURNING email
+        ;"#,
+        )
+        .bind(hash.to_string())
+        .bind(user.to_string())
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|err| {
+            tracing::warn!("Unable to consume auth link in database: {}", err);
+        })?;
+
+        let Some(email) = deleted else {
+            // Already consumed concurrently (or unknown): nothing to verify.
+            tx.rollback().await.map_err(|err| {
+                tracing::warn!("Unable to roll back auth link consumption: {}", err);
+            })?;
+            return Ok(false);
+        };
+
+        match email {
+            None => {}
+            Some(email) => match EmailAddress::try_from(email) {
+                Ok(email) => {
+                    sqlx::query(
+                        r#"
+                    UPDATE t_emails SET verified = TRUE
+                    WHERE
+                        user = (SELECT rowid FROM t_users WHERE user_id = ?1)
+                        AND email = ?2
+                    ;"#,
+                    )
+                    .bind(user.to_string())
+                    .bind(email.to_string())
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(|err| {
+                        tracing::warn!("Unable to mark auth link email verified: {}", err);
+                    })?;
+                }
+                Err(err) => {
+                    tracing::warn!(
+                        "Consumed auth link carries an invalid target email ({}): it verifies no \
+                         address",
+                        err
+                    );
+                }
+            },
+        }
+
+        tx.commit().await.map_err(|err| {
+            tracing::warn!(
+                "Unable to commit auth link consumption transaction: {}",
+                err
+            );
+        })?;
+
+        Ok(true)
     }
 
     #[tracing::instrument(skip_all, err)]
@@ -900,6 +987,134 @@ mod test_sqlite_users_repository {
     }
 
     #[tokio::test]
+    async fn test_consume_auth_link_verifies_the_bound_email() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let link = AuthLink::new(
+            UserId::test_default(),
+            test_email(),
+            AuthToken::from("test_token".to_string()),
+            Utc::now() + TimeDelta::minutes(5),
+        )
+        .as_hash()
+        .unwrap();
+        repository.store_auth_link(&link).await.unwrap();
+
+        let consumed = repository
+            .consume_auth_link(link.user(), link.hash())
+            .await
+            .expect("consume should succeed");
+        assert!(consumed);
+
+        // The link is consumed...
+        assert!(repository.get_all_auth_links().await.is_empty());
+        // ...and its bound address is marked verified.
+        let verified: bool = sqlx::query_scalar("SELECT verified FROM t_emails WHERE email = ?1")
+            .bind(test_email().to_string())
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap();
+        assert!(verified);
+    }
+
+    #[tokio::test]
+    async fn test_consume_auth_link_does_not_verify_a_changed_email() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let link = AuthLink::new(
+            UserId::test_default(),
+            test_email(),
+            AuthToken::from("test_token".to_string()),
+            Utc::now() + TimeDelta::minutes(5),
+        )
+        .as_hash()
+        .unwrap();
+        repository.store_auth_link(&link).await.unwrap();
+
+        // The user changes to a different (unverified) address before opening the link.
+        let new_email = EmailAddress::try_from("new@mail.test").unwrap();
+        repository
+            .update_user_email(&UserId::test_default(), &new_email, false)
+            .await
+            .unwrap();
+
+        let consumed = repository
+            .consume_auth_link(link.user(), link.hash())
+            .await
+            .expect("consume should succeed");
+        assert!(consumed);
+
+        // The link is consumed, but the changed address stays unverified.
+        assert!(repository.get_all_auth_links().await.is_empty());
+        let verified: bool = sqlx::query_scalar("SELECT verified FROM t_emails WHERE email = ?1")
+            .bind(new_email.to_string())
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap();
+        assert!(!verified);
+    }
+
+    #[tokio::test]
+    async fn test_consume_auth_link_is_single_use() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let link = AuthLink::new(
+            UserId::test_default(),
+            test_email(),
+            AuthToken::from("test_token".to_string()),
+            Utc::now() + TimeDelta::minutes(5),
+        )
+        .as_hash()
+        .unwrap();
+        repository.store_auth_link(&link).await.unwrap();
+
+        assert!(
+            repository
+                .consume_auth_link(link.user(), link.hash())
+                .await
+                .unwrap()
+        );
+        // A second, concurrent consumption finds nothing to delete.
+        assert!(
+            !repository
+                .consume_auth_link(link.user(), link.hash())
+                .await
+                .unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_consume_auth_link_without_email_only_consumes() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let link = AuthLink::new(
+            UserId::test_default(),
+            test_email(),
+            AuthToken::from("legacy_token".to_string()),
+            Utc::now() + TimeDelta::minutes(5),
+        )
+        .as_hash()
+        .unwrap();
+        repository.store_auth_link(&link).await.unwrap();
+
+        // Simulate a link created before the address was tracked.
+        sqlx::query("UPDATE t_auth_links SET email = NULL;")
+            .execute(&repository.writer)
+            .await
+            .unwrap();
+
+        let consumed = repository
+            .consume_auth_link(link.user(), link.hash())
+            .await
+            .unwrap();
+        assert!(consumed);
+        assert!(repository.get_all_auth_links().await.is_empty());
+        // A legacy link without a bound address verifies nothing.
+        let verified: bool = sqlx::query_scalar("SELECT verified FROM t_emails WHERE email = ?1")
+            .bind(test_email().to_string())
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap();
+        assert!(!verified);
+    }
+
+    #[tokio::test]
     async fn test_user_has_no_password_hash_by_default() {
         let (_db_file, repository) = repository_with_test_user().await;
 
@@ -970,6 +1185,7 @@ mod test_sqlite_users_repository {
         let expire_at = Utc::now() + TimeDelta::minutes(5);
         let hashed_auth_link = AuthLink::new(
             UserId::test_default(),
+            test_email(),
             AuthToken::from("test_token".to_string()),
             expire_at,
         )
@@ -1001,6 +1217,7 @@ mod test_sqlite_users_repository {
             .store_auth_link(
                 &AuthLink::new(
                     UserId::test_default(),
+                    test_email(),
                     AuthToken::from("test_token".to_string()),
                     expire_at,
                 )
@@ -1015,6 +1232,7 @@ mod test_sqlite_users_repository {
             .store_auth_link(
                 &AuthLink::new(
                     UserId::test_default(),
+                    test_email(),
                     AuthToken::from("another_test_token".to_string()),
                     expire_at,
                 )
@@ -1033,6 +1251,7 @@ mod test_sqlite_users_repository {
 
         let hashed_auth_link = AuthLink::new(
             UserId::test_default(),
+            test_email(),
             AuthToken::from("test_token".to_string()),
             Utc::now(),
         )
@@ -1071,6 +1290,7 @@ mod test_sqlite_users_repository {
 
         let hashed_auth_link = AuthLink::new(
             UserId::test_default(),
+            test_email(),
             AuthToken::from("test_token".to_string()),
             Utc::now(),
         )
@@ -1094,6 +1314,7 @@ mod test_sqlite_users_repository {
             .store_auth_link(
                 &AuthLink::new(
                     UserId::test_default(),
+                    test_email(),
                     AuthToken::from("test_token".to_string()),
                     expire_at,
                 )
@@ -1131,6 +1352,7 @@ mod test_sqlite_users_repository {
             .store_auth_link(
                 &AuthLink::new(
                     UserId::test_default(),
+                    test_email(),
                     AuthToken::from("a_token".to_string()),
                     expire_at,
                 )
@@ -1144,6 +1366,7 @@ mod test_sqlite_users_repository {
             .store_auth_link(
                 &AuthLink::new(
                     UserId::test_default(),
+                    test_email(),
                     AuthToken::from("another_token".to_string()),
                     expire_at,
                 )
@@ -1173,6 +1396,7 @@ mod test_sqlite_users_repository {
 
         let hashed_auth_link = AuthLink::new(
             UserId::test_default(),
+            test_email(),
             AuthToken::from("test_token".to_string()),
             Utc::now(),
         )
@@ -1201,6 +1425,7 @@ mod test_sqlite_users_repository {
 
         let expired = AuthLink::new(
             UserId::test_default(),
+            test_email(),
             AuthToken::from("expired_token".to_string()),
             Utc::now() - TimeDelta::minutes(5),
         )
@@ -1208,6 +1433,7 @@ mod test_sqlite_users_repository {
         .unwrap();
         let still_valid = AuthLink::new(
             UserId::test_default(),
+            test_email(),
             AuthToken::from("valid_token".to_string()),
             Utc::now() + TimeDelta::minutes(5),
         )

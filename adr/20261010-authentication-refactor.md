@@ -176,12 +176,27 @@ admin role may provide a stronger remedy.
 Neither an email change nor a password change invalidates existing sessions; they remain valid until
 their normal expiry. A separate feature will later allow closing existing sessions.
 
+### Email verification
+
+An authenticated user whose current address is unverified can request a fresh verification link
+(`POST /api/account/email/verify`) when email-based auth is enabled. The endpoint reuses the login
+auth-link machinery — same single-use token, 15-minute expiry, background send and rate limit — and
+is a no-op (`200 OK`) when the address is already verified; it is rejected (`403 Forbidden`) when
+email auth is disabled. Each auth link is bound to the address it was sent to (`t_auth_links.email`),
+and consuming a link marks that exact address verified in the same transaction that deletes the
+token, using the address read back from the deleted row: opening a link proves control of the
+address it was mailed to, and a link can neither be used twice nor verify an address the user
+changed away from in the meantime (the update simply matches no row). This also closes the
+registration loop, since registration already sends an auth link. Links created before the migration
+carry no bound address and are consumed without verifying anything.
+
 ### Client surface
 
 A `/settings` page (password section, switching between "set" and "change" based on a
 `GET /api/user/password` status endpoint, hidden when password auth is disabled) and a dedicated
-`/settings/email` page hosting both the change form and the auth-link token validation (token in the
-URL fragment, same pattern as `/login#token`).
+`/settings/email` page hosting both the change form, a "verify email" action shown while the address
+is unverified, and the auth-link token validation (token in the URL fragment, same pattern as
+`/login#token`).
 
 ### Alternatives considered (account settings)
 
