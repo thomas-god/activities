@@ -15,15 +15,14 @@ for both `amd64` and `arm64`.
 
 The application authentication flow can be configured in 3 different ways:
 
-- _multi user_: allows multiple users to use your instance. Two authentication methods are
-  supported: email-based password-less login (authentication links sent by email) and password-based
-  login. One or both methods can be enabled, but at least one is required. By default anyone with a
-  valid email address can register; set `ACTIVITIES_ALLOW_REGISTRATION=false` to restrict the
-  instance to already-registered users only. The email-based method requires a valid **SMTP server**
-  for sending emails to users containing their authentication link. HTTPS is strongly recommended
-  (session cookies are only marked `Secure` when served over HTTPS), but the app also works over
-  plain HTTP when the traffic is already protected by another layer (e.g. a WireGuard or Tailscale
-  tunnel).
+- _multi user_: allows multiple users to use your instance. Password-based login is always enabled,
+  and email-based password-less login (authentication links sent by email) can be enabled on top. By
+  default anyone with a valid email address can register; set `ACTIVITIES_ALLOW_REGISTRATION=false`
+  to restrict the instance to already-registered users only. Email-based login requires a valid
+  **SMTP server** for sending emails to users containing their authentication link. HTTPS is
+  strongly recommended (session cookies are only marked `Secure` when served over HTTPS), but the
+  app also works over plain HTTP when the traffic is already protected by another layer (e.g. a
+  WireGuard or Tailscale tunnel).
 - _single user, main password_: allows a single user to use the instance using a password set
   through an environment variable in your deployment. Does not require having an SMTP server nor
   having HTTPS (HTTP only might be fine for local deployment but HTTPS is still recommended as
@@ -145,29 +144,40 @@ supports a `*_FILE` variant to load the variable content from a file
 
 #### Multi-user version
 
-Multi-user mode is enabled as soon as any multi-user environment variable below is set, and requires
-**at least one authentication method** to be configured: either all the `ACTIVITIES_MAILER_*`
-variables (email-based auth) or `ACTIVITIES_PASSWORD_AUTH_ENABLED=true` (password-based auth).
+Multi-user mode is enabled as soon as any multi-user environment variable below is set:
 
-| Variable name                    | Required             | Purpose                                                                                                                                                                                                       | Example                 |
-| -------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| ACTIVITIES_MAILER_FROM           | for email-based auth |                                                                                                                                                                                                               | no-reply@your.domain    |
-| ACTIVITIES_MAILER_USERNAME       | for email-based auth | SMTP username                                                                                                                                                                                                 |                         |
-| ACTIVITIES_MAILER_PASSWORD       | for email-based auth | SMTP password                                                                                                                                                                                                 |                         |
-| ACTIVITIES_MAILER_RELAY          | for email-based auth | SMTP server                                                                                                                                                                                                   |                         |
-| ACTIVITIES_MAILER_DOMAIN         | for email-based auth | The domain on which your instance is hosted. Used to craft the auth link url. Can be a different domain than the one used by your SMTP server.                                                                | https://app.your.domain |
-| ACTIVITIES_PASSWORD_AUTH_ENABLED | no                   | Enable password-based authentication (`true`/`false`, defaults to `false`). Can be combined with email-based auth, or used on its own (password-only multi-user) without the `ACTIVITIES_MAILER_*` variables. | true                    |
-| ACTIVITIES_ALLOW_REGISTRATION    | no                   | Wether new users can register a new account. Set to `false` to only allow already-registered users to log in.                                                                                                 | false                   |
+- **password-based authentication is always enabled**: users register with a password and log in
+  with it;
+- **email-based authentication is optional**: configuring all the `ACTIVITIES_MAILER_*` variables
+  adds password-less login through authentication links (and email verification).
+
+A password-only instance runs without any SMTP configuration: set the
+`ACTIVITIES_PASSWORD_AUTH_ENABLED` variable (its value no longer matters) to select multi-user mode,
+or simply configure the mailer for email-based login as well.
+
+| Variable name                    | Required             | Purpose                                                                                                                                                                                                                                                                                                                       | Example                 |
+| -------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| ACTIVITIES_MAILER_FROM           | for email-based auth |                                                                                                                                                                                                                                                                                                                               | no-reply@your.domain    |
+| ACTIVITIES_MAILER_USERNAME       | for email-based auth | SMTP username                                                                                                                                                                                                                                                                                                                 |                         |
+| ACTIVITIES_MAILER_PASSWORD       | for email-based auth | SMTP password                                                                                                                                                                                                                                                                                                                 |                         |
+| ACTIVITIES_MAILER_RELAY          | for email-based auth | SMTP server                                                                                                                                                                                                                                                                                                                   |                         |
+| ACTIVITIES_MAILER_DOMAIN         | for email-based auth | The domain on which your instance is hosted. Used to craft the auth link url. Can be a different domain than the one used by your SMTP server.                                                                                                                                                                                | https://app.your.domain |
+| ACTIVITIES_PASSWORD_AUTH_ENABLED | no                   | Deprecated selector kept for backward compatibility. Password-based authentication can no longer be disabled: the value is ignored and setting it to `false` only logs a warning. It still selects multi-user mode, so it can be used on its own to run a password-only instance without the `ACTIVITIES_MAILER_*` variables. | true                    |
+| ACTIVITIES_ALLOW_REGISTRATION    | no                   | Wether new users can register a new account. Set to `false` to only allow already-registered users to log in.                                                                                                                                                                                                                 | false                   |
 
 _Notes:_
 
 - _if any environment variables for the multi-user version is set but others are missing the
   application will fail to start, even if a valid single user configuration could be loaded._
-- _setting `ACTIVITIES_PASSWORD_AUTH_ENABLED=false` does **not** disable authentication or fall back
-  to single-user mode: as soon as this variable is set, multi-user mode is selected and the
-  application requires at least one authentication method to be configured. If you intend to run
-  with no authentication at all (*single user, no password*), leave **all** multi-user variables
-  unset._
+- _password-based authentication can no longer be disabled: `ACTIVITIES_PASSWORD_AUTH_ENABLED=false`
+  is accepted for backward compatibility but ignored (a warning is logged), and password login comes
+  on. The variable is still what selects multi-user mode, so a password-only instance can run
+  without any mailer. If you intend to run with no authentication at all (*single user, no
+  password*), leave **all** multi-user variables unset._
+- _at startup, a warning reports how many existing users have no password registered (if your
+  instance pre-dates the authentication update). Those accounts can only log in through the
+  email-based flow; make sure they set a password from their account settings while email login is
+  still enabled, otherwise disabling email-based authentication will lock them out._
 
 #### Observability
 

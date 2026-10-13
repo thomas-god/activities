@@ -226,3 +226,74 @@ is unverified, and the auth-link token validation (token in the URL fragment, sa
 - **A dedicated table for email-change links** instead of a payload column on `t_auth_links`.
   Rejected: links are single-use, short-lived and already carry the user reference; a nullable
   column reuses validation, expiry and cleanup unchanged.
+
+## Addendum: password authentication is always enabled (2026-10-13)
+
+### Context
+
+Multi-user mode originally supported three configurations: email-only, password-only, and both.
+Password auth was off by default (`ACTIVITIES_PASSWORD_AUTH_ENABLED` omitted) and the two methods
+were independent, so an operator could move from email-only to password-only. Accounts created in
+email-only mode have no `password_hash`, and an account cannot log in with a password it never set:
+switching to an exclusive password mode therefore locked those users out. The email-only →
+email+password → password-only migration path (with the "register password" flow) already mitigated
+this, but it relied on operators following it and on users keeping a valid session long enough to
+register a password.
+
+### Decision
+
+Password-based authentication is now **always enabled** in multi-user mode. Email-based
+authentication remains an optional addition on top.
+
+- `MultiUserConfig` no longer carries a password method: only the optional `email` config and
+  `allow_registration` remain. `AuthMethods` tracks only whether email auth is enabled;
+  `/api/auth_info` keeps reporting `auth_methods.password = true` so existing clients are unaffected.
+- **Registration** always requires a password: a missing password answers `PasswordRequired`
+  (`400`), and the hash is stored with the user. When email auth is enabled, the authentication link
+  is still generated and sent, both to verify the address and to log the user in.
+- **Login** accepts a password whenever one is supplied. When none is supplied it falls back to the
+  authentication-link flow only if email auth is enabled; otherwise the result is the usual uniform
+  `Invalid`. Unknown accounts, wrong passwords and passwordless accounts keep collapsing into the
+  same `Invalid` outcome with the same dummy-Argon2 timing equalization.
+- `ACTIVITIES_PASSWORD_AUTH_ENABLED` is kept only as a multi-user **mode selector** (notably to run
+  password-only without a mailer). Its value no longer disables anything: an explicit `false` is
+  accepted for backward compatibility and logs a warning at startup instead of failing, so existing
+  email-only deployments upgrade without breaking. An invalid value still fails fast.
+- The now-unreachable `RegisterPasswordResult::PasswordAuthDisabled` and
+  `UpdatePasswordResult::PasswordAuthDisabled` variants (and their `403` HTTP mapping) are removed.
+- At startup, the application counts users without a `password_hash` and logs a warning with the
+  number. The message adapts to whether email auth is enabled: with email auth on it tells the
+  operator those users would be locked out if it were disabled and to have them set a password;
+  with email auth off it reports that those accounts currently cannot log in. A future admin role
+  will provide a stronger remedy.
+
+No schema change is needed: `password_hash` remains nullable, so existing instances keep their
+passwordless rows and no data migration is required.
+
+### Alternatives considered
+
+- **Remove `ACTIVITIES_PASSWORD_AUTH_ENABLED` entirely and add a new multi-user selector.** Rejected
+  for now: it would break the deployment configuration of every existing password-only instance for
+  no functional gain, since the variable already doubles as the selector. Keeping it and ignoring
+  its value preserves backward compatibility.
+- **Reject `ACTIVITIES_PASSWORD_AUTH_ENABLED=false` at startup.** Rejected: email-only deployments set
+  it explicitly and would stop starting on upgrade even though the requested configuration is
+  expressible again (email + the now-mandatory password). A warning is preferred.
+- **Automatically assign or reset passwords for existing passwordless accounts.** Rejected: it would
+  either invent credentials users cannot know, or email one in a flow that password-only instances
+  cannot run. Warning operators and relying on the existing register-password flow is safer.
+- **Key the warning off a new metric/endpoint instead of startup logs.** Rejected for now: a log line
+  is enough to reach self-hosters at upgrade time; exposing the count can come with the admin role.
+
+### Benefits and trade-offs
+
+**Benefits**: new instances can never be configured into a state where a user has no credential
+path once email auth is dropped; password login works without a mail server, so password-only
+deployments are the simplest to operate; existing passwordless accounts keep working through the
+email flow and can be rescued via the register-password flow.
+
+**Trade-offs**: email-only instances necessarily pick up password auth on upgrade, so the password
+field appears for everyone and users must now choose a password at registration; the
+`ACTIVITIES_PASSWORD_AUTH_ENABLED` name no longer matches its behavior; and the lock-out risk is only
+reduced, not removed, for accounts that already exist without a password (the startup warning is the
+main safeguard until an admin role exists).

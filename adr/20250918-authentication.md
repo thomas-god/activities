@@ -2,6 +2,11 @@
 
 _Date:_ 2025-09-18, updated 2026-08-25
 
+> **Superseded.** Password authentication and per-user accounts were introduced later; see
+> [Authentication refactor](20261010-authentication-refactor.md). The password-less flow described
+> here is now one of the supported multi-user authentication methods (email-based auth), no longer
+> the only one, and password-based auth is always enabled.
+
 ## Context
 
 The _multi-user_ version of the _activities_ needs to support user authentication. We want to keep
