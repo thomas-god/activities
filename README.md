@@ -192,8 +192,9 @@ instance has no admin yet, either:
 
 - **from the environment** — set both `ACTIVITIES_BOOTSTRAP_ADMIN_EMAIL` and
   `ACTIVITIES_BOOTSTRAP_ADMIN_PASSWORD` (or `ACTIVITIES_BOOTSTRAP_ADMIN_PASSWORD_FILE`) before
-  starting the container. The account is created if it does not exist, and promoted otherwise. Once
-  an admin exists the variables become inert, so remove them from your configuration afterwards.
+  starting the container. The account is created if it does not exist, and promoted otherwise (with
+  its password updated). Once an admin exists the variables become inert, so remove them from your
+  configuration afterwards.
 - **with the CLI** — `app admin ...` runs directly against the database, without a session and
   without the rest of the server configuration. It is also the break-glass path when the server
   cannot start or the current admin is locked out:
