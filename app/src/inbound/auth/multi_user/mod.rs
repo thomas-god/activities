@@ -12,6 +12,7 @@ use email_address::EmailAddress as EmailAddressValidator;
 use rand::RngExt;
 use sha2::{Digest, Sha256};
 
+pub mod admin;
 pub mod infra;
 pub mod service;
 pub mod session;
