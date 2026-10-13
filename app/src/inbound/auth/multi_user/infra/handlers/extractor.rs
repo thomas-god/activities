@@ -14,10 +14,7 @@ use std::{marker::PhantomData, sync::Arc};
 use crate::inbound::{
     auth::{
         AuthenticatedSession, AuthenticatedUser, SessionRevoked,
-        multi_user::{
-            GenerateSessionTokenResult, IMultiUserService, SessionToken,
-            infra::handlers::AuthAppState,
-        },
+        multi_user::{GenerateSessionTokenResult, IMultiUserService, SessionToken},
     },
     http::CookieConfig,
 };
@@ -57,22 +54,26 @@ where
     }
 }
 
-pub async fn cookie_auth_middleware<US>(
-    State(state): State<AuthAppState<US>>,
+pub async fn cookie_auth_middleware<US, S>(
+    State(state): State<S>,
     mut request: Request,
     next: Next,
 ) -> Response
 where
     US: IMultiUserService,
+    S: Clone + Send + Sync + 'static,
+    Arc<US>: FromRef<S>,
+    Arc<CookieConfig>: FromRef<S>,
 {
+    let user_service = Arc::<US>::from_ref(&state);
     let jar = CookieJar::from_headers(request.headers());
-    let cookie_config = state.cookie_config.for_request(request.headers());
+    let cookie_config = Arc::<CookieConfig>::from_ref(&state).for_request(request.headers());
     let Some(cookie) = jar.get("session_token") else {
         return StatusCode::UNAUTHORIZED.into_response();
     };
 
     let session_token: SessionToken = cookie.value().into();
-    let Ok(result) = state.user_service.check_session_token(&session_token).await else {
+    let Ok(result) = user_service.check_session_token(&session_token).await else {
         return StatusCode::UNAUTHORIZED.into_response();
     };
 
@@ -142,7 +143,7 @@ mod test {
             auth::multi_user::{
                 CheckSessionResult, GenerateSessionTokenResult, SessionToken,
                 infra::handlers::{
-                    UserRegistration,
+                    AuthAppState, UserRegistration,
                     extractor::{CookieUserExtractor, cookie_auth_middleware},
                 },
                 test_utils::MockUserService,
@@ -232,7 +233,7 @@ mod test {
             .route("/", get(test_route))
             .route_layer(from_fn_with_state(
                 state.clone(),
-                cookie_auth_middleware::<MockUserService>,
+                cookie_auth_middleware::<MockUserService, AuthAppState<MockUserService>>,
             ))
             .with_state(state);
         TestServer::new(app)
@@ -348,7 +349,7 @@ mod test {
             .route("/", get(test_route))
             .route_layer(from_fn_with_state(
                 state.clone(),
-                cookie_auth_middleware::<MockUserService>,
+                cookie_auth_middleware::<MockUserService, AuthAppState<MockUserService>>,
             ))
             .with_state(state);
         TestServer::new(app)
@@ -417,7 +418,7 @@ mod test {
             .route("/", get(test_route))
             .route_layer(from_fn_with_state(
                 state.clone(),
-                cookie_auth_middleware::<MockUserService>,
+                cookie_auth_middleware::<MockUserService, AuthAppState<MockUserService>>,
             ))
             .with_state(state);
         TestServer::new(app)

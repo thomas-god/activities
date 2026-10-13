@@ -20,6 +20,7 @@ pub use set_password::{register_password, update_password};
 pub use update_email::{update_email, validate_email_change};
 pub use validate_login::validate_login;
 
+pub mod admin;
 pub mod extractor;
 pub mod login_user;
 pub mod logout;
@@ -74,6 +75,15 @@ where
     }
 }
 
+impl<US> FromRef<AuthAppState<US>> for Arc<CookieConfig>
+where
+    US: IMultiUserService,
+{
+    fn from_ref(input: &AuthAppState<US>) -> Self {
+        input.cookie_config.clone()
+    }
+}
+
 pub fn multi_user_login_routes<US: IMultiUserService, S>(
     mut base_router: Router<S>,
     user_service: US,
@@ -90,7 +100,7 @@ where
 
     base_router = base_router.route_layer(axum::middleware::from_fn_with_state(
         auth_state.clone(),
-        cookie_auth_middleware::<US>,
+        cookie_auth_middleware::<US, AuthAppState<US>>,
     ));
 
     // Tighter limit for the mail-sending endpoints: each hit sends an email, so this also
@@ -139,7 +149,7 @@ where
         )
         .route_layer(axum::middleware::from_fn_with_state(
             auth_state.clone(),
-            cookie_auth_middleware::<US>,
+            cookie_auth_middleware::<US, AuthAppState<US>>,
         ))
         .route_layer(IpRateLimitLayer::new(
             RateLimitStore::new(),

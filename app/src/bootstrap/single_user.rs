@@ -10,7 +10,7 @@ use crate::{
         training::TrainingService,
     },
     inbound::{
-        http::{DisabledUserService, HttpServer},
+        http::{DisabledAdminService, DisabledUserService, HttpServer},
         parser::Parser,
     },
     outbound::{
@@ -48,6 +48,7 @@ pub async fn bootstrap_single_user(
         ActualTrainingService,
         DisabledUserService,
         PreferencesService<SqlitePreferencesRepository>,
+        DisabledAdminService,
     >,
     ActualSearchService,
     ActualTrainingService,
@@ -106,6 +107,7 @@ pub async fn bootstrap_single_user(
     );
 
     let user_service = DisabledUserService {};
+    let admin_service = DisabledAdminService {};
     let preferences_service = build_preferences_service(&config).await?;
 
     let search_service = build_search_service(
@@ -123,6 +125,7 @@ pub async fn bootstrap_single_user(
         parser,
         training_service.clone(),
         user_service,
+        admin_service,
         preferences_service,
         search_service.clone(),
         config,

@@ -50,6 +50,7 @@ type ActualUserService = MultiUserService<
     SessionService<SqliteUsersRepository>,
     MaybeMailProvider<SMTPEmailProvider>,
 >;
+type ActualAdminService = AdminService<SqliteUsersRepository>;
 type ActualSearchService =
     SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService, Clock>;
 
@@ -66,6 +67,7 @@ pub async fn bootstrap_multi_user(
         ActualTrainingService,
         ActualUserService,
         PreferencesService<SqlitePreferencesRepository>,
+        ActualAdminService,
     >,
     ActualSearchService,
     ActualTrainingService,
@@ -87,7 +89,7 @@ pub async fn bootstrap_multi_user(
     )
     .await?;
 
-    let user_service = build_user_service(&config, &mode_config).await?;
+    let (user_service, admin_service) = build_user_service(&config, &mode_config).await?;
 
     let preferences_service = build_preferences_service(&config).await?;
 
@@ -106,6 +108,7 @@ pub async fn bootstrap_multi_user(
         parser,
         training_service.clone(),
         user_service,
+        admin_service,
         preferences_service,
         search_service.clone(),
         config,
@@ -216,7 +219,7 @@ fn passwordless_users_warning(count: u64, email_auth_enabled: bool) -> Option<St
 async fn build_user_service(
     config: &BaseConfig,
     mode_config: &MultiUserConfig,
-) -> anyhow::Result<ActualUserService> {
+) -> anyhow::Result<(ActualUserService, ActualAdminService)> {
     let root_path = PathBuf::from(config.activities_data_path.clone());
     let db_dir = root_path.clone().join("db/");
     if !db_dir.exists() {
@@ -276,6 +279,8 @@ async fn build_user_service(
         );
     }
 
+    let admin_service = AdminService::new(users_repository.as_ref().clone());
+
     let session_service = SessionService::new(users_repository.clone());
     let auth_methods = AuthMethods::from(mode_config);
     let user_service = MultiUserService::new(
@@ -285,7 +290,7 @@ async fn build_user_service(
         Arc::new(mailer),
     );
 
-    Ok(user_service)
+    Ok((user_service, admin_service))
 }
 
 async fn build_preferences_service(

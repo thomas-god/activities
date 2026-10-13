@@ -14,6 +14,7 @@ pub struct UserInfoResponse {
     email: String,
     verified: bool,
     has_password: bool,
+    is_admin: bool,
 }
 
 impl From<UserInfo> for UserInfoResponse {
@@ -22,6 +23,7 @@ impl From<UserInfo> for UserInfoResponse {
             email: info.email().value().to_string(),
             verified: info.verified(),
             has_password: info.has_password(),
+            is_admin: info.is_admin(),
         }
     }
 }
@@ -94,6 +96,7 @@ mod test {
                     EmailAddress::try_from("test@mail.test").unwrap(),
                     true,
                     true,
+                    false,
                 ))
             });
         let server = build_test_server(user_service);
@@ -104,7 +107,8 @@ mod test {
         response.assert_json(&json!({
             "email": "test@mail.test",
             "verified": true,
-            "has_password": true
+            "has_password": true,
+            "is_admin": false
         }));
     }
 

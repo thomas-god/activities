@@ -22,7 +22,9 @@ use crate::domain::ports::{
 
 use crate::inbound::auth::AuthStrategy;
 use crate::inbound::auth::infra::add_auth_router;
-use crate::inbound::auth::multi_user::IMultiUserService;
+use crate::inbound::auth::multi_user::{
+    IMultiUserService, admin::IAdminService, infra::handlers::admin::admin_routes,
+};
 use crate::inbound::http::handlers::{
     get_default_activity_metrics, get_training_metric_templates, upload_bulk_weight_and_nutrition,
 };
@@ -45,6 +47,7 @@ pub use crate::inbound::auth::multi_user::infra::mailer::smtp::SMTPEmailProvider
 
 pub use crate::inbound::auth::multi_user::{
     AuthMethods, DisabledUserService, MultiUserService, SessionService,
+    admin::DisabledAdminService,
     infra::{mailer::DoNothingMailProvider, sqlite::SqliteUsersRepository},
     spawn_expired_sessions_cleanup,
 };
@@ -127,7 +130,7 @@ struct AppState<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, PS: 
     preferences_service: Arc<PS>,
 }
 
-pub struct HttpServer<AS, PF, TMS, UR, PS> {
+pub struct HttpServer<AS, PF, TMS, UR, PS, AD> {
     router: axum::Router,
     listener: net::TcpListener,
     _marker_activity: PhantomData<AS>,
@@ -135,6 +138,7 @@ pub struct HttpServer<AS, PF, TMS, UR, PS> {
     _marker_training_metrics: PhantomData<TMS>,
     _marker_user_service: PhantomData<UR>,
     _marker_preferences_service: PhantomData<PS>,
+    _marker_admin_service: PhantomData<AD>,
 }
 
 impl<
@@ -143,7 +147,8 @@ impl<
     TMS: ITrainingService,
     US: IMultiUserService,
     PS: IPreferencesService,
-> HttpServer<AS, PF, TMS, US, PS>
+    AD: IAdminService,
+> HttpServer<AS, PF, TMS, US, PS, AD>
 {
     #[allow(clippy::too_many_arguments)]
     pub async fn new<SS: ISearchService>(
@@ -152,6 +157,7 @@ impl<
         file_parser: PF,
         training_metric_service: TMS,
         user_service: US,
+        admin_service: AD,
         preferences_service: PS,
         search_service: SS,
         config: BaseConfig,
@@ -178,6 +184,11 @@ impl<
         let api_routes = core_routes(state.clone()).merge(search_routes(search_service));
         let router = axum::Router::new().nest("/api", api_routes);
 
+        // Admin routes only exist in multi-user mode; the single-user modes carry a disabled admin
+        // service and never mount them.
+        let admin_router = matches!(mode, AppMode::MultiUser(_))
+            .then(|| admin_routes(user_service.clone(), admin_service));
+
         let auth_strategy = AuthStrategy::from(mode);
         tracing::info!(
             "App starting with authentication strategy: {:?}",
@@ -189,6 +200,10 @@ impl<
         // auth middleware.
         let mut router =
             add_auth_router(auth_strategy, router, user_service).route("/health", get(health));
+
+        if let Some(admin_router) = admin_router {
+            router = router.nest("/api", admin_router);
+        }
 
         router = router.layer(trace_layer).layer(
             CorsLayer::new()
@@ -211,6 +226,7 @@ impl<
             _marker_training_metrics: PhantomData,
             _marker_user_service: PhantomData,
             _marker_preferences_service: PhantomData,
+            _marker_admin_service: PhantomData,
         })
     }
 
