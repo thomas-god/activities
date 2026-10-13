@@ -34,7 +34,8 @@
 			// For convenience, don't add end date if it's today
 			url += `&end=${encodeURIComponent(dayjs(newDates.end).format('YYYY-MM-DD'))}`;
 		}
-		 
+
+		/* eslint-disable-next-line svelte/no-navigation-without-resolve */
 		goto(url);
 	};
 </script>

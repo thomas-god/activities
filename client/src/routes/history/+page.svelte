@@ -67,6 +67,7 @@
 			url.searchParams.set('view', mode);
 		}
 
+		/* eslint-disable-next-line svelte/no-navigation-without-resolve */
 		goto(url, { replaceState: true, reset: false });
 	};
 
@@ -79,12 +80,14 @@
 			url.searchParams.set('month', month.format('YYYY-MM'));
 		}
 
+		/* eslint-disable-next-line svelte/no-navigation-without-resolve */
 		goto(url, { replaceState: true, reset: false });
 	};
 
 	const handleFilterChange = (filters: ActivitiesFilters) => {
 		const url = new URL(page.url.href);
 		applyFiltersToSearchParams(url.searchParams, filters);
+		/* eslint-disable-next-line svelte/no-navigation-without-resolve */
 		goto(url, { replaceState: false, reset: false });
 	};
 

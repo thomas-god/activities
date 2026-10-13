@@ -59,7 +59,8 @@
 				selectedActivities.map((activity) => activity.id).join(',')
 			);
 		}
-		 
+
+		/* eslint-disable-next-line svelte/no-navigation-without-resolve */
 		goto(url, { replaceState: false, reset: false });
 	};
 </script>

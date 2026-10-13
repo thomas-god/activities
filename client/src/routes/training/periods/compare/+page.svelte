@@ -37,7 +37,8 @@
 		} else {
 			url.searchParams.set('periods', param);
 		}
-		 
+
+		/* eslint-disable-next-line svelte/no-navigation-without-resolve */
 		goto(url, { replaceState: false, reset: false });
 	};
 

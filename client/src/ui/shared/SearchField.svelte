@@ -9,7 +9,7 @@
 		id: string;
 	}
 
-	/* eslint-disable no-useless-assignment*/
+	/* eslint-disable-next-line */
 	let { searchResults = $bindable() }: { searchResults: Option<SearchResult[]> } = $props();
 
 	let searchPattern: string | null = $state(null);

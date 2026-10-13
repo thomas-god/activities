@@ -71,7 +71,7 @@
 			label: theme.variant === 'dark' ? 'Light mode' : 'Dark mode',
 			onClick: toggleTheme
 		},
-		...(showAccount ? [{ label: 'Settings', onClick: () => goto('/settings') }] : []),
+		...(showAccount ? [{ label: 'Settings', onClick: () => goto(resolve('/settings')) }] : []),
 		...(showLogout ? [{ label: 'Log out', onClick: handleLogout }] : [])
 	]);
 

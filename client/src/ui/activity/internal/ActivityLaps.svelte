@@ -12,7 +12,7 @@
 	}
 
 	// For selectedLap
-	/* eslint-disable no-useless-assignment */
+	/* eslint-disable-next-line */
 	let { activity, selectedLap = $bindable(), onLapSelectedCallback }: Props = $props();
 
 	let laps = $derived(activity.timeseries.laps);
