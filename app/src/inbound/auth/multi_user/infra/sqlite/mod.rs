@@ -13,7 +13,8 @@ use crate::{
         EmailAddress, EmailChangeFinalizeResult, HashedAuthLink, HashedAuthToken,
         HashedEmailChangeToken, HashedPassword, HashedSession, HashedSessionToken, UserInfo,
         admin::{AdminRepository, BootstrapAdminMode, BootstrapAdminOutcome, RevokeAdminOutcome},
-        service::UserRepository, session::SessionRepository,
+        service::UserRepository,
+        session::SessionRepository,
     },
 };
 
@@ -184,7 +185,10 @@ impl AdminRepository for SqliteUsersRepository {
         .fetch_optional(&mut *tx)
         .await
         .map_err(|err| {
-            tracing::warn!("Unable to look up user by email to bootstrap admin: {}", err);
+            tracing::warn!(
+                "Unable to look up user by email to bootstrap admin: {}",
+                err
+            );
         })?;
 
         let outcome = match existing {
@@ -296,6 +300,35 @@ impl AdminRepository for SqliteUsersRepository {
         })?;
 
         Ok(RevokeAdminOutcome::Revoked)
+    }
+}
+
+#[cfg(test)]
+impl SqliteUsersRepository {
+    /// Test-only accessor for the number of admins, kept out of the production port.
+    pub(crate) async fn test_count_admins(&self) -> u64 {
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM t_users WHERE is_admin = TRUE;")
+            .fetch_one(&self.readers)
+            .await
+            .unwrap();
+        count.max(0) as u64
+    }
+
+    /// Test-only accessor for whether the user with the given email is an admin.
+    pub(crate) async fn test_is_admin(&self, email: &EmailAddress) -> bool {
+        sqlx::query_scalar(
+            r#"
+        SELECT u.is_admin
+        FROM t_users u
+        JOIN t_emails e ON e.user = u.rowid
+        WHERE e.email = ?1
+        ;"#,
+        )
+        .bind(email.to_string())
+        .fetch_optional(&self.readers)
+        .await
+        .unwrap()
+        .unwrap_or(false)
     }
 }
 
@@ -1101,11 +1134,10 @@ mod test_sqlite_users_repository {
             .unwrap();
         assert!(verified);
 
-        let stored: Option<String> =
-            sqlx::query_scalar("SELECT password_hash FROM t_users;")
-                .fetch_one(&repository.writer)
-                .await
-                .unwrap();
+        let stored: Option<String> = sqlx::query_scalar("SELECT password_hash FROM t_users;")
+            .fetch_one(&repository.writer)
+            .await
+            .unwrap();
         assert!(stored.is_some());
     }
 
@@ -1165,7 +1197,11 @@ mod test_sqlite_users_repository {
         let (_db, repository) = repository_with_test_user().await;
 
         let outcome = repository
-            .create_or_promote_admin(&test_email(), password_hash("s3cret"), BootstrapAdminMode::Force)
+            .create_or_promote_admin(
+                &test_email(),
+                password_hash("s3cret"),
+                BootstrapAdminMode::Force,
+            )
             .await
             .unwrap();
 
@@ -1178,12 +1214,20 @@ mod test_sqlite_users_repository {
     async fn test_bootstrap_admin_force_updates_existing_admin_password() {
         let (_db, repository) = repository_with_test_user().await;
         repository
-            .create_or_promote_admin(&test_email(), password_hash("first"), BootstrapAdminMode::Force)
+            .create_or_promote_admin(
+                &test_email(),
+                password_hash("first"),
+                BootstrapAdminMode::Force,
+            )
             .await
             .unwrap();
 
         let outcome = repository
-            .create_or_promote_admin(&test_email(), password_hash("second"), BootstrapAdminMode::Force)
+            .create_or_promote_admin(
+                &test_email(),
+                password_hash("second"),
+                BootstrapAdminMode::Force,
+            )
             .await
             .unwrap();
 
@@ -1194,7 +1238,10 @@ mod test_sqlite_users_repository {
                 .fetch_one(&repository.writer)
                 .await
                 .unwrap();
-        assert!(HashedPassword::new(stored).verify_password(&Password::try_from("second".to_string()).unwrap()));
+        assert!(
+            HashedPassword::new(stored)
+                .verify_password(&Password::try_from("second".to_string()).unwrap())
+        );
     }
 
     #[tokio::test]
@@ -1225,7 +1272,11 @@ mod test_sqlite_users_repository {
     async fn test_revoke_admin_refuses_last_admin() {
         let (_db, repository) = repository_with_test_user().await;
         repository
-            .create_or_promote_admin(&test_email(), password_hash("pw"), BootstrapAdminMode::Force)
+            .create_or_promote_admin(
+                &test_email(),
+                password_hash("pw"),
+                BootstrapAdminMode::Force,
+            )
             .await
             .unwrap();
 

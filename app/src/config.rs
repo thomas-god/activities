@@ -20,6 +20,8 @@ const MULTI_USER_MAILER_RELAY_KEY: &str = "ACTIVITIES_MAILER_RELAY";
 const MULTI_USER_MAILER_DOMAIN_KEY: &str = "ACTIVITIES_MAILER_DOMAIN";
 const MULTI_USER_ALLOW_REGISTRATION_KEY: &str = "ACTIVITIES_ALLOW_REGISTRATION";
 const MULTI_USER_PASSWORD_AUTH_ENABLED_KEY: &str = "ACTIVITIES_PASSWORD_AUTH_ENABLED";
+const MULTI_USER_BOOTSTRAP_ADMIN_EMAIL_KEY: &str = "ACTIVITIES_BOOTSTRAP_ADMIN_EMAIL";
+const MULTI_USER_BOOTSTRAP_ADMIN_PASSWORD_KEY: &str = "ACTIVITIES_BOOTSTRAP_ADMIN_PASSWORD";
 
 // Telemetry related keys. Named after the standard OpenTelemetry env var conventions `OTEL_`
 // (rather than prefixed with ACTIVITIES_) so they stay interoperable with collectors/dashboards
@@ -84,6 +86,8 @@ fn is_multi_user_mode_selected<T: Environment>(env: &T) -> bool {
         MULTI_USER_MAILER_RELAY_KEY,
         MULTI_USER_MAILER_DOMAIN_KEY,
         MULTI_USER_PASSWORD_AUTH_ENABLED_KEY,
+        MULTI_USER_BOOTSTRAP_ADMIN_EMAIL_KEY,
+        MULTI_USER_BOOTSTRAP_ADMIN_PASSWORD_KEY,
     ]
     .iter()
     .any(|key| load_env(env, key).as_string().is_some())
@@ -187,10 +191,51 @@ fn validate_password_auth_env<T: Environment>(env: &T) -> Result<(), String> {
     }
 }
 
+/// First admin bootstrap configuration.
+///
+/// Email and password are configured together: requiring a password guarantees the bootstrapped
+/// admin can log in immediately in every authentication configuration. The `_FILE` variant of the
+/// password variable is handled by [`load_env`] (e.g. for Docker secrets).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdminBootstrapConfig {
+    pub email: String,
+    pub password: String,
+}
+
+impl AdminBootstrapConfig {
+    pub fn try_from_env<T: Environment>(env: &T) -> Result<Option<AdminBootstrapConfig>, String> {
+        let email = load_env(env, MULTI_USER_BOOTSTRAP_ADMIN_EMAIL_KEY).as_string();
+        let password = load_env(env, MULTI_USER_BOOTSTRAP_ADMIN_PASSWORD_KEY).as_string();
+
+        // An empty environment variable is reported as set: treat it as absent.
+        let email = email.filter(|value| !value.is_empty());
+        let password = password.filter(|value| !value.is_empty());
+
+        match (email, password) {
+            (None, None) => Ok(None),
+            (Some(email), Some(password)) => Ok(Some(AdminBootstrapConfig { email, password })),
+            (email, password) => {
+                let mut errs = Vec::new();
+                if email.is_none() {
+                    errs.push(MULTI_USER_BOOTSTRAP_ADMIN_EMAIL_KEY);
+                }
+                if password.is_none() {
+                    errs.push(MULTI_USER_BOOTSTRAP_ADMIN_PASSWORD_KEY);
+                }
+                Err(format!(
+                    "Invalid admin bootstrap configuration, missing or empty environment variables: {}",
+                    errs.join(", ")
+                ))
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct MultiUserConfig {
     pub email: Option<EmailAuthConfig>,
     pub allow_registration: bool,
+    pub admin_bootstrap: Option<AdminBootstrapConfig>,
 }
 impl MultiUserConfig {
     pub fn try_from_env<T: Environment>(env: &T) -> Result<MultiUserConfig, String> {
@@ -211,10 +256,12 @@ impl MultiUserConfig {
 
         validate_password_auth_env(env)?;
         let email = EmailAuthConfig::try_from_env(env)?;
+        let admin_bootstrap = AdminBootstrapConfig::try_from_env(env)?;
 
         Ok(MultiUserConfig {
             email,
             allow_registration,
+            admin_bootstrap,
         })
     }
 }
@@ -657,6 +704,122 @@ mod test_config {
         );
 
         assert!(MultiUserConfig::try_from_env(&env).is_err());
+    }
+
+    #[test]
+    fn test_admin_bootstrap_defaults_to_none() {
+        let env = MockEnvironment::default();
+
+        assert!(
+            MultiUserConfig::try_from_env(&env)
+                .unwrap()
+                .admin_bootstrap
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn test_admin_bootstrap_reads_email_and_password() {
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            MULTI_USER_BOOTSTRAP_ADMIN_EMAIL_KEY,
+            EnvironmentVariable::Set("admin@example.com".to_string()),
+        );
+        env.set_var(
+            MULTI_USER_BOOTSTRAP_ADMIN_PASSWORD_KEY,
+            EnvironmentVariable::Set("s3cret".to_string()),
+        );
+
+        let config = MultiUserConfig::try_from_env(&env)
+            .unwrap()
+            .admin_bootstrap
+            .unwrap();
+
+        assert_eq!(config.email, "admin@example.com");
+        assert_eq!(config.password, "s3cret");
+    }
+
+    #[test]
+    fn test_admin_bootstrap_reads_password_from_file() {
+        let mut tmpfile = tempfile::NamedTempFile::new().unwrap();
+        write!(tmpfile, "secret-from-file").unwrap();
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            MULTI_USER_BOOTSTRAP_ADMIN_EMAIL_KEY,
+            EnvironmentVariable::Set("admin@example.com".to_string()),
+        );
+        env.set_var(
+            &format!("{MULTI_USER_BOOTSTRAP_ADMIN_PASSWORD_KEY}_FILE"),
+            EnvironmentVariable::Set(tmpfile.path().to_str().unwrap().to_string()),
+        );
+
+        let config = MultiUserConfig::try_from_env(&env)
+            .unwrap()
+            .admin_bootstrap
+            .unwrap();
+
+        assert_eq!(config.password, "secret-from-file");
+    }
+
+    #[test]
+    fn test_admin_bootstrap_email_without_password_errors() {
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            MULTI_USER_BOOTSTRAP_ADMIN_EMAIL_KEY,
+            EnvironmentVariable::Set("admin@example.com".to_string()),
+        );
+
+        let err = MultiUserConfig::try_from_env(&env).unwrap_err();
+
+        assert!(err.contains(MULTI_USER_BOOTSTRAP_ADMIN_PASSWORD_KEY));
+    }
+
+    #[test]
+    fn test_admin_bootstrap_password_without_email_errors() {
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            MULTI_USER_BOOTSTRAP_ADMIN_PASSWORD_KEY,
+            EnvironmentVariable::Set("s3cret".to_string()),
+        );
+
+        let err = MultiUserConfig::try_from_env(&env).unwrap_err();
+
+        assert!(err.contains(MULTI_USER_BOOTSTRAP_ADMIN_EMAIL_KEY));
+    }
+
+    #[test]
+    fn test_admin_bootstrap_empty_password_errors() {
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            MULTI_USER_BOOTSTRAP_ADMIN_EMAIL_KEY,
+            EnvironmentVariable::Set("admin@example.com".to_string()),
+        );
+        env.set_var(
+            MULTI_USER_BOOTSTRAP_ADMIN_PASSWORD_KEY,
+            EnvironmentVariable::Set(String::new()),
+        );
+
+        let err = MultiUserConfig::try_from_env(&env).unwrap_err();
+
+        assert!(err.contains(MULTI_USER_BOOTSTRAP_ADMIN_PASSWORD_KEY));
+    }
+
+    #[test]
+    fn test_admin_bootstrap_selects_multi_user_mode() {
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            MULTI_USER_BOOTSTRAP_ADMIN_EMAIL_KEY,
+            EnvironmentVariable::Set("admin@example.com".to_string()),
+        );
+        env.set_var(
+            MULTI_USER_BOOTSTRAP_ADMIN_PASSWORD_KEY,
+            EnvironmentVariable::Set("s3cret".to_string()),
+        );
+
+        match AppMode::try_from_env(&env).unwrap() {
+            AppMode::MultiUser(config) => assert!(config.admin_bootstrap.is_some()),
+            AppMode::SingleUser(_) => panic!("expected multi-user mode"),
+        }
     }
 
     #[test]

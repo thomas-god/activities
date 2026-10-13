@@ -102,6 +102,7 @@ mod tests {
                 domain: "https://example.com".to_string(),
             }),
             allow_registration,
+            admin_bootstrap: None,
         })
     }
 

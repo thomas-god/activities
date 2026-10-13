@@ -12,6 +12,7 @@ use crate::{
     inbound::{
         auth::multi_user::{
             MaybeMailProvider,
+            admin::AdminService,
             service::{
                 UserRepository, spawn_expired_auth_links_cleanup,
                 spawn_expired_email_change_tokens_cleanup,
@@ -227,6 +228,18 @@ async fn build_user_service(
         SqliteUsersRepository::new(&format!("sqlite:{}", user_db.to_string_lossy())).await?,
     );
 
+    if let Some(admin_bootstrap) = mode_config.admin_bootstrap.as_ref() {
+        AdminService::new(users_repository.as_ref().clone())
+            .apply_bootstrap_config(admin_bootstrap)
+            .await
+            .map_err(|err| {
+                anyhow!(
+                    "Failed to bootstrap admin `{}` from environment variables: {err}",
+                    admin_bootstrap.email
+                )
+            })?;
+    }
+
     // Warn about accounts that can only log in through the email-based flow, so operators know
     // before changing the authentication methods (e.g. disabling email auth and locking them out).
     match users_repository.count_users_without_password().await {
@@ -326,6 +339,7 @@ async fn build_search_service(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::inbound::auth::multi_user::EmailAddress;
 
     fn base_config(path: &std::path::Path) -> BaseConfig {
         BaseConfig {
@@ -339,7 +353,118 @@ mod tests {
         MultiUserConfig {
             email: None,
             allow_registration: true,
+            admin_bootstrap: None,
         }
+    }
+
+    fn admin_bootstrap_config(email: &str, password: &str) -> MultiUserConfig {
+        MultiUserConfig {
+            email: None,
+            allow_registration: true,
+            admin_bootstrap: Some(crate::config::AdminBootstrapConfig {
+                email: email.to_string(),
+                password: password.to_string(),
+            }),
+        }
+    }
+
+    /// Opens the users database to inspect the admin state after [`build_user_service`] returned.
+    async fn admin_repository(data_path: &std::path::Path) -> SqliteUsersRepository {
+        let user_db = data_path.join("db").join("user.db");
+        SqliteUsersRepository::new(&format!("sqlite:{}", user_db.to_string_lossy()))
+            .await
+            .expect("user db should open")
+    }
+
+    fn email(value: &str) -> EmailAddress {
+        EmailAddress::try_from(value).unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_bootstrap_admin_from_env_creates_admin() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config = base_config(tmp.path());
+
+        let _ = build_user_service(
+            &config,
+            &admin_bootstrap_config("admin@example.com", "s3cret"),
+        )
+        .await
+        .expect("bootstrap config should start");
+
+        assert_eq!(
+            admin_repository(tmp.path()).await.test_count_admins().await,
+            1
+        );
+        assert!(
+            admin_repository(tmp.path())
+                .await
+                .test_is_admin(&email("admin@example.com"))
+                .await
+        );
+    }
+
+    #[tokio::test]
+    async fn test_bootstrap_admin_from_env_is_skipped_when_admin_exists() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config = base_config(tmp.path());
+
+        let _ = build_user_service(
+            &config,
+            &admin_bootstrap_config("first@example.com", "s3cret"),
+        )
+        .await
+        .unwrap();
+        let _ = build_user_service(
+            &config,
+            &admin_bootstrap_config("second@example.com", "s3cret"),
+        )
+        .await
+        .expect("a second bootstrap should be ignored, not fail");
+
+        assert!(
+            admin_repository(tmp.path())
+                .await
+                .test_is_admin(&email("first@example.com"))
+                .await
+        );
+        assert!(
+            !admin_repository(tmp.path())
+                .await
+                .test_is_admin(&email("second@example.com"))
+                .await
+        );
+        assert_eq!(
+            admin_repository(tmp.path()).await.test_count_admins().await,
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn test_bootstrap_admin_from_env_invalid_email_fails_startup() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config = base_config(tmp.path());
+
+        assert!(
+            build_user_service(&config, &admin_bootstrap_config("not-an-email", "s3cret"))
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_no_bootstrap_config_creates_no_admin() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config = base_config(tmp.path());
+
+        let _ = build_user_service(&config, &password_only_config())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            admin_repository(tmp.path()).await.test_count_admins().await,
+            0
+        );
     }
 
     #[tokio::test]
