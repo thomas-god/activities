@@ -207,9 +207,11 @@ instance has no admin yet, either:
   docker exec -it <container> /app_bin admin revoke --email admin@your.domain
   ```
 
-The admin role is what allows user accounts to be managed on an instance with registration closed:
-creating new accounts and setting passwords for users that have none. Those management screens are
-not available yet; until then the CLI above is the way to bootstrap and manage admins.
+An admin can manage accounts from the **`/admin`** page (linked in the navigation once logged in as
+an admin): create users even when registration is closed, set or reset any user's password, grant or
+revoke the admin role, and revoke a user's sessions. The first admin still has to exist before that
+page can be reached, hence the bootstrap variables and CLI above; the CLI remains the break-glass
+path and also refuses to revoke the last admin.
 
 #### Observability
 

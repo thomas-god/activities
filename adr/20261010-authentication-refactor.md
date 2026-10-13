@@ -169,8 +169,8 @@ a password, so accounts created after the migration are unaffected.
 whose session expired after the instance dropped email auth cannot be rescued (pwd-only mode has no
 mailer, hence no login link). Operators migrating away from email auth should always run an
 email+pwd phase long enough for users to log in via an email link and register a password. The
-[admin role addendum](#addendum-admin-role-and-first-admin-bootstrap-2026-10-13) provides the
-foundation for that remedy (its user-management surface is a separate change).
+[admin role addendum](#addendum-admin-role-and-first-admin-bootstrap-2026-10-13) and the
+[admin user-management addendum](#addendum-admin-user-management-2026-10-13) provide that remedy.
 
 ### Sessions
 
@@ -265,9 +265,9 @@ authentication remains an optional addition on top.
 - At startup, the application counts users without a `password_hash` and logs a warning with the
   number. The message adapts to whether email auth is enabled: with email auth on it tells the
   operator those users would be locked out if it were disabled and to have them set a password;
-  with email auth off it reports that those accounts currently cannot log in. The
-  [admin role addendum](#addendum-admin-role-and-first-admin-bootstrap-2026-10-13) provides a
-  stronger remedy.
+  with email auth off it reports that those accounts currently cannot log in. An admin can set a
+  password for them through the
+  [admin user-management addendum](#addendum-admin-user-management-2026-10-13).
 
 No schema change is needed: `password_hash` remains nullable, so existing instances keep their
 passwordless rows and no data migration is required.
@@ -298,8 +298,7 @@ email flow and can be rescued via the register-password flow.
 field appears for everyone and users must now choose a password at registration; the
 `ACTIVITIES_PASSWORD_AUTH_ENABLED` name no longer matches its behavior; and the lock-out risk is only
 reduced, not removed, for accounts that already exist without a password (the startup warning and
-the admin role are the safeguards there, though the admin user-management surface is a separate
-change).
+the admin role are the safeguards there: an admin can set a password for them).
 
 ## Addendum: admin role and first-admin bootstrap (2026-10-13)
 
@@ -353,6 +352,60 @@ authentication methods.
 operation serves both the declarative and break-glass paths; the bootstrap is inert once an admin
 exists, so leaving the variables configured is not a standing privilege grant.
 
-**Trade-offs**: the flag currently carries no permission by itself — the user-management surface
-(creating users, setting passwords, listing passwordless accounts) is a separate change, and
-`is_admin` is not exposed through the API yet.
+**Trade-offs**: the flag carries no permission by itself: the actual management surface lives in
+the [admin user-management addendum](#addendum-admin-user-management-2026-10-13) below.
+
+## Addendum: admin user management (2026-10-13)
+
+### Context
+
+The bootstrap addendum above establishes an admin but gives it no power: `is_admin` is not read
+anywhere, so accounts can still only be created through registration and a user with no password
+cannot be given one. This addendum adds the management surface itself.
+
+### Decision
+
+**Admin operations reuse the `AdminRepository` port and service** (the same ones the environment
+bootstrap and the CLI use), exposed through a session-authenticated `/api/admin` router mounted only
+in multi-user mode:
+
+- `GET /api/admin/users` — list every user with `{ user_id, email, email_valid, verified,
+  has_password, is_admin }`, used to spot accounts without a password and to target the actions
+  below; the email is the raw stored value and `email_valid` flags an address that no longer parses,
+  so a malformed row is surfaced instead of failing the whole listing;
+- `POST /api/admin/users` — create a user (ignoring a closed registration) with a password; the
+  email stays unverified and is confirmed through the regular verification flow;
+- `POST /api/admin/users/{id}/password` — set or reset a user's password without the current one
+  (the recovery path the account-settings flows cannot cover);
+- `POST /api/admin/users/{id}/admin` — grant or revoke the admin flag;
+- `POST /api/admin/users/{id}/sessions/revoke` — revoke every session of a user.
+
+Authorization is enforced by an `AdminGuard` extractor that resolves the current user from the
+session and asks the admin service whether it is an admin: `401` without a session, `403` for a
+non-admin, `503` when the check fails. Demoting the last admin is refused (`409`), and revoking
+sessions is an explicit action rather than an automatic side effect of resetting a password.
+
+`GET /api/account/me` gains `is_admin`, and the Svelte client fetches it once in the root layout to
+expose the admin navigation and the `/admin` page. Client-side gating is cosmetic: every admin
+endpoint checks the flag server-side.
+
+### Alternatives considered
+
+- **Add the operations to the existing `IMultiUserService`** instead of a dedicated `IAdminService`
+  and `/api/admin` router. Rejected: it would grow the authentication service with unrelated
+  concerns; the dedicated service keeps the admin surface isolated and separately testable.
+- **Automatically revoke a user's sessions when an admin resets their password.** Rejected:
+  revocation stays an explicit action, consistent with the self-service password flow.
+- **Mark admin-created emails as verified.** Rejected: verification proves the user controls the
+  address, which an admin cannot do on their behalf; the regular flow is used instead.
+- **Fail the listing on an unparseable address.** Rejected: the admin page is the recovery surface
+  and must tolerate malformed rows.
+
+### Benefits and trade-offs
+
+**Benefits**: an instance with closed registration can still manage accounts; admins can restore
+access to passwordless or locked-out users; the API and page reuse the bootstrap's port and service.
+
+**Trade-offs**: `is_admin` is now a real authorization boundary, so it is queried on every admin
+request (only on the rare admin endpoints); and an admin who loses their password still needs the
+CLI break-glass, since there is no in-app recovery beyond another admin resetting it.
