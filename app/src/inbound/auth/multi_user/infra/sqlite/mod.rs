@@ -12,7 +12,10 @@ use crate::{
     inbound::auth::multi_user::{
         EmailAddress, EmailChangeFinalizeResult, HashedAuthLink, HashedAuthToken,
         HashedEmailChangeToken, HashedPassword, HashedSession, HashedSessionToken, UserInfo,
-        admin::{AdminRepository, BootstrapAdminMode, BootstrapAdminOutcome, RevokeAdminOutcome},
+        admin::{
+            AdminRepository, AdminUser, BootstrapAdminMode, BootstrapAdminOutcome,
+            CreateUserOutcome, RevokeAdminOutcome, SetAdminOutcome, SetUserPasswordOutcome,
+        },
         service::UserRepository,
         session::SessionRepository,
     },
@@ -300,6 +303,207 @@ impl AdminRepository for SqliteUsersRepository {
         })?;
 
         Ok(RevokeAdminOutcome::Revoked)
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn is_admin(&self, user: &UserId) -> Result<bool, ()> {
+        let res: Result<Option<bool>, sqlx::Error> =
+            sqlx::query_scalar("SELECT is_admin FROM t_users WHERE user_id = ?1;")
+                .bind(user.to_string())
+                .fetch_optional(&self.readers)
+                .await;
+        match res {
+            Ok(Some(is_admin)) => Ok(is_admin),
+            Ok(None) => Ok(false),
+            Err(err) => {
+                tracing::warn!("Cannot check admin status from database: {}", err);
+                Err(())
+            }
+        }
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn list_users(&self) -> Result<Vec<AdminUser>, ()> {
+        type UserRow = (String, String, bool, bool, bool);
+        let rows: Result<Vec<UserRow>, sqlx::Error> = sqlx::query_as(
+            r#"
+        SELECT u.user_id, e.email, e.verified, u.password_hash IS NOT NULL, u.is_admin
+        FROM t_users u
+        JOIN t_emails e ON e.user = u.rowid
+        ORDER BY e.email
+        ;"#,
+        )
+        .fetch_all(&self.readers)
+        .await;
+
+        let rows = match rows {
+            Ok(rows) => rows,
+            Err(err) => {
+                tracing::warn!("Cannot list users from database: {}", err);
+                return Err(());
+            }
+        };
+
+        let mut users = Vec::with_capacity(rows.len());
+        for (user_id, email, verified, has_password, is_admin) in rows {
+            let email_valid = EmailAddress::try_from(email.as_str()).is_ok();
+            if !email_valid {
+                tracing::warn!(%user_id, "Stored user email is not a valid email address");
+            }
+            users.push(AdminUser::new(
+                UserId::from(user_id),
+                email,
+                email_valid,
+                verified,
+                has_password,
+                is_admin,
+            ));
+        }
+
+        Ok(users)
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn create_user(
+        &self,
+        email: &EmailAddress,
+        password_hash: HashedPassword,
+    ) -> Result<CreateUserOutcome, ()> {
+        let mut tx = self.writer.begin().await.map_err(|err| {
+            tracing::warn!("Unable to start transaction to create user: {}", err);
+        })?;
+
+        let email_in_use: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM t_emails WHERE email = ?1);")
+                .bind(email.to_string())
+                .fetch_one(&mut *tx)
+                .await
+                .map_err(|err| {
+                    tracing::warn!("Unable to check email availability: {}", err);
+                })?;
+        if email_in_use {
+            return Ok(CreateUserOutcome::EmailAlreadyUsed);
+        }
+
+        let user = UserId::new();
+        sqlx::query("INSERT INTO t_users (user_id, password_hash) VALUES (?1, ?2);")
+            .bind(user.to_string())
+            .bind(password_hash.to_string())
+            .execute(&mut *tx)
+            .await
+            .map_err(|err| {
+                tracing::warn!("Unable to insert user: {}", err);
+            })?;
+
+        sqlx::query(
+            r#"
+        INSERT INTO t_emails (email, user) VALUES (
+            ?1, (SELECT rowid FROM t_users WHERE user_id = ?2)
+        );"#,
+        )
+        .bind(email.to_string())
+        .bind(user.to_string())
+        .execute(&mut *tx)
+        .await
+        .map_err(|err| {
+            tracing::warn!("Unable to insert user email: {}", err);
+        })?;
+
+        tx.commit().await.map_err(|err| {
+            tracing::warn!("Unable to commit create user transaction: {}", err);
+        })?;
+
+        Ok(CreateUserOutcome::Created(user))
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn set_user_password(
+        &self,
+        user: &UserId,
+        password_hash: HashedPassword,
+    ) -> Result<SetUserPasswordOutcome, ()> {
+        let res = sqlx::query("UPDATE t_users SET password_hash = ?1 WHERE user_id = ?2;")
+            .bind(password_hash.to_string())
+            .bind(user.to_string())
+            .execute(&self.writer)
+            .await
+            .map_err(|err| {
+                tracing::warn!("Unable to set user password: {}", err);
+            })?;
+
+        if res.rows_affected() == 0 {
+            Ok(SetUserPasswordOutcome::UnknownUser)
+        } else {
+            Ok(SetUserPasswordOutcome::Updated)
+        }
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn set_admin(&self, user: &UserId, is_admin: bool) -> Result<SetAdminOutcome, ()> {
+        let mut tx = self.writer.begin().await.map_err(|err| {
+            tracing::warn!("Unable to start transaction to set admin flag: {}", err);
+        })?;
+
+        let current: Option<bool> =
+            sqlx::query_scalar("SELECT is_admin FROM t_users WHERE user_id = ?1;")
+                .bind(user.to_string())
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(|err| {
+                    tracing::warn!("Unable to look up user to set admin flag: {}", err);
+                })?;
+
+        let Some(current) = current else {
+            return Ok(SetAdminOutcome::UnknownUser);
+        };
+        if current == is_admin {
+            return Ok(SetAdminOutcome::Updated);
+        }
+
+        if !is_admin {
+            let admin_count: i64 =
+                sqlx::query_scalar("SELECT COUNT(*) FROM t_users WHERE is_admin = TRUE;")
+                    .fetch_one(&mut *tx)
+                    .await
+                    .map_err(|err| {
+                        tracing::warn!("Unable to count admins before revoking: {}", err);
+                    })?;
+            if admin_count <= 1 {
+                return Ok(SetAdminOutcome::LastAdmin);
+            }
+        }
+
+        sqlx::query("UPDATE t_users SET is_admin = ?1 WHERE user_id = ?2;")
+            .bind(is_admin)
+            .bind(user.to_string())
+            .execute(&mut *tx)
+            .await
+            .map_err(|err| {
+                tracing::warn!("Unable to set admin flag: {}", err);
+            })?;
+
+        tx.commit().await.map_err(|err| {
+            tracing::warn!("Unable to commit set admin transaction: {}", err);
+        })?;
+
+        Ok(SetAdminOutcome::Updated)
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn revoke_user_sessions(&self, user: &UserId) -> Result<u64, ()> {
+        sqlx::query(
+            r#"
+        DELETE FROM t_sessions
+        WHERE user = (SELECT rowid FROM t_users WHERE user_id = ?1)
+        ;"#,
+        )
+        .bind(user.to_string())
+        .execute(&self.writer)
+        .await
+        .map(|res| res.rows_affected())
+        .map_err(|err| {
+            tracing::warn!("Unable to revoke user sessions: {}", err);
+        })
     }
 }
 
@@ -892,11 +1096,12 @@ impl UserRepository for SqliteUsersRepository {
 
     #[tracing::instrument(skip_all, err(Debug))]
     async fn get_user_info(&self, user: &UserId) -> Result<Option<UserInfo>, ()> {
+        type UserInfoRow = (Option<String>, bool, bool, bool);
         // LEFT JOIN: users registered without email-based auth also have a t_users row, but the
         // result is only meaningful when the user has an email.
-        let res: Result<Option<(Option<String>, bool, bool)>, sqlx::Error> = sqlx::query_as(
+        let res: Result<Option<UserInfoRow>, sqlx::Error> = sqlx::query_as(
             r#"
-        SELECT e.email, e.verified, u.password_hash IS NOT NULL
+        SELECT e.email, e.verified, u.password_hash IS NOT NULL, u.is_admin
         FROM t_users u
         LEFT JOIN t_emails e ON e.user = u.rowid
         WHERE u.user_id = ?1
@@ -906,12 +1111,12 @@ impl UserRepository for SqliteUsersRepository {
         .fetch_optional(&self.readers)
         .await;
         match res {
-            Ok(Some((Some(email), verified, has_password))) => {
+            Ok(Some((Some(email), verified, has_password, is_admin))) => {
                 let Ok(email) = EmailAddress::try_from(email) else {
                     tracing::warn!("Stored user email is not a valid email address");
                     return Err(());
                 };
-                Ok(Some(UserInfo::new(email, verified, has_password)))
+                Ok(Some(UserInfo::new(email, verified, has_password, is_admin)))
             }
             // User unknown, or user without an email row.
             Ok(_) => Ok(None),
@@ -1051,7 +1256,8 @@ mod test_sqlite_users_repository {
             AuthLink, AuthToken, EmailAddress, EmailChangeFinalizeResult, HashedEmailChangeToken,
             HashedSessionToken, Password, Session, SessionToken,
             admin::{
-                AdminRepository, BootstrapAdminMode, BootstrapAdminOutcome, RevokeAdminOutcome,
+                AdminRepository, BootstrapAdminMode, BootstrapAdminOutcome, CreateUserOutcome,
+                RevokeAdminOutcome, SetAdminOutcome, SetUserPasswordOutcome,
             },
             service::UserRepository,
             session::SessionRepository,
@@ -1305,6 +1511,291 @@ mod test_sqlite_users_repository {
         let outcome = repository.revoke_admin(&test_email()).await.unwrap();
 
         assert_eq!(outcome, RevokeAdminOutcome::NotAdmin);
+    }
+
+    #[tokio::test]
+    async fn test_is_admin_returns_false_for_unknown_and_non_admin_users() {
+        let (_db, repository) = repository_with_test_user().await;
+
+        assert!(!repository.is_admin(&UserId::from("unknown")).await.unwrap());
+        assert!(!repository.is_admin(&UserId::test_default()).await.unwrap());
+
+        repository
+            .create_or_promote_admin(
+                &test_email(),
+                password_hash("pw"),
+                BootstrapAdminMode::Force,
+            )
+            .await
+            .unwrap();
+
+        assert!(repository.is_admin(&UserId::test_default()).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_list_users_returns_flags() {
+        let (_db, repository) = repository_with_test_user().await;
+        repository
+            .create_user(
+                &EmailAddress::try_from("second@mail.test").unwrap(),
+                password_hash("pw"),
+            )
+            .await
+            .unwrap();
+        repository
+            .create_or_promote_admin(
+                &test_email(),
+                password_hash("pw"),
+                BootstrapAdminMode::Force,
+            )
+            .await
+            .unwrap();
+
+        let users = repository.list_users().await.unwrap();
+
+        assert_eq!(users.len(), 2);
+        // Ordered by email.
+        assert_eq!(users[0].email(), "second@mail.test");
+        assert_eq!(users[1].email(), "test@mail.test");
+
+        let second = &users[0];
+        assert!(!second.verified());
+        assert!(second.has_password());
+        assert!(!second.is_admin());
+
+        assert!(users[1].is_admin());
+    }
+
+    #[tokio::test]
+    async fn test_list_users_surfaces_unparseable_email() {
+        let (_db, repository) = repository_with_test_user().await;
+
+        sqlx::query("INSERT INTO t_users (user_id) VALUES ('broken_user');")
+            .execute(&repository.writer)
+            .await
+            .unwrap();
+        sqlx::query(
+            r#"
+        INSERT INTO t_emails (email, user) VALUES (
+            'not-an-email', (SELECT rowid FROM t_users WHERE user_id = 'broken_user')
+        );"#,
+        )
+        .execute(&repository.writer)
+        .await
+        .unwrap();
+
+        let users = repository.list_users().await.unwrap();
+
+        let broken = users
+            .iter()
+            .find(|user| user.user_id() == &UserId::from("broken_user"))
+            .expect("the broken user should be listed");
+        assert_eq!(broken.email(), "not-an-email");
+        assert!(!broken.email_valid());
+
+        assert_eq!(users.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_create_user_stores_unverified_user_with_password() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .unwrap();
+
+        let email = EmailAddress::try_from("new@mail.test").unwrap();
+        let outcome = repository
+            .create_user(&email, password_hash("s3cret"))
+            .await
+            .unwrap();
+
+        let CreateUserOutcome::Created(user_id) = outcome else {
+            panic!("expected the user to be created");
+        };
+
+        let users = repository.list_users().await.unwrap();
+        assert_eq!(users.len(), 1);
+        let user = &users[0];
+        assert_eq!(user.user_id(), &user_id);
+        assert_eq!(user.email(), "new@mail.test");
+        assert!(!user.verified());
+        assert!(user.has_password());
+        assert!(!user.is_admin());
+    }
+
+    #[tokio::test]
+    async fn test_create_user_rejects_duplicate_email() {
+        let (_db, repository) = repository_with_test_user().await;
+
+        let outcome = repository
+            .create_user(&test_email(), password_hash("s3cret"))
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, CreateUserOutcome::EmailAlreadyUsed);
+        assert_eq!(repository.list_users().await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_set_user_password_updates_existing_user() {
+        let (_db, repository) = repository_with_test_user().await;
+
+        let outcome = repository
+            .set_user_password(&UserId::test_default(), password_hash("new"))
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, SetUserPasswordOutcome::Updated);
+        let stored: String =
+            sqlx::query_scalar("SELECT password_hash FROM t_users WHERE user_id = ?1;")
+                .bind(UserId::test_default().to_string())
+                .fetch_one(&repository.writer)
+                .await
+                .unwrap();
+        assert!(
+            HashedPassword::new(stored)
+                .verify_password(&Password::try_from("new".to_string()).unwrap())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_set_user_password_unknown_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .unwrap();
+
+        let outcome = repository
+            .set_user_password(&UserId::from("unknown"), password_hash("new"))
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, SetUserPasswordOutcome::UnknownUser);
+    }
+
+    #[tokio::test]
+    async fn test_set_admin_grants_and_revokes_with_last_admin_guard() {
+        let (_db, repository) = repository_with_test_user().await;
+        repository
+            .create_user(
+                &EmailAddress::try_from("second@mail.test").unwrap(),
+                password_hash("pw"),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            repository
+                .set_admin(&UserId::test_default(), true)
+                .await
+                .unwrap(),
+            SetAdminOutcome::Updated
+        );
+        assert!(repository.is_admin(&UserId::test_default()).await.unwrap());
+
+        // A single admin cannot be demoted.
+        assert_eq!(
+            repository
+                .set_admin(&UserId::test_default(), false)
+                .await
+                .unwrap(),
+            SetAdminOutcome::LastAdmin
+        );
+        assert!(repository.is_admin(&UserId::test_default()).await.unwrap());
+
+        // With a second admin, the first can be demoted.
+        let second = repository
+            .list_users()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|user| user.email() == "second@mail.test")
+            .unwrap()
+            .user_id()
+            .clone();
+
+        assert_eq!(
+            repository.set_admin(&second, true).await.unwrap(),
+            SetAdminOutcome::Updated
+        );
+        assert_eq!(
+            repository
+                .set_admin(&UserId::test_default(), false)
+                .await
+                .unwrap(),
+            SetAdminOutcome::Updated
+        );
+        assert!(!repository.is_admin(&UserId::test_default()).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_set_admin_unknown_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            repository
+                .set_admin(&UserId::from("unknown"), true)
+                .await
+                .unwrap(),
+            SetAdminOutcome::UnknownUser
+        );
+    }
+
+    #[tokio::test]
+    async fn test_revoke_user_sessions_only_affects_target_user() {
+        let (_db, repository) = repository_with_test_user().await;
+        repository
+            .create_user(
+                &EmailAddress::try_from("second@mail.test").unwrap(),
+                password_hash("pw"),
+            )
+            .await
+            .unwrap();
+        let second = repository
+            .list_users()
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|user| user.email() == "second@mail.test")
+            .unwrap()
+            .user_id()
+            .clone();
+
+        let expire_at = Utc::now() + TimeDelta::minutes(5);
+        for (user, token) in [
+            (UserId::test_default(), "first_token"),
+            (second.clone(), "second_token"),
+        ] {
+            repository
+                .store_session(
+                    &Session::new(user, SessionToken::from(token.to_string()), expire_at).as_hash(),
+                )
+                .await
+                .unwrap();
+        }
+
+        let revoked = repository
+            .revoke_user_sessions(&UserId::test_default())
+            .await
+            .unwrap();
+
+        assert_eq!(revoked, 1);
+
+        // Only the other user's session remains.
+        let remaining: String = sqlx::query_scalar(
+            r#"
+        SELECT u.user_id
+        FROM t_sessions s
+        JOIN t_users u ON u.rowid = s.user
+        ;"#,
+        )
+        .fetch_one(&repository.readers)
+        .await
+        .unwrap();
+        assert_eq!(remaining, second.to_string());
     }
 
     #[tokio::test]

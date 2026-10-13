@@ -596,6 +596,8 @@ pub struct UserInfo {
     /// Whether the user has registered a password, so clients can offer `register_password` vs
     /// `update_password`.
     has_password: bool,
+    /// Whether the user is an admin, so clients can expose the admin pages.
+    is_admin: bool,
 }
 
 impl UserInfo {
@@ -609,6 +611,10 @@ impl UserInfo {
 
     pub fn has_password(&self) -> bool {
         self.has_password
+    }
+
+    pub fn is_admin(&self) -> bool {
+        self.is_admin
     }
 }
 

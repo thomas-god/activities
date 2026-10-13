@@ -2739,7 +2739,7 @@ mod test_user_service_get_user_info {
         user.expect_get_user_info()
             .times(1)
             .withf(|user| user == &UserId::test_default())
-            .returning(|_| Ok(Some(UserInfo::new(email(), true, false))));
+            .returning(|_| Ok(Some(UserInfo::new(email(), true, false, false))));
 
         let service = mail_and_password_service(user, MockMailProvider::new());
 
@@ -2816,7 +2816,7 @@ mod test_user_service_request_email_verification {
         let mut user = MockUserRepository::new();
         user.expect_get_user_info()
             .times(1)
-            .returning(|_| Ok(Some(UserInfo::new(email(), true, false))));
+            .returning(|_| Ok(Some(UserInfo::new(email(), true, false, false))));
         user.expect_store_auth_link().times(0);
 
         let service = mail_and_password_service(user, mailer);
@@ -2839,7 +2839,7 @@ mod test_user_service_request_email_verification {
         let mut user = MockUserRepository::new();
         user.expect_get_user_info()
             .times(1)
-            .returning(|_| Ok(Some(UserInfo::new(email(), false, false))));
+            .returning(|_| Ok(Some(UserInfo::new(email(), false, false, false))));
         user.expect_store_auth_link()
             .times(1)
             .withf(|link| link.user() == &UserId::test_default())
@@ -2876,7 +2876,7 @@ mod test_user_service_request_email_verification {
         let mut user = MockUserRepository::new();
         user.expect_get_user_info()
             .times(1)
-            .returning(|_| Ok(Some(UserInfo::new(email(), false, false))));
+            .returning(|_| Ok(Some(UserInfo::new(email(), false, false, false))));
         user.expect_store_auth_link()
             .times(1)
             .returning(|_| Err(anyhow::anyhow!("boom")));
