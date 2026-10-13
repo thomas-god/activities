@@ -36,6 +36,16 @@ pub struct BaseConfig {
     pub activities_data_path: String,
 }
 
+/// Reads only the data path from the environment.
+///
+/// Exposed for maintenance commands (e.g. the admin CLI) that need to locate the databases without
+/// providing the full server configuration.
+pub fn data_path_from_env<T: Environment>(env: &T) -> Result<String, String> {
+    load_env(env, ACTIVITIES_DATA_PATH_KEY)
+        .as_string()
+        .ok_or_else(|| format!("Invalid or missing {ACTIVITIES_DATA_PATH_KEY}"))
+}
+
 impl BaseConfig {
     pub fn from_env<T: Environment>(env: &T) -> Result<BaseConfig, String> {
         let server_port = load_env(env, SERVER_PORT_KEY)
@@ -44,9 +54,7 @@ impl BaseConfig {
         let allow_origin = load_env(env, ALLOW_ORIGIN_KEY)
             .as_string()
             .ok_or_else(|| format!("Invalid or missing {ALLOW_ORIGIN_KEY}"))?;
-        let activities_data_path = load_env(env, ACTIVITIES_DATA_PATH_KEY)
-            .as_string()
-            .ok_or_else(|| format!("Invalid or missing {ACTIVITIES_DATA_PATH_KEY}"))?;
+        let activities_data_path = data_path_from_env(env)?;
 
         Ok(BaseConfig {
             server_port,

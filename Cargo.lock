@@ -111,6 +111,7 @@ dependencies = [
  "axum-test",
  "base64 0.23.1",
  "chrono",
+ "clap",
  "const-hex",
  "cookie",
  "derive_more",
