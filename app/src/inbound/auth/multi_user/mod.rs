@@ -566,6 +566,7 @@ pub enum UpdateEmailResult {
 #[derive(Debug, Clone, PartialEq)]
 pub enum EmailVerificationResult {
     EmailSent,
+    EmailInvalid,
     AlreadyVerified,
     EmailAuthDisabled,
     Retry,
@@ -591,22 +592,24 @@ impl From<EmailChangeFinalizeResult> for EmailChangeValidationResult {
 /// Information about the authenticated user, exposed at `GET /api/account/me`.
 #[derive(Debug, Clone, Constructor, PartialEq)]
 pub struct UserInfo {
-    email: EmailAddress,
-    verified: bool,
-    /// Whether the user has registered a password, so clients can offer `register_password` vs
-    /// `update_password`.
+    email: String,
+    email_valid: bool,
+    email_verified: bool,
     has_password: bool,
-    /// Whether the user is an admin, so clients can expose the admin pages.
     is_admin: bool,
 }
 
 impl UserInfo {
-    pub fn email(&self) -> &EmailAddress {
+    pub fn email(&self) -> &str {
         &self.email
     }
 
-    pub fn verified(&self) -> bool {
-        self.verified
+    pub fn email_valid(&self) -> bool {
+        self.email_valid
+    }
+
+    pub fn email_verified(&self) -> bool {
+        self.email_verified
     }
 
     pub fn has_password(&self) -> bool {

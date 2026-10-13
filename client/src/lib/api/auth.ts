@@ -41,13 +41,11 @@ export const logout = async (): Promise<void> => {
 	});
 };
 
-/** Metadata about the authenticated user's account, from `GET /api/account/me`. */
 export interface UserInfo {
 	email: string;
-	verified: boolean;
-	/** Whether the user registered a password: drives set-password vs change-password forms. */
+	email_valid: boolean;
+	email_verified: boolean;
 	has_password: boolean;
-	/** Whether the user is an admin: exposes the admin pages. */
 	is_admin: boolean;
 }
 

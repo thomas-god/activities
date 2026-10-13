@@ -12,7 +12,8 @@ use crate::inbound::auth::multi_user::{
 #[derive(Debug, Serialize)]
 pub struct UserInfoResponse {
     email: String,
-    verified: bool,
+    email_valid: bool,
+    email_verified: bool,
     has_password: bool,
     is_admin: bool,
 }
@@ -20,8 +21,9 @@ pub struct UserInfoResponse {
 impl From<UserInfo> for UserInfoResponse {
     fn from(info: UserInfo) -> Self {
         Self {
-            email: info.email().value().to_string(),
-            verified: info.verified(),
+            email: info.email().to_string(),
+            email_valid: info.email_valid(),
+            email_verified: info.email_verified(),
             has_password: info.has_password(),
             is_admin: info.is_admin(),
         }
@@ -49,9 +51,7 @@ mod test {
 
     use crate::{
         domain::models::UserId,
-        inbound::auth::multi_user::{
-            EmailAddress, UserInfo, UserInfoResult, test_utils::MockUserService,
-        },
+        inbound::auth::multi_user::{UserInfo, UserInfoResult, test_utils::MockUserService},
         inbound::http::CookieConfig,
     };
 
@@ -93,7 +93,8 @@ mod test {
             .withf(|user| user == &UserId::test_default())
             .returning(|_| {
                 UserInfoResult::Success(UserInfo::new(
-                    EmailAddress::try_from("test@mail.test").unwrap(),
+                    "test@mail.test".to_string(),
+                    true,
                     true,
                     true,
                     false,
@@ -106,7 +107,8 @@ mod test {
         response.assert_status(StatusCode::OK);
         response.assert_json(&json!({
             "email": "test@mail.test",
-            "verified": true,
+            "email_verified": true,
+            "email_valid": true,
             "has_password": true,
             "is_admin": false
         }));

@@ -216,10 +216,15 @@ where
         }
 
         let email = match self.get_user_info(user).await {
-            UserInfoResult::Success(info) if info.verified() => {
+            UserInfoResult::Success(info) if info.email_verified() => {
                 return EmailVerificationResult::AlreadyVerified;
             }
-            UserInfoResult::Success(info) => info.email().clone(),
+            UserInfoResult::Success(info) => {
+                let Ok(email) = EmailAddress::try_from(info.email) else {
+                    return EmailVerificationResult::EmailInvalid;
+                };
+                email
+            }
             UserInfoResult::Retry => return EmailVerificationResult::Retry,
         };
 
@@ -2739,7 +2744,15 @@ mod test_user_service_get_user_info {
         user.expect_get_user_info()
             .times(1)
             .withf(|user| user == &UserId::test_default())
-            .returning(|_| Ok(Some(UserInfo::new(email(), true, false, false))));
+            .returning(|_| {
+                Ok(Some(UserInfo::new(
+                    email().value().to_string(),
+                    true,
+                    true,
+                    false,
+                    false,
+                )))
+            });
 
         let service = mail_and_password_service(user, MockMailProvider::new());
 
@@ -2748,8 +2761,8 @@ mod test_user_service_get_user_info {
         let UserInfoResult::Success(info) = res else {
             panic!("expected Success, got {res:?}");
         };
-        assert_eq!(info.email(), &email());
-        assert!(info.verified());
+        assert_eq!(info.email(), email().value());
+        assert!(info.email_verified());
         assert!(!info.has_password());
     }
 
@@ -2814,9 +2827,15 @@ mod test_user_service_request_email_verification {
         let mut mailer = MockMailProvider::new();
         mailer.expect_send_auth_link_email().times(0);
         let mut user = MockUserRepository::new();
-        user.expect_get_user_info()
-            .times(1)
-            .returning(|_| Ok(Some(UserInfo::new(email(), true, false, false))));
+        user.expect_get_user_info().times(1).returning(|_| {
+            Ok(Some(UserInfo::new(
+                email().to_string(),
+                true,
+                true,
+                false,
+                false,
+            )))
+        });
         user.expect_store_auth_link().times(0);
 
         let service = mail_and_password_service(user, mailer);
@@ -2837,9 +2856,15 @@ mod test_user_service_request_email_verification {
             .withf(|mail, _| mail == &email())
             .returning(|_, _| Ok(()));
         let mut user = MockUserRepository::new();
-        user.expect_get_user_info()
-            .times(1)
-            .returning(|_| Ok(Some(UserInfo::new(email(), false, false, false))));
+        user.expect_get_user_info().times(1).returning(|_| {
+            Ok(Some(UserInfo::new(
+                email().to_string(),
+                true,
+                false,
+                false,
+                false,
+            )))
+        });
         user.expect_store_auth_link()
             .times(1)
             .withf(|link| link.user() == &UserId::test_default())
@@ -2874,9 +2899,15 @@ mod test_user_service_request_email_verification {
     #[tokio::test]
     async fn test_request_email_verification_store_auth_link_err_returns_retry() {
         let mut user = MockUserRepository::new();
-        user.expect_get_user_info()
-            .times(1)
-            .returning(|_| Ok(Some(UserInfo::new(email(), false, false, false))));
+        user.expect_get_user_info().times(1).returning(|_| {
+            Ok(Some(UserInfo::new(
+                email().to_string(),
+                true,
+                false,
+                false,
+                false,
+            )))
+        });
         user.expect_store_auth_link()
             .times(1)
             .returning(|_| Err(anyhow::anyhow!("boom")));

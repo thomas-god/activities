@@ -164,14 +164,14 @@ impl AdminRepository for SqliteUsersRepository {
         })?;
 
         if mode == BootstrapAdminMode::IfNoAdmin {
-            let admin_exists: bool =
+            let admins_exist: bool =
                 sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM t_users WHERE is_admin = TRUE);")
                     .fetch_one(&mut *tx)
                     .await
                     .map_err(|err| {
                         tracing::warn!("Unable to check for an existing admin: {}", err);
                     })?;
-            if admin_exists {
+            if admins_exist {
                 return Ok(BootstrapAdminOutcome::SkippedAdminExists);
             }
         }
@@ -1112,11 +1112,17 @@ impl UserRepository for SqliteUsersRepository {
         .await;
         match res {
             Ok(Some((Some(email), verified, has_password, is_admin))) => {
-                let Ok(email) = EmailAddress::try_from(email) else {
-                    tracing::warn!("Stored user email is not a valid email address");
-                    return Err(());
+                let email_valid = EmailAddress::try_from(email.as_str()).is_ok();
+                if !email_valid {
+                    tracing::warn!("Stored user email is not a valid email address: {}", &email);
                 };
-                Ok(Some(UserInfo::new(email, verified, has_password, is_admin)))
+                Ok(Some(UserInfo::new(
+                    email,
+                    email_valid,
+                    verified,
+                    has_password,
+                    is_admin,
+                )))
             }
             // User unknown, or user without an email row.
             Ok(_) => Ok(None),
@@ -3388,8 +3394,8 @@ mod test_sqlite_users_repository {
             .await
             .unwrap()
             .expect("user should exist");
-        assert_eq!(info.email(), &test_email());
-        assert!(!info.verified());
+        assert_eq!(info.email(), test_email().value());
+        assert!(!info.email_verified());
         assert!(!info.has_password());
 
         // With a password and a verified email.
@@ -3406,7 +3412,7 @@ mod test_sqlite_users_repository {
             .await
             .unwrap()
             .unwrap();
-        assert!(info.verified());
+        assert!(info.email_verified());
         assert!(info.has_password());
     }
 

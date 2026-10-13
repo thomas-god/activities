@@ -18,6 +18,7 @@ pub async fn request_email_verification<UR: IMultiUserService>(
         EmailVerificationResult::EmailSent => StatusCode::ACCEPTED.into_response(),
         // Idempotent: there is nothing to do when the address is already verified.
         EmailVerificationResult::AlreadyVerified => StatusCode::OK.into_response(),
+        EmailVerificationResult::EmailInvalid => StatusCode::BAD_REQUEST.into_response(),
         EmailVerificationResult::EmailAuthDisabled => StatusCode::FORBIDDEN.into_response(),
         EmailVerificationResult::Retry => StatusCode::SERVICE_UNAVAILABLE.into_response(),
     }

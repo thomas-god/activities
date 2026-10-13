@@ -286,17 +286,22 @@
 
 				<div class="flex items-center justify-between gap-2">
 					<p class="text-sm font-bold">{userInfo.email}</p>
-					<span
-						class={`badge badge-sm ${
-							userInfo.verified
-								? 'badge-success'
-								: emailAuthEnabled
-									? 'badge-warning'
-									: 'badge-ghost'
-						}`}
-					>
-						{userInfo.verified ? 'Verified' : 'Unverified'}
-					</span>
+					<div class="flex flex-row">
+						<span
+							class={`badge badge-sm ${
+								userInfo.email_verified
+									? 'badge-success'
+									: emailAuthEnabled
+										? 'badge-warning'
+										: 'badge-ghost'
+							}`}
+						>
+							{userInfo.email_verified ? 'Verified' : 'Unverified'}
+						</span>
+						{#if !userInfo.email_valid}
+							<span class="badge badge-sm badge-error">Invalid email</span>
+						{/if}
+					</div>
 				</div>
 
 				{#if !emailAuthEnabled}
@@ -304,7 +309,7 @@
 						Your email address is only used as your sign-in identifier, you won't receive emails on
 						it.
 					</p>
-				{:else if !userInfo.verified}
+				{:else if !userInfo.email_verified}
 					<div class="mt-2 flex items-center gap-2">
 						<button
 							class="btn btn-primary btn-sm"
