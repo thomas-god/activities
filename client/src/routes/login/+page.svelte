@@ -38,10 +38,9 @@
 		: none();
 
 	const authInfo: AuthInfo = await fetchAuthInfo();
-	// Both default to false for single-user strategies (where `auth_methods` is absent) and for
-	// older servers that don't report the methods yet (which keeps the historical email-only form).
+	// Password-based auth is always enabled in multi-user mode; email-based auth is optional. Both
+	// default to false for single-user strategies, where `auth_methods` is absent.
 	const emailAuthEnabled = authInfo.auth_methods?.email ?? false;
-	const passwordAuthEnabled = authInfo.auth_methods?.password ?? false;
 	const registrationOpen = authInfo.registration_open ?? false;
 
 	let multiUserLoginError: string | null = $state(null);
@@ -95,23 +94,15 @@
 	};
 
 	const callbackMultiUserLogin = (): Promise<void> => {
-		if (!isEmailValid) {
+		if (!isEmailValid || password.trim().length === 0) {
 			return Promise.resolve();
 		}
-		if (passwordAuthEnabled) {
-			if (password.trim().length === 0) {
-				return Promise.resolve();
-			}
-			const body: MultiUserAuthRequest = { email, password };
-			return submitMultiUser('/api/login', body, () => goto(resolve('/')));
-		}
-		const body: MultiUserAuthRequest = { email };
-		return submitMultiUser('/api/login', body, () => {
-			multiUserLoginInfo = authLinkSentMessage;
-		});
+		const body: MultiUserAuthRequest = { email, password };
+		return submitMultiUser('/api/login', body, () => goto(resolve('/')));
 	};
 
-	// Mail + password mode: omitting the password falls back to the authentication-link flow.
+	// Only reachable when email-based auth is enabled: omitting the password requests an
+	// authentication link instead of logging in directly.
 	const callbackRequestAuthLink = (): Promise<void> => {
 		if (!isEmailValid) {
 			return Promise.resolve();
@@ -122,19 +113,13 @@
 	};
 
 	const callbackRegister = (): Promise<void> => {
-		if (!isEmailValid) {
+		if (!isEmailValid || password.trim().length === 0) {
 			return Promise.resolve();
 		}
-		const body: MultiUserAuthRequest = passwordAuthEnabled ? { email, password } : { email };
-		return submitMultiUser('/api/register', body, () => {
-			if (!emailAuthEnabled) {
-				multiUserLoginInfo = 'Account created. You can now log in with your password.';
-			} else if (passwordAuthEnabled) {
-				multiUserLoginInfo =
-					'Account created. You can log in with your password, or use the link sent to your inbox.';
-			} else {
-				multiUserLoginInfo = authLinkSentMessage;
-			}
+		return submitMultiUser('/api/register', { email, password }, () => {
+			multiUserLoginInfo = emailAuthEnabled
+				? 'Account created. You can log in with your password, or use the link sent to your inbox.'
+				: 'Account created. You can now log in with your password.';
 		});
 	};
 
@@ -194,48 +179,42 @@
 			/>
 			{#if !emailAuthEnabled}
 				<p class="mt-1 text-xs opacity-70">
-					Your email address is only used as your sign-in identifier, you won't received emails on
+					Your email address is only used as your sign-in identifier, you won't receive emails on
 					it.
 				</p>
 			{/if}
 
-			{#if passwordAuthEnabled}
-				<label class="label" for="login-password">Password</label>
-				<input
-					type="password"
-					class="input"
-					placeholder="Password"
-					id="login-password"
-					required
-					bind:value={password}
-					onkeypress={(e) => {
-						if (e.key === 'Enter') {
-							callbackMultiUserLogin();
-						}
-					}}
-				/>
-			{/if}
+			<label class="label" for="login-password">Password</label>
+			<input
+				type="password"
+				class="input"
+				placeholder="Password"
+				id="login-password"
+				required
+				bind:value={password}
+				onkeypress={(e) => {
+					if (e.key === 'Enter') {
+						callbackMultiUserLogin();
+					}
+				}}
+			/>
 
 			<div class="join mx-auto mt-4 join-horizontal gap-4">
 				<button
 					class="btn join-item rounded-xs btn-primary"
-					disabled={multiUserRequestPending ||
-						!isEmailValid ||
-						(passwordAuthEnabled && password.trim().length === 0)}
+					disabled={multiUserRequestPending || !isEmailValid || password.trim().length === 0}
 					onclick={callbackMultiUserLogin}>Login</button
 				>
 				{#if registrationOpen}
 					<button
 						class="btn join-item rounded-xs btn-secondary"
-						disabled={multiUserRequestPending ||
-							!isEmailValid ||
-							(passwordAuthEnabled && password.trim().length === 0)}
+						disabled={multiUserRequestPending || !isEmailValid || password.trim().length === 0}
 						onclick={callbackRegister}>Register</button
 					>
 				{/if}
 			</div>
 
-			{#if emailAuthEnabled && passwordAuthEnabled}
+			{#if emailAuthEnabled}
 				<button
 					class="btn mt-2 w-full btn-ghost btn-sm"
 					disabled={multiUserRequestPending || !isEmailValid}

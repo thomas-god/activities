@@ -19,9 +19,9 @@ export interface AuthInfo {
 /**
  * Body shared by the multi-user `POST /api/login` and `POST /api/register` requests.
  *
- * `password` is only meaningful when password-based authentication is enabled: it is required to
- * register, and optional to log in — omitting it (or sending an empty string) falls back to the
- * authentication-link email flow when email-based auth is enabled.
+ * Password-based authentication is always enabled: `password` is required to register. For login
+ * it is optional — omitting it (or sending an empty string) falls back to the authentication-link
+ * email flow when email-based auth is enabled.
  */
 export interface MultiUserAuthRequest {
 	email: string;

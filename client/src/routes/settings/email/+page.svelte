@@ -22,7 +22,6 @@
 	let authInfo = getAuthInfo();
 	const authInfoValue = $derived(isSome(authInfo) && authInfo.value ? authInfo.value : undefined);
 	const emailAuthEnabled = $derived(authInfoValue?.auth_methods?.email ?? false);
-	const passwordAuthEnabled = $derived(authInfoValue?.auth_methods?.password ?? false);
 
 	// Account management endpoints only exist for the multi-user strategy.
 	const isMultiUser = $derived(authInfoValue?.strategy === 'MultiUser');
@@ -177,8 +176,6 @@
 				passwordError = 'A password is required';
 			} else if (res.status === 401) {
 				passwordError = 'Current password is incorrect';
-			} else if (res.status === 403) {
-				passwordError = 'Password authentication is disabled';
 			} else if (res.status === 409) {
 				passwordError = 'You already have a password';
 				await refreshUserInfo();
@@ -305,7 +302,7 @@
 
 			{#if !emailAuthEnabled}
 				<p class="mt-2 text-xs opacity-70">
-					Your email address is only used as your sign-in identifier, you won't received emails on
+					Your email address is only used as your sign-in identifier, you won't receive emails on
 					it.
 				</p>
 			{:else if !userInfo.verified}
@@ -357,59 +354,57 @@
 			{/if}
 		</fieldset>
 
-		{#if passwordAuthEnabled}
-			<fieldset class="mt-4 fieldset rounded-box border border-base-300 bg-base-100 p-4">
-				<legend class="fieldset-legend"
-					>{userInfo.has_password ? 'Password' : 'Set a password'}</legend
-				>
+		<fieldset class="mt-4 fieldset rounded-box border border-base-300 bg-base-100 p-4">
+			<legend class="fieldset-legend"
+				>{userInfo.has_password ? 'Password' : 'Set a password'}</legend
+			>
 
-				{#if userInfo.has_password}
-					<label class="label" for="settings-current-password">Current password</label>
-					<input
-						type="password"
-						class="input"
-						placeholder="Current password"
-						id="settings-current-password"
-						required
-						bind:value={currentPassword}
-					/>
-				{/if}
-
-				<label class="label" for="settings-new-password">
-					{userInfo.has_password ? 'New password' : 'Password'}
-				</label>
+			{#if userInfo.has_password}
+				<label class="label" for="settings-current-password">Current password</label>
 				<input
 					type="password"
 					class="input"
-					placeholder="New password"
-					id="settings-new-password"
+					placeholder="Current password"
+					id="settings-current-password"
 					required
-					bind:value={newPassword}
-					onkeypress={(e) => {
-						if (e.key === 'Enter') {
-							submitPassword();
-						}
-					}}
+					bind:value={currentPassword}
 				/>
+			{/if}
 
-				<div class="join mx-auto mt-4 join-horizontal gap-4">
-					<button
-						class="btn join-item rounded-xs btn-primary"
-						disabled={passwordPending ||
-							newPassword.length === 0 ||
-							(userInfo.has_password && currentPassword.length === 0)}
-						onclick={submitPassword}
-						>{userInfo.has_password ? 'Change password' : 'Set password'}</button
-					>
-				</div>
+			<label class="label" for="settings-new-password">
+				{userInfo.has_password ? 'New password' : 'Password'}
+			</label>
+			<input
+				type="password"
+				class="input"
+				placeholder="New password"
+				id="settings-new-password"
+				required
+				bind:value={newPassword}
+				onkeypress={(e) => {
+					if (e.key === 'Enter') {
+						submitPassword();
+					}
+				}}
+			/>
 
-				{#if passwordError}
-					<p class="text-error">{passwordError}</p>
-				{:else if passwordInfo}
-					<p class="text-info">{passwordInfo}</p>
-				{/if}
-			</fieldset>
-		{/if}
+			<div class="join mx-auto mt-4 join-horizontal gap-4">
+				<button
+					class="btn join-item rounded-xs btn-primary"
+					disabled={passwordPending ||
+						newPassword.length === 0 ||
+						(userInfo.has_password && currentPassword.length === 0)}
+					onclick={submitPassword}
+					>{userInfo.has_password ? 'Change password' : 'Set password'}</button
+				>
+			</div>
+
+			{#if passwordError}
+				<p class="text-error">{passwordError}</p>
+			{:else if passwordInfo}
+				<p class="text-info">{passwordInfo}</p>
+			{/if}
+		</fieldset>
 
 		<fieldset class="mt-4 fieldset rounded-box border border-base-300 bg-base-100 p-4">
 			<legend class="fieldset-legend">Sessions</legend>
