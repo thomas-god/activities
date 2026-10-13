@@ -47,6 +47,8 @@ export interface UserInfo {
 	verified: boolean;
 	/** Whether the user registered a password: drives set-password vs change-password forms. */
 	has_password: boolean;
+	/** Whether the user is an admin: exposes the admin pages. */
+	is_admin: boolean;
 }
 
 /** Thrown when fetching the user info fails, carrying the HTTP status for control flow. */

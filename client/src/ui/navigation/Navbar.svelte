@@ -5,8 +5,8 @@
 	import { logout } from '#lib/api/auth.js';
 	import ThemeToggle from '#ui/shared/ThemeToggle.svelte';
 	import { getTheme, persistTheme } from '#lib/contexts/theme.js';
-	import { getAuthInfo } from '#lib/contexts/auth.js';
-	import { isSome, none, some, type Option } from '#lib/Options.js';
+	import { getAuthInfo, getCurrentUser } from '#lib/contexts/auth.js';
+	import { isSome, isSomeAnd, none, some, type Option } from '#lib/Options.js';
 	import {
 		CalendarFold,
 		ChartColumn,
@@ -46,6 +46,10 @@
 	let showAccount = $derived(
 		isSome(authInfo) && authInfo.value !== undefined && authInfo.value.strategy === 'MultiUser'
 	);
+
+	// The admin link is only shown to an authenticated admin.
+	let currentUser = getCurrentUser();
+	let isAdmin = $derived(isSomeAnd(currentUser, (user) => user.is_admin));
 
 	let theme = getTheme();
 	const toggleTheme = () => {
@@ -147,6 +151,12 @@
 			<a
 				class={`btn shrink-0 btn-ghost px-1 text-[15px] font-medium xs:px-2 xs:text-[16px] sm:text-lg ${classExactPath('/settings/email')}`}
 				href={resolve('settings/email')}>Account</a
+			>
+		{/if}
+		{#if isAdmin}
+			<a
+				class={`btn shrink-0 btn-ghost px-1 text-[15px] font-medium xs:px-2 xs:text-[16px] sm:text-lg ${classPathStartWith('/admin')}`}
+				href={resolve('/admin')}>Admin</a
 			>
 		{/if}
 	</div>

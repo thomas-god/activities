@@ -1,8 +1,8 @@
 <script lang="ts">
 	import '../app.css';
 	import { loadTheme, setTheme } from '#lib/contexts/theme.js';
-	import { setAuthInfo } from '#lib/contexts/auth.js';
-	import { fetchAuthInfo, type AuthInfo } from '#lib/api/index.js';
+	import { setAuthInfo, setCurrentUser } from '#lib/contexts/auth.js';
+	import { fetchAuthInfo, fetchUserInfo, type AuthInfo, type UserInfo } from '#lib/api/index.js';
 	import { none, setInnerValue, type Option } from '#lib/Options.js';
 
 	let { children } = $props();
@@ -12,7 +12,20 @@
 	setTheme(theme);
 	let authInfo: Option<AuthInfo> = $state(none());
 	setAuthInfo(authInfo);
-	setInnerValue(authInfo, await fetchAuthInfo());
+	let currentUser: Option<UserInfo> = $state(none());
+	setCurrentUser(currentUser);
+
+	const fetchedAuthInfo = await fetchAuthInfo();
+	setInnerValue(authInfo, fetchedAuthInfo);
+
+	// The current user only exists in multi-user mode and requires a session: fetch it without
+	// blocking the initial render, so the admin navigation simply stays hidden until it resolves
+	// (and on the login page where the request answers `401`).
+	if (fetchedAuthInfo.strategy === 'MultiUser') {
+		void fetchUserInfo()
+			.then((user) => setInnerValue(currentUser, user))
+			.catch(() => {});
+	}
 </script>
 
 <div class="page-container">
