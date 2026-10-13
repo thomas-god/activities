@@ -13,7 +13,8 @@ use crate::{
         auth::multi_user::{
             MaybeMailProvider,
             service::{
-                spawn_expired_auth_links_cleanup, spawn_expired_email_change_tokens_cleanup,
+                UserRepository, spawn_expired_auth_links_cleanup,
+                spawn_expired_email_change_tokens_cleanup,
             },
         },
         http::{
@@ -190,6 +191,27 @@ async fn build_activity_service(
     anyhow::Ok((activity_service, parser, training_service))
 }
 
+/// Builds the startup warning about accounts without a password, if any.
+///
+/// Password-based authentication is always enabled, but accounts created before it (or before a
+/// password was registered) can only log in through the email-based flow. Operators changing the
+/// authentication methods should know how many such accounts exist before they disable email auth.
+fn passwordless_users_warning(count: u64, email_auth_enabled: bool) -> Option<String> {
+    if count == 0 {
+        return None;
+    }
+
+    Some(if email_auth_enabled {
+        format!(
+            "{count} user(s) have no password set. They can only log in through the email-based flow; disabling email-based authentication would lock them out. Ask them to set a password from their account settings while email login is still enabled."
+        )
+    } else {
+        format!(
+            "{count} user(s) have no password set and email-based authentication is disabled: these accounts currently cannot log in. Restore email login or set a password for them."
+        )
+    })
+}
+
 async fn build_user_service(
     config: &BaseConfig,
     mode_config: &MultiUserConfig,
@@ -204,6 +226,21 @@ async fn build_user_service(
     let users_repository = Arc::new(
         SqliteUsersRepository::new(&format!("sqlite:{}", user_db.to_string_lossy())).await?,
     );
+
+    // Warn about accounts that can only log in through the email-based flow, so operators know
+    // before changing the authentication methods (e.g. disabling email auth and locking them out).
+    match users_repository.count_users_without_password().await {
+        Result::Ok(count) => {
+            if let Some(warning) = passwordless_users_warning(count, mode_config.email.is_some()) {
+                tracing::warn!("{warning}");
+            }
+        }
+        Result::Err(()) => {
+            tracing::warn!(
+                "Unable to count users without a password; some accounts may be at risk if email-based authentication is disabled."
+            );
+        }
+    }
 
     let mailer = match mode_config.email.as_ref() {
         Some(email_config) => MaybeMailProvider::Enabled(build_mailer(email_config).await?),
@@ -313,5 +350,28 @@ mod tests {
         let _ = build_user_service(&config, &password_only_config())
             .await
             .expect("password-only config should start without SMTP credentials");
+    }
+
+    #[test]
+    fn test_passwordless_users_warning_none_when_no_passwordless_user() {
+        assert!(passwordless_users_warning(0, true).is_none());
+        assert!(passwordless_users_warning(0, false).is_none());
+    }
+
+    #[test]
+    fn test_passwordless_users_warning_mentions_count_and_remedy_when_email_enabled() {
+        let warning = passwordless_users_warning(3, true).expect("expected a warning");
+
+        assert!(warning.contains('3'));
+        assert!(warning.contains("email-based"));
+        assert!(warning.contains("set a password"));
+    }
+
+    #[test]
+    fn test_passwordless_users_warning_reports_locked_out_when_email_disabled() {
+        let warning = passwordless_users_warning(2, false).expect("expected a warning");
+
+        assert!(warning.contains('2'));
+        assert!(warning.contains("cannot log in"));
     }
 }
