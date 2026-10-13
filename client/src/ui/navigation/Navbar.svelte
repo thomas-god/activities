@@ -3,7 +3,6 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { logout } from '#lib/api/auth.js';
-	import ThemeToggle from '#ui/shared/ThemeToggle.svelte';
 	import { getTheme, persistTheme } from '#lib/contexts/theme.js';
 	import { getAuthInfo } from '#lib/contexts/auth.js';
 	import { isSome, none, some, type Option } from '#lib/Options.js';
@@ -68,11 +67,12 @@
 
 	// On mobile the logout button, and the theme toggle collapse into a single menu.
 	let mobileMenuItems = $derived([
-		...(showLogout ? [{ label: 'Log out', onClick: handleLogout }] : []),
 		{
 			label: theme.variant === 'dark' ? 'Light mode' : 'Dark mode',
 			onClick: toggleTheme
-		}
+		},
+		...(showAccount ? [{ label: 'Settings', onClick: () => goto('/settings') }] : []),
+		...(showLogout ? [{ label: 'Log out', onClick: handleLogout }] : [])
 	]);
 
 	let addItemMenuBtn: HTMLButtonElement;
@@ -143,12 +143,6 @@
 			class={`btn shrink-0 btn-ghost px-1 text-[15px] font-medium xs:px-2 xs:text-[16px] sm:text-lg ${classPathStartWith('/training/period')}`}
 			href={resolve('training/periods')}>Periods</a
 		>
-		{#if showAccount}
-			<a
-				class={`btn shrink-0 btn-ghost px-1 text-[15px] font-medium xs:px-2 xs:text-[16px] sm:text-lg ${classExactPath('/settings/email')}`}
-				href={resolve('/settings')}>Account</a
-			>
-		{/if}
 	</div>
 
 	<div class="flex shrink-0 items-center gap-0 min-[400px]:gap-2">
@@ -196,18 +190,10 @@
 			</ul>
 		</div>
 
-		{#if showLogout}
-			<button class="btn hidden btn-ghost btn-sm min-[400px]:flex" onclick={handleLogout}
-				>Log out</button
-			>
-		{/if}
-
-		<ThemeToggle {theme} onToggle={toggleTheme} class="hidden min-[850px]:flex" />
-
-		<div class="dropdown dropdown-end min-[850px]:hidden">
+		<div class="dropdown dropdown-end">
 			<button
 				tabindex="0"
-				class="btn btn-ghost btn-primary btn-xs [min-850px]:btn-sm"
+				class="btn btn-ghost btn-primary btn-xs min-[400px]:btn-sm"
 				aria-label="Quick actions"
 			>
 				<Menu class="size-5" />
