@@ -168,8 +168,9 @@ a password, so accounts created after the migration are unaffected.
 **Residual risk**: registering a password only helps users who still have a valid session. A user
 whose session expired after the instance dropped email auth cannot be rescued (pwd-only mode has no
 mailer, hence no login link). Operators migrating away from email auth should always run an
-email+pwd phase long enough for users to log in via an email link and register a password. A future
-admin role may provide a stronger remedy.
+email+pwd phase long enough for users to log in via an email link and register a password. The
+[admin role addendum](#addendum-admin-role-and-first-admin-bootstrap-2026-10-13) provides the
+foundation for that remedy (its user-management surface is a separate change).
 
 ### Sessions
 
@@ -264,8 +265,9 @@ authentication remains an optional addition on top.
 - At startup, the application counts users without a `password_hash` and logs a warning with the
   number. The message adapts to whether email auth is enabled: with email auth on it tells the
   operator those users would be locked out if it were disabled and to have them set a password;
-  with email auth off it reports that those accounts currently cannot log in. A future admin role
-  will provide a stronger remedy.
+  with email auth off it reports that those accounts currently cannot log in. The
+  [admin role addendum](#addendum-admin-role-and-first-admin-bootstrap-2026-10-13) provides a
+  stronger remedy.
 
 No schema change is needed: `password_hash` remains nullable, so existing instances keep their
 passwordless rows and no data migration is required.
@@ -295,5 +297,62 @@ email flow and can be rescued via the register-password flow.
 **Trade-offs**: email-only instances necessarily pick up password auth on upgrade, so the password
 field appears for everyone and users must now choose a password at registration; the
 `ACTIVITIES_PASSWORD_AUTH_ENABLED` name no longer matches its behavior; and the lock-out risk is only
-reduced, not removed, for accounts that already exist without a password (the startup warning is the
-main safeguard until an admin role exists).
+reduced, not removed, for accounts that already exist without a password (the startup warning and
+the admin role are the safeguards there, though the admin user-management surface is a separate
+change).
+
+## Addendum: admin role and first-admin bootstrap (2026-10-13)
+
+### Context
+
+The authentication flows above repeatedly point to "a future admin role" as the remedy for two gaps:
+accounts without a password that can no longer log in, and the inability to create users when
+registration is closed. Existing instances also have no admin concept at all, so there is no obvious
+account to promote: choosing "the first user" would be arbitrary on an instance that already has
+several.
+
+### Decision
+
+**An admin is a regular user carrying an `is_admin` flag** (`t_users.is_admin`, migration
+`007_add_admin_flag.sql`, default `FALSE`). No account is promoted by the migration, so existing
+instances upgrade with zero admins and no data heuristic.
+
+The first admin is established out-of-band through a single operation (the `AdminService` over the
+`AdminRepository` port), exposed by two thin adapters:
+
+- **environment bootstrap** — `ACTIVITIES_BOOTSTRAP_ADMIN_EMAIL` and
+  `ACTIVITIES_BOOTSTRAP_ADMIN_PASSWORD`, set together (the `_FILE` variant is supported by the
+  standard configuration loader). At startup the application creates or promotes the matching
+  account **only when no admin exists**, then logs a warning telling the operator to remove the
+  variables. Because the check and the write share a transaction, two concurrent bootstraps cannot
+  both create an admin.
+- **break-glass CLI** — `app admin bootstrap|revoke` runs directly against `user.db`, without the
+  full server configuration. `bootstrap` always acts, so it can recover access when the current
+  admin is locked out; `revoke` refuses to remove the last admin.
+
+The bootstrap password is mandatory, so the resulting admin can always log in, whatever the enabled
+authentication methods.
+
+### Alternatives considered
+
+- **Promote the first/oldest user.** Rejected: existing instances already have several users, making
+  the choice arbitrary.
+- **A first-run setup wizard.** Rejected: existing instances already have users, so "zero users" is
+  not a valid trigger, and it would add an unauthenticated surface.
+- **A standing environment override** (Grafana-style, re-applied on every start). Rejected: it would
+  silently re-grant admin after an in-app demotion. Recovery of a locked-out admin is the CLI's job.
+- **Keying the bootstrap on the internal `user_id`.** Rejected in favour of the email address, which
+  is the operator-facing identifier and is already globally unique.
+- **Allowing a password-less bootstrap** (logging in through the email flow). Rejected: it adds a
+  lock-out failure mode for password-only instances for no benefit, since the operator supplies a
+  secret either way.
+
+### Benefits and trade-offs
+
+**Benefits**: existing instances upgrade without an admin and without a data heuristic; a single
+operation serves both the declarative and break-glass paths; the bootstrap is inert once an admin
+exists, so leaving the variables configured is not a standing privilege grant.
+
+**Trade-offs**: the flag currently carries no permission by itself — the user-management surface
+(creating users, setting passwords, listing passwordless accounts) is a separate change, and
+`is_admin` is not exposed through the API yet.

@@ -18,11 +18,11 @@ The application authentication flow can be configured in 3 different ways:
 - _multi user_: allows multiple users to use your instance. Password-based login is always enabled,
   and email-based password-less login (authentication links sent by email) can be enabled on top. By
   default anyone with a valid email address can register; set `ACTIVITIES_ALLOW_REGISTRATION=false`
-  to restrict the instance to already-registered users only. Email-based login requires a valid
-  **SMTP server** for sending emails to users containing their authentication link. HTTPS is
-  strongly recommended (session cookies are only marked `Secure` when served over HTTPS), but the
-  app also works over plain HTTP when the traffic is already protected by another layer (e.g. a
-  WireGuard or Tailscale tunnel).
+  to restrict the instance to already-registered users only (an [admin](#admin-role) can still
+  create accounts). Email-based login requires a valid **SMTP server** for sending emails to users
+  containing their authentication link. HTTPS is strongly recommended (session cookies are only
+  marked `Secure` when served over HTTPS), but the app also works over plain HTTP when the traffic
+  is already protected by another layer (e.g. a WireGuard or Tailscale tunnel).
 - _single user, main password_: allows a single user to use the instance using a password set
   through an environment variable in your deployment. Does not require having an SMTP server nor
   having HTTPS (HTTP only might be fine for local deployment but HTTPS is still recommended as
@@ -149,21 +149,26 @@ Multi-user mode is enabled as soon as any multi-user environment variable below 
 - **password-based authentication is always enabled**: users register with a password and log in
   with it;
 - **email-based authentication is optional**: configuring all the `ACTIVITIES_MAILER_*` variables
-  adds password-less login through authentication links (and email verification).
+  adds password-less login through authentication links (and email verification);
+- **an admin role is available**: the first admin is established from the environment or with the
+  CLI, and is the account used to manage users when registration is closed (see
+  [Admin role](#admin-role)).
 
 A password-only instance runs without any SMTP configuration: set the
 `ACTIVITIES_PASSWORD_AUTH_ENABLED` variable (its value no longer matters) to select multi-user mode,
 or simply configure the mailer for email-based login as well.
 
-| Variable name                    | Required             | Purpose                                                                                                                                                                                                                                                                                                                       | Example                 |
-| -------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| ACTIVITIES_MAILER_FROM           | for email-based auth |                                                                                                                                                                                                                                                                                                                               | no-reply@your.domain    |
-| ACTIVITIES_MAILER_USERNAME       | for email-based auth | SMTP username                                                                                                                                                                                                                                                                                                                 |                         |
-| ACTIVITIES_MAILER_PASSWORD       | for email-based auth | SMTP password                                                                                                                                                                                                                                                                                                                 |                         |
-| ACTIVITIES_MAILER_RELAY          | for email-based auth | SMTP server                                                                                                                                                                                                                                                                                                                   |                         |
-| ACTIVITIES_MAILER_DOMAIN         | for email-based auth | The domain on which your instance is hosted. Used to craft the auth link url. Can be a different domain than the one used by your SMTP server.                                                                                                                                                                                | https://app.your.domain |
-| ACTIVITIES_PASSWORD_AUTH_ENABLED | no                   | Deprecated selector kept for backward compatibility. Password-based authentication can no longer be disabled: the value is ignored and setting it to `false` only logs a warning. It still selects multi-user mode, so it can be used on its own to run a password-only instance without the `ACTIVITIES_MAILER_*` variables. | true                    |
-| ACTIVITIES_ALLOW_REGISTRATION    | no                   | Wether new users can register a new account. Set to `false` to only allow already-registered users to log in.                                                                                                                                                                                                                 | false                   |
+| Variable name                       | Required             | Purpose                                                                                                                                                                                                                                                                                                                       | Example                 |
+| ----------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| ACTIVITIES_MAILER_FROM              | for email-based auth |                                                                                                                                                                                                                                                                                                                               | no-reply@your.domain    |
+| ACTIVITIES_MAILER_USERNAME          | for email-based auth | SMTP username                                                                                                                                                                                                                                                                                                                 |                         |
+| ACTIVITIES_MAILER_PASSWORD          | for email-based auth | SMTP password                                                                                                                                                                                                                                                                                                                 |                         |
+| ACTIVITIES_MAILER_RELAY             | for email-based auth | SMTP server                                                                                                                                                                                                                                                                                                                   |                         |
+| ACTIVITIES_MAILER_DOMAIN            | for email-based auth | The domain on which your instance is hosted. Used to craft the auth link url. Can be a different domain than the one used by your SMTP server.                                                                                                                                                                                | https://app.your.domain |
+| ACTIVITIES_PASSWORD_AUTH_ENABLED    | no                   | Deprecated selector kept for backward compatibility. Password-based authentication can no longer be disabled: the value is ignored and setting it to `false` only logs a warning. It still selects multi-user mode, so it can be used on its own to run a password-only instance without the `ACTIVITIES_MAILER_*` variables. | true                    |
+| ACTIVITIES_ALLOW_REGISTRATION       | no                   | Wether new users can register a new account. Set to `false` to only allow already-registered users to log in.                                                                                                                                                                                                                 | false                   |
+| ACTIVITIES_BOOTSTRAP_ADMIN_EMAIL    | no                   | Email of the account to create or promote as the first admin at startup. Must be set together with the password variable; the bootstrap only runs while the instance has no admin.                                                                                                                                            | admin@your.domain       |
+| ACTIVITIES_BOOTSTRAP_ADMIN_PASSWORD | no                   | Password for the bootstrapped admin account. Set together with the email variable. A `*_FILE` variant is recommended to keep the secret out of the deployment configuration.                                                                                                                                                  |                         |
 
 _Notes:_
 
@@ -177,7 +182,34 @@ _Notes:_
 - _at startup, a warning reports how many existing users have no password registered (if your
   instance pre-dates the authentication update). Those accounts can only log in through the
   email-based flow; make sure they set a password from their account settings while email login is
-  still enabled, otherwise disabling email-based authentication will lock them out._
+  still enabled, otherwise disabling email-based authentication will lock them out. An
+  [admin](#admin-role) can also set a password for those accounts._
+
+#### Admin role
+
+An **admin** is a regular account flagged as administrator. The first admin is established while the
+instance has no admin yet, either:
+
+- **from the environment** — set both `ACTIVITIES_BOOTSTRAP_ADMIN_EMAIL` and
+  `ACTIVITIES_BOOTSTRAP_ADMIN_PASSWORD` (or `ACTIVITIES_BOOTSTRAP_ADMIN_PASSWORD_FILE`) before
+  starting the container. The account is created if it does not exist, and promoted otherwise. Once
+  an admin exists the variables become inert, so remove them from your configuration afterwards.
+- **with the CLI** — `app admin ...` runs directly against the database, without a session and
+  without the rest of the server configuration. It is also the break-glass path when the server
+  cannot start or the current admin is locked out:
+
+  ```bash
+  # Create or promote an admin. Prefer --password-file to keep the secret out of the process list.
+  docker exec -it <container> /app_bin admin bootstrap \
+    --email admin@your.domain --password-file /run/secrets/admin
+
+  # Clear the admin flag (refused if it would leave the instance with no admin).
+  docker exec -it <container> /app_bin admin revoke --email admin@your.domain
+  ```
+
+The admin role is what allows user accounts to be managed on an instance with registration closed:
+creating new accounts and setting passwords for users that have none. Those management screens are
+not available yet; until then the CLI above is the way to bootstrap and manage admins.
 
 #### Observability
 
