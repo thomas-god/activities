@@ -474,14 +474,12 @@ impl UserRegistrationRequest {
 #[derive(Debug, Clone, Copy, Constructor)]
 pub struct AuthMethods {
     email: bool,
-    password: bool,
 }
 
 impl From<&MultiUserConfig> for AuthMethods {
     fn from(value: &MultiUserConfig) -> Self {
         Self {
             email: value.email.is_some(),
-            password: value.password.is_some(),
         }
     }
 }
@@ -489,10 +487,6 @@ impl From<&MultiUserConfig> for AuthMethods {
 impl AuthMethods {
     pub fn email(&self) -> bool {
         self.email
-    }
-
-    pub fn password(&self) -> bool {
-        self.password
     }
 }
 
@@ -516,7 +510,6 @@ impl RegisterPasswordRequest {
 pub enum RegisterPasswordResult {
     Success(GenerateSessionTokenResult),
     PasswordAlreadySet,
-    PasswordAuthDisabled,
     Retry,
 }
 
@@ -544,7 +537,6 @@ impl UpdatePasswordRequest {
 pub enum UpdatePasswordResult {
     Success(GenerateSessionTokenResult),
     InvalidCurrentPassword,
-    PasswordAuthDisabled,
     Retry,
 }
 

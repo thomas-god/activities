@@ -65,7 +65,6 @@ pub async fn register_password<UR: IMultiUserService>(
             session_response(&state.cookie_config, &headers, &session)
         }
         RegisterPasswordResult::PasswordAlreadySet => StatusCode::CONFLICT.into_response(),
-        RegisterPasswordResult::PasswordAuthDisabled => StatusCode::FORBIDDEN.into_response(),
         RegisterPasswordResult::Retry => StatusCode::SERVICE_UNAVAILABLE.into_response(),
     }
 }
@@ -103,7 +102,6 @@ pub async fn update_password<UR: IMultiUserService>(
         UpdatePasswordResult::InvalidCurrentPassword => {
             (StatusCode::UNAUTHORIZED, "invalid current password").into_response()
         }
-        UpdatePasswordResult::PasswordAuthDisabled => StatusCode::FORBIDDEN.into_response(),
         UpdatePasswordResult::Retry => StatusCode::SERVICE_UNAVAILABLE.into_response(),
     }
 }
@@ -206,22 +204,6 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_register_password_forbidden_when_password_auth_disabled() {
-        let mut user_service = MockUserService::new();
-        user_service
-            .expect_register_password()
-            .returning(|_| RegisterPasswordResult::PasswordAuthDisabled);
-        let server = build_test_server(user_service);
-
-        let response = server
-            .post("/password")
-            .json(&json!({"new_password": "secret"}))
-            .await;
-
-        response.assert_status(StatusCode::FORBIDDEN);
-    }
-
-    #[tokio::test]
     async fn test_register_password_rejects_empty_password() {
         let mut user_service = MockUserService::new();
         user_service.expect_register_password().times(0);
@@ -293,22 +275,6 @@ mod test {
 
         response.assert_status(StatusCode::UNAUTHORIZED);
         assert_eq!(response.text(), "invalid current password");
-    }
-
-    #[tokio::test]
-    async fn test_update_password_forbidden_when_password_auth_disabled() {
-        let mut user_service = MockUserService::new();
-        user_service
-            .expect_update_password()
-            .returning(|_| UpdatePasswordResult::PasswordAuthDisabled);
-        let server = build_test_server(user_service);
-
-        let response = server
-            .post("/password/change")
-            .json(&json!({"current_password": "old", "new_password": "secret"}))
-            .await;
-
-        response.assert_status(StatusCode::FORBIDDEN);
     }
 
     #[tokio::test]

@@ -31,7 +31,8 @@ impl From<&AuthMethods> for AuthInfoMethods {
     fn from(value: &AuthMethods) -> Self {
         Self {
             email: value.email(),
-            password: value.password(),
+            // Password-based authentication is always enabled in multi-user mode.
+            password: true,
         }
     }
 }
@@ -55,9 +56,10 @@ where
     let router = match &strategy {
         AuthStrategy::NoAuth => no_auth_login_routes(base_router),
         AuthStrategy::SinglePassword(pwd) => single_password_login_routes(base_router, pwd),
-        // Every multi-user combination mounts the same email-based routes: `/api/login` handles
-        // both password and mail flows, and `/api/register` accepts an optional password. Which
-        // methods are active is advertised through `/api/auth_info`, not through the route set.
+        // Every multi-user combination mounts the same routes: `/api/login` handles both password
+        // and mail flows, and `/api/register` requires a password. Which methods are active (email
+        // being optional, password always on) is advertised through `/api/auth_info`, not through
+        // the route set.
         AuthStrategy::MultiUser(multi_user) => {
             multi_user_login_routes(base_router, user_service, multi_user.registration().clone())
         }
@@ -85,12 +87,12 @@ mod tests {
     use axum_test::TestServer;
     use serde_json::json;
 
-    use crate::config::{AppMode, EmailAuthConfig, MultiUserConfig, PasswordAuthConfig};
+    use crate::config::{AppMode, EmailAuthConfig, MultiUserConfig};
     use crate::inbound::auth::multi_user::test_utils::MockUserService;
 
     use super::*;
 
-    fn multi_user_mode(email: bool, password: bool, allow_registration: bool) -> AppMode {
+    fn multi_user_mode(email: bool, allow_registration: bool) -> AppMode {
         AppMode::MultiUser(MultiUserConfig {
             email: email.then(|| EmailAuthConfig {
                 from: "noreply@example.com".to_string(),
@@ -99,7 +101,6 @@ mod tests {
                 relay: "smtp.example.com".to_string(),
                 domain: "https://example.com".to_string(),
             }),
-            password: password.then(PasswordAuthConfig::default),
             allow_registration,
         })
     }
@@ -114,7 +115,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_password_only_mode_reports_multi_user_strategy_with_password_method() {
-        let server = build_server(&multi_user_mode(false, true, false), MockUserService::new());
+        let server = build_server(&multi_user_mode(false, false), MockUserService::new());
 
         let response = server.get("/api/auth_info").await;
         response.assert_status(StatusCode::OK);
@@ -136,7 +137,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_email_and_password_mode_reports_both_methods() {
-        let server = build_server(&multi_user_mode(true, true, true), MockUserService::new());
+        let server = build_server(&multi_user_mode(true, true), MockUserService::new());
 
         let response = server.get("/api/auth_info").await;
         response.assert_status(StatusCode::OK);

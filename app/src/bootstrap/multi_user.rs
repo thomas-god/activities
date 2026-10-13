@@ -289,7 +289,6 @@ async fn build_search_service(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::PasswordAuthConfig;
 
     fn base_config(path: &std::path::Path) -> BaseConfig {
         BaseConfig {
@@ -302,7 +301,6 @@ mod tests {
     fn password_only_config() -> MultiUserConfig {
         MultiUserConfig {
             email: None,
-            password: Some(PasswordAuthConfig::default()),
             allow_registration: true,
         }
     }

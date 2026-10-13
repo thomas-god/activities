@@ -249,6 +249,22 @@ impl UserRepository for SqliteUsersRepository {
         }
     }
 
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn count_users_without_password(&self) -> Result<u64, ()> {
+        let res: Result<i64, sqlx::Error> =
+            sqlx::query_scalar("SELECT COUNT(*) FROM t_users WHERE password_hash IS NULL;")
+                .fetch_one(&self.readers)
+                .await;
+        match res {
+            Ok(count) => Ok(count.max(0) as u64),
+            Err(err) => {
+                tracing::warn!("Cannot count users without a password in database");
+                tracing::warn!("{}", err);
+                Err(())
+            }
+        }
+    }
+
     /// Compare-and-set to avoid concurrent operations overwriting each other.
     #[tracing::instrument(skip_all, err(Debug))]
     async fn set_user_password_if_absent(
@@ -1161,6 +1177,39 @@ mod test_sqlite_users_repository {
                 .await
                 .unwrap();
         assert_eq!(password_hash, None);
+    }
+
+    #[tokio::test]
+    async fn test_count_users_without_password() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Empty repository: nobody is missing a password.
+        assert_eq!(repository.count_users_without_password().await.unwrap(), 0);
+
+        repository
+            .store_user(&UserId::test_default(), &test_email(), None)
+            .await
+            .unwrap();
+        repository
+            .store_user(
+                &UserId::from("other_user".to_string()),
+                &EmailAddress::try_from("other@mail.test").unwrap(),
+                Some(test_password_hash()),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(repository.count_users_without_password().await.unwrap(), 1);
+
+        repository
+            .set_user_password_if_absent(&UserId::test_default(), &test_password_hash())
+            .await
+            .unwrap();
+
+        assert_eq!(repository.count_users_without_password().await.unwrap(), 0);
     }
 
     #[tokio::test]

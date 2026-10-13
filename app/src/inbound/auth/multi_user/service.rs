@@ -33,18 +33,11 @@ where
 {
     #[tracing::instrument(skip_all)]
     async fn register_user(&self, req: UserRegistrationRequest) -> UserRegistrationResult {
-        let password_hash = match (self.auth_methods.password(), req.password()) {
-            (true, Some(password)) => match password.as_hash() {
-                Some(hash) => Some(hash),
-                None => return UserRegistrationResult::Retry,
-            },
-            // Registering without a password is valid if email-based is active: the
-            // user can still authenticate via the authentication link sent by email.
-            (true, None) if self.auth_methods.email() => None,
-            // Password-only mode: a password is required to create a new account.
-            (true, None) => return UserRegistrationResult::PasswordRequired,
-            // Password-based auth is disabled: silently ignore any provided password.
-            (false, _) => None,
+        let Some(password) = req.password() else {
+            return UserRegistrationResult::PasswordRequired;
+        };
+        let Some(password_hash) = password.as_hash() else {
+            return UserRegistrationResult::Retry;
         };
 
         let email = req.email().clone();
@@ -53,7 +46,7 @@ where
                 let user = UserId::new();
                 let store_res = self
                     .user_repository
-                    .store_user(&user, &email, password_hash)
+                    .store_user(&user, &email, Some(password_hash))
                     .await;
                 if store_res.is_err() {
                     return UserRegistrationResult::Retry;
@@ -81,13 +74,10 @@ where
 
     #[tracing::instrument(skip_all)]
     async fn login_user(&self, email: EmailAddress, password: Option<Password>) -> UserLoginResult {
-        match (self.auth_methods.password(), password) {
-            // Password active and supplied: verify it and issue a session on match.
-            (true, Some(password)) => self.login_with_password(email, password).await,
-            // Password-only mode without a password: no mail fallback is available.
-            (true, None) if !self.auth_methods.email() => UserLoginResult::Invalid,
-            // Mail active (with or without password): fall back to the authentication link flow.
-            _ => self.login_with_email_link(email).await,
+        match password {
+            Some(password) => self.login_with_password(email, password).await,
+            None if self.auth_methods.email() => self.login_with_email_link(email).await,
+            None => UserLoginResult::Invalid,
         }
     }
 
@@ -144,10 +134,6 @@ where
     /// password-based auth. Fails if a password already exist, use `update_password` instead.
     #[tracing::instrument(skip_all)]
     async fn register_password(&self, req: RegisterPasswordRequest) -> RegisterPasswordResult {
-        if !self.auth_methods.password() {
-            return RegisterPasswordResult::PasswordAuthDisabled;
-        }
-
         let Some(new_hash) = req.password().as_hash() else {
             return RegisterPasswordResult::Retry;
         };
@@ -174,10 +160,6 @@ where
 
     #[tracing::instrument(skip_all)]
     async fn update_password(&self, req: UpdatePasswordRequest) -> UpdatePasswordResult {
-        if !self.auth_methods.password() {
-            return UpdatePasswordResult::PasswordAuthDisabled;
-        }
-
         let current_hash = match self
             .user_repository
             .get_user_password_hash(req.user())
@@ -571,6 +553,8 @@ pub trait UserRepository: Clone + Send + Sync + 'static {
         user: &UserId,
     ) -> impl Future<Output = Result<Option<HashedPassword>, ()>> + Send;
 
+    fn count_users_without_password(&self) -> impl Future<Output = Result<u64, ()>> + Send;
+
     fn set_user_password_if_absent(
         &self,
         user: &UserId,
@@ -726,6 +710,8 @@ mod test_utils {
                 user: &UserId,
             ) -> Result<Option<HashedPassword>, ()>;
 
+            async fn count_users_without_password(&self) -> Result<u64, ()>;
+
             async fn set_user_password_if_absent(
                 &self,
                 user: &UserId,
@@ -800,27 +786,6 @@ mod test_utils {
 
     pub const TEST_EMAIL: &str = "test@mail.test";
 
-    pub fn mail_only_service(
-        user: MockUserRepository,
-
-        mail: MockMailProvider,
-    ) -> MultiUserService<MockUserRepository, MockSessionService, MockMailProvider> {
-        mail_only_service_with_session(user, MockSessionService::new(), mail)
-    }
-
-    pub fn mail_only_service_with_session(
-        user: MockUserRepository,
-        session: MockSessionService,
-        mail: MockMailProvider,
-    ) -> MultiUserService<MockUserRepository, MockSessionService, MockMailProvider> {
-        MultiUserService::new(
-            Arc::new(user),
-            session,
-            AuthMethods::new(true, false),
-            Arc::new(mail),
-        )
-    }
-
     pub fn mail_and_password_service(
         user: MockUserRepository,
         mail: MockMailProvider,
@@ -836,7 +801,7 @@ mod test_utils {
         MultiUserService::new(
             Arc::new(user),
             session,
-            AuthMethods::new(true, true),
+            AuthMethods::new(true),
             Arc::new(mail),
         )
     }
@@ -856,7 +821,7 @@ mod test_utils {
         MultiUserService::new(
             Arc::new(user),
             session,
-            AuthMethods::new(false, true),
+            AuthMethods::new(false),
             Arc::new(mail),
         )
     }
@@ -878,8 +843,8 @@ mod test_user_service_register_new_user {
         inbound::auth::multi_user::{
             UserRegistrationResult,
             service::test_utils::{
-                MockUserRepository, TEST_EMAIL, mail_and_password_service, mail_only_service,
-                password_only_service, registration_request,
+                MockUserRepository, TEST_EMAIL, mail_and_password_service, password_only_service,
+                registration_request,
             },
             test_utils::MockMailProvider,
         },
@@ -903,13 +868,15 @@ mod test_user_service_register_new_user {
         user.expect_get_user_by_email().returning(|_| Ok(None));
         user.expect_store_user()
             .times(1)
-            .withf(|_user, addr, password_hash| addr == &email() && password_hash.is_none())
+            .withf(|_user, addr, password_hash| addr == &email() && password_hash.is_some())
             .returning(|_, _, _| Ok(()));
         user.expect_store_auth_link().times(1).returning(|_| Ok(()));
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
-        let res = service.register_user(registration_request(None)).await;
+        let res = service
+            .register_user(registration_request(Some("secret")))
+            .await;
 
         assert_eq!(res, UserRegistrationResult::Success);
 
@@ -929,9 +896,11 @@ mod test_user_service_register_new_user {
             .returning(|_, _, _| Ok(()));
         user.expect_store_auth_link()
             .returning(|_| Err(anyhow!("error")));
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
-        let res = service.register_user(registration_request(None)).await;
+        let res = service
+            .register_user(registration_request(Some("secret")))
+            .await;
 
         assert_eq!(res, UserRegistrationResult::Retry);
     }
@@ -947,9 +916,11 @@ mod test_user_service_register_new_user {
             .returning(|_, _, _| Err(()));
         user.expect_store_auth_link().times(0);
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
-        let res = service.register_user(registration_request(None)).await;
+        let res = service
+            .register_user(registration_request(Some("secret")))
+            .await;
 
         assert_eq!(res, UserRegistrationResult::Retry);
     }
@@ -967,9 +938,11 @@ mod test_user_service_register_new_user {
         user.expect_store_user().times(0);
         user.expect_store_auth_link().times(1).returning(|_| Ok(()));
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
-        let res = service.register_user(registration_request(None)).await;
+        let res = service
+            .register_user(registration_request(Some("secret")))
+            .await;
 
         assert_eq!(res, UserRegistrationResult::Success);
         tokio::time::sleep(std::time::Duration::from_millis(20)).await;
@@ -984,36 +957,13 @@ mod test_user_service_register_new_user {
         user.expect_store_user().times(0);
         user.expect_store_auth_link().times(0);
 
-        let service = mail_only_service(user, mailer);
-
-        let res = service.register_user(registration_request(None)).await;
-
-        assert_eq!(res, UserRegistrationResult::Retry);
-    }
-
-    #[tokio::test]
-    async fn test_mail_only_ignores_provided_password() {
-        let mut mailer = MockMailProvider::new();
-        mailer
-            .expect_send_auth_link_email()
-            .times(1)
-            .returning(|_, _| Ok(()));
-        let mut user = MockUserRepository::new();
-        user.expect_get_user_by_email().returning(|_| Ok(None));
-        user.expect_store_user()
-            .times(1)
-            .withf(|_user, _email, password_hash| password_hash.is_none())
-            .returning(|_, _, _| Ok(()));
-        user.expect_store_auth_link().times(1).returning(|_| Ok(()));
-
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
         let res = service
             .register_user(registration_request(Some("secret")))
             .await;
 
-        assert_eq!(res, UserRegistrationResult::Success);
-        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        assert_eq!(res, UserRegistrationResult::Retry);
     }
 
     #[tokio::test]
@@ -1042,26 +992,19 @@ mod test_user_service_register_new_user {
     }
 
     #[tokio::test]
-    async fn test_mail_and_password_without_password_uses_mail_flow() {
+    async fn test_mail_and_password_without_password_requires_password() {
         let mut mailer = MockMailProvider::new();
-        mailer
-            .expect_send_auth_link_email()
-            .times(1)
-            .returning(|_, _| Ok(()));
+        mailer.expect_send_auth_link_email().times(0);
         let mut user = MockUserRepository::new();
-        user.expect_get_user_by_email().returning(|_| Ok(None));
-        user.expect_store_user()
-            .times(1)
-            .withf(|_user, _email, password_hash| password_hash.is_none())
-            .returning(|_, _, _| Ok(()));
-        user.expect_store_auth_link().times(1).returning(|_| Ok(()));
+        user.expect_get_user_by_email().times(0);
+        user.expect_store_user().times(0);
+        user.expect_store_auth_link().times(0);
 
         let service = mail_and_password_service(user, mailer);
 
         let res = service.register_user(registration_request(None)).await;
 
-        assert_eq!(res, UserRegistrationResult::Success);
-        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        assert_eq!(res, UserRegistrationResult::PasswordRequired);
     }
 
     #[tokio::test]
@@ -1133,7 +1076,7 @@ mod test_user_service_register_new_user {
         user.expect_store_user().times(0);
         user.expect_store_auth_link().times(1).returning(|_| Ok(()));
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
         let res = service
             .register_user(registration_request(Some("secret")))
@@ -1161,9 +1104,11 @@ mod test_user_service_register_new_user {
             .times(1)
             .returning(|_| Ok(()));
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
-        let res = service.register_user(registration_request(None)).await;
+        let res = service
+            .register_user(registration_request(Some("secret")))
+            .await;
 
         assert_eq!(res, UserRegistrationResult::Success);
         tokio::time::sleep(std::time::Duration::from_millis(20)).await;
@@ -1180,8 +1125,8 @@ mod test_user_service_login_user {
         inbound::auth::multi_user::{
             GenerateSessionTokenResult, HashedPassword, Password, SessionToken,
             service::test_utils::{
-                MockUserRepository, TEST_EMAIL, mail_and_password_service_with_session,
-                mail_only_service, password_only_service_with_session,
+                MockUserRepository, TEST_EMAIL, mail_and_password_service,
+                mail_and_password_service_with_session, password_only_service_with_session,
             },
             test_utils::{MockMailProvider, MockSessionService},
         },
@@ -1209,7 +1154,7 @@ mod test_user_service_login_user {
         user.expect_get_user_by_email().returning(|_| Ok(None));
         user.expect_store_auth_link().times(0);
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
         let res = service.login_user(email(), None).await;
 
@@ -1224,7 +1169,7 @@ mod test_user_service_login_user {
         user.expect_get_user_by_email().returning(|_| Err(()));
         user.expect_store_auth_link().times(0);
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
         let res = service.login_user(email(), None).await;
 
@@ -1241,7 +1186,7 @@ mod test_user_service_login_user {
         user.expect_store_auth_link()
             .returning(|_| Err(anyhow!("error")));
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
         let res = service.login_user(email(), None).await;
 
@@ -1266,7 +1211,7 @@ mod test_user_service_login_user {
             .withf(|link| link.user() == &UserId::test_default())
             .returning(|_| Ok(()));
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
         let res = service.login_user(email(), None).await;
 
@@ -1513,7 +1458,7 @@ mod test_user_service_password_management {
         GenerateSessionTokenResult, HashedPassword, Password, RegisterPasswordRequest,
         RegisterPasswordResult, SessionToken, UpdatePasswordRequest, UpdatePasswordResult,
         service::test_utils::{
-            MockUserRepository, mail_and_password_service_with_session, mail_only_service,
+            MockUserRepository, mail_and_password_service_with_session,
             password_only_service_with_session,
         },
         test_utils::{MockMailProvider, MockSessionService},
@@ -1542,22 +1487,6 @@ mod test_user_service_password_management {
             SessionToken::from("new-session-token"),
             Utc::now() + TimeDelta::days(30),
         )
-    }
-
-    #[tokio::test]
-    async fn test_register_password_disabled_when_password_auth_disabled() {
-        let mut user = MockUserRepository::new();
-        user.expect_set_user_password_if_absent().times(0);
-        let mut session = MockSessionService::new();
-        session.expect_generate_session_token().times(0);
-
-        let service = mail_only_service(user, MockMailProvider::new());
-
-        let res = service
-            .register_password(register_request("new-secret"))
-            .await;
-
-        assert_eq!(res, RegisterPasswordResult::PasswordAuthDisabled);
     }
 
     #[tokio::test]
@@ -1668,23 +1597,6 @@ mod test_user_service_password_management {
             .await;
 
         assert!(matches!(res, RegisterPasswordResult::Success(_)));
-    }
-
-    #[tokio::test]
-    async fn test_update_password_disabled_when_password_auth_disabled() {
-        let mut user = MockUserRepository::new();
-        user.expect_get_user_password_hash().times(0);
-        user.expect_replace_user_password_if_matches().times(0);
-        let mut session = MockSessionService::new();
-        session.expect_generate_session_token().times(0);
-
-        let service = mail_only_service(user, MockMailProvider::new());
-
-        let res = service
-            .update_password(update_request("current", "new-secret"))
-            .await;
-
-        assert_eq!(res, UpdatePasswordResult::PasswordAuthDisabled);
     }
 
     #[tokio::test]
@@ -1972,7 +1884,7 @@ mod test_user_service_validate_auth_link {
     use crate::inbound::auth::multi_user::{
         AuthLinkValidationResult, AuthToken, GenerateSessionTokenResult, HashedAuthLink,
         SessionToken,
-        service::test_utils::{MockUserRepository, mail_only_service_with_session},
+        service::test_utils::{MockUserRepository, mail_and_password_service_with_session},
         test_utils::{MockMailProvider, MockSessionService},
     };
 
@@ -2002,7 +1914,7 @@ mod test_user_service_validate_auth_link {
         user: MockUserRepository,
         session: MockSessionService,
     ) -> MultiUserService<MockUserRepository, MockSessionService, MockMailProvider> {
-        mail_only_service_with_session(user, session, MockMailProvider::new())
+        mail_and_password_service_with_session(user, session, MockMailProvider::new())
     }
 
     #[tokio::test]
@@ -2187,7 +2099,7 @@ mod test_user_service_validate_auth_link {
 mod test_user_service_check_session_token {
     use crate::inbound::auth::multi_user::{
         SessionToken,
-        service::test_utils::{MockUserRepository, mail_only_service_with_session},
+        service::test_utils::{MockUserRepository, mail_and_password_service_with_session},
         test_utils::{MockMailProvider, MockSessionService},
     };
 
@@ -2196,7 +2108,11 @@ mod test_user_service_check_session_token {
     fn new_service(
         session: MockSessionService,
     ) -> MultiUserService<MockUserRepository, MockSessionService, MockMailProvider> {
-        mail_only_service_with_session(MockUserRepository::new(), session, MockMailProvider::new())
+        mail_and_password_service_with_session(
+            MockUserRepository::new(),
+            session,
+            MockMailProvider::new(),
+        )
     }
 
     #[tokio::test]
@@ -2308,8 +2224,8 @@ mod test_user_service_update_email {
         EmailAddress, EmailChangeFinalizeResult, EmailChangeToken, EmailChangeValidationResult,
         HashedEmailChangeToken,
         service::test_utils::{
-            MockUserRepository, TEST_EMAIL, mail_only_service, mail_only_service_with_session,
-            password_only_service, registration_request,
+            MockUserRepository, TEST_EMAIL, mail_and_password_service,
+            mail_and_password_service_with_session, password_only_service, registration_request,
         },
         test_utils::{MockMailProvider, MockSessionService},
     };
@@ -2377,7 +2293,7 @@ mod test_user_service_update_email {
             })
             .returning(|_| Ok(()));
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
         let res = service.update_email(update_request("new@mail.test")).await;
 
@@ -2397,7 +2313,7 @@ mod test_user_service_update_email {
             .returning(|_| Ok(Some((UserId::from("other".to_string()), None))));
         user.expect_store_email_change_token().times(0);
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
         let res = service.update_email(update_request("new@mail.test")).await;
 
@@ -2415,7 +2331,7 @@ mod test_user_service_update_email {
         user.expect_get_user_by_email().times(0);
         user.expect_store_email_change_token().times(0);
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
         let res = service.update_email(update_request(TEST_EMAIL)).await;
 
@@ -2435,7 +2351,7 @@ mod test_user_service_update_email {
             .times(1)
             .returning(|_| Ok(()));
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
         let res = service.update_email(update_request("new@mail.test")).await;
 
@@ -2452,7 +2368,7 @@ mod test_user_service_update_email {
         user.expect_store_email_change_token()
             .returning(|_| Err(anyhow!("error")));
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
         let res = service.update_email(update_request("new@mail.test")).await;
 
@@ -2475,7 +2391,7 @@ mod test_user_service_update_email {
             .times(1)
             .returning(|_| Ok(()));
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
         let res = service.update_email(update_request("new@mail.test")).await;
 
@@ -2490,7 +2406,7 @@ mod test_user_service_update_email {
         let mut user = MockUserRepository::new();
         user.expect_get_user_email().returning(|_| Err(()));
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
         let res = service.update_email(update_request("new@mail.test")).await;
 
@@ -2585,7 +2501,8 @@ mod test_user_service_update_email {
             .withf(move |user, hash| user == &UserId::test_default() && hash.verify_token(&token))
             .returning(|_, _| Ok(EmailChangeFinalizeResult::Swapped(new_email())));
 
-        let service = mail_only_service_with_session(user, session, MockMailProvider::new());
+        let service =
+            mail_and_password_service_with_session(user, session, MockMailProvider::new());
 
         let res = service.validate_email_change(raw_token()).await;
 
@@ -2606,7 +2523,7 @@ mod test_user_service_update_email {
             .times(1)
             .returning(|_, _| Ok(EmailChangeFinalizeResult::EmailAlreadyInUse));
 
-        let service = mail_only_service_with_session(
+        let service = mail_and_password_service_with_session(
             user,
             MockSessionService::new(),
             MockMailProvider::new(),
@@ -2624,7 +2541,7 @@ mod test_user_service_update_email {
             .returning(Vec::new);
         user.expect_finalize_email_change().times(0);
 
-        let service = mail_only_service_with_session(
+        let service = mail_and_password_service_with_session(
             user,
             MockSessionService::new(),
             MockMailProvider::new(),
@@ -2646,7 +2563,7 @@ mod test_user_service_update_email {
             .returning(|_| Ok(()));
         user.expect_finalize_email_change().times(0);
 
-        let service = mail_only_service_with_session(
+        let service = mail_and_password_service_with_session(
             user,
             MockSessionService::new(),
             MockMailProvider::new(),
@@ -2669,7 +2586,7 @@ mod test_user_service_update_email {
             .times(1)
             .returning(|_, _| Ok(EmailChangeFinalizeResult::UnknownToken));
 
-        let service = mail_only_service_with_session(
+        let service = mail_and_password_service_with_session(
             user,
             MockSessionService::new(),
             MockMailProvider::new(),
@@ -2690,7 +2607,7 @@ mod test_user_service_update_email {
             .times(1)
             .returning(|_, _| Err(()));
 
-        let service = mail_only_service_with_session(
+        let service = mail_and_password_service_with_session(
             user,
             MockSessionService::new(),
             MockMailProvider::new(),
@@ -2708,7 +2625,7 @@ mod test_user_service_update_email {
         let mut user = MockUserRepository::new();
         expect_changeable(&mut user);
 
-        let service = mail_only_service(user, MockMailProvider::new());
+        let service = mail_and_password_service(user, MockMailProvider::new());
 
         // Same email: no-op.
         assert_eq!(
@@ -2724,7 +2641,7 @@ mod test_user_service_update_email {
             .returning(|_| Ok(Some(current_email())));
         user.expect_get_user_by_email()
             .returning(|_| Ok(Some((UserId::from("other".to_string()), None))));
-        let service = mail_only_service(user, MockMailProvider::new());
+        let service = mail_and_password_service(user, MockMailProvider::new());
         assert_eq!(
             service
                 .check_email_changeable(&UserId::test_default(), &new_email())
@@ -2739,7 +2656,7 @@ mod test_user_service_update_email {
     async fn test_check_email_changeable_returns_err_on_repo_error() {
         let mut user = MockUserRepository::new();
         user.expect_get_user_email().returning(|_| Err(()));
-        let service = mail_only_service(user, MockMailProvider::new());
+        let service = mail_and_password_service(user, MockMailProvider::new());
         assert_eq!(
             service
                 .check_email_changeable(&UserId::test_default(), &new_email())
@@ -2751,7 +2668,7 @@ mod test_user_service_update_email {
         user.expect_get_user_email()
             .returning(|_| Ok(Some(current_email())));
         user.expect_get_user_by_email().returning(|_| Err(()));
-        let service = mail_only_service(user, MockMailProvider::new());
+        let service = mail_and_password_service(user, MockMailProvider::new());
         assert_eq!(
             service
                 .check_email_changeable(&UserId::test_default(), &new_email())
@@ -2776,9 +2693,11 @@ mod test_user_service_update_email {
             .times(1)
             .returning(|_, _| Ok(()));
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
-        let res = service.register_user(registration_request(None)).await;
+        let res = service
+            .register_user(registration_request(Some("secret")))
+            .await;
 
         assert_eq!(res, UserRegistrationResult::Success);
         tokio::time::sleep(std::time::Duration::from_millis(20)).await;
@@ -2804,7 +2723,7 @@ mod test_user_service_update_email {
 mod test_user_service_get_user_info {
     use crate::inbound::auth::multi_user::{
         EmailAddress, UserInfo,
-        service::test_utils::{MockUserRepository, TEST_EMAIL, mail_only_service},
+        service::test_utils::{MockUserRepository, TEST_EMAIL, mail_and_password_service},
         test_utils::MockMailProvider,
     };
 
@@ -2822,7 +2741,7 @@ mod test_user_service_get_user_info {
             .withf(|user| user == &UserId::test_default())
             .returning(|_| Ok(Some(UserInfo::new(email(), true, false))));
 
-        let service = mail_only_service(user, MockMailProvider::new());
+        let service = mail_and_password_service(user, MockMailProvider::new());
 
         let res = service.get_user_info(&UserId::test_default()).await;
 
@@ -2839,7 +2758,7 @@ mod test_user_service_get_user_info {
         let mut user = MockUserRepository::new();
         user.expect_get_user_info().returning(|_| Ok(None));
 
-        let service = mail_only_service(user, MockMailProvider::new());
+        let service = mail_and_password_service(user, MockMailProvider::new());
 
         let res = service.get_user_info(&UserId::test_default()).await;
 
@@ -2851,7 +2770,7 @@ mod test_user_service_get_user_info {
         let mut user = MockUserRepository::new();
         user.expect_get_user_info().returning(|_| Err(()));
 
-        let service = mail_only_service(user, MockMailProvider::new());
+        let service = mail_and_password_service(user, MockMailProvider::new());
 
         let res = service.get_user_info(&UserId::test_default()).await;
 
@@ -2864,7 +2783,7 @@ mod test_user_service_request_email_verification {
     use crate::inbound::auth::multi_user::{
         EmailAddress, EmailVerificationResult, UserInfo,
         service::test_utils::{
-            MockUserRepository, TEST_EMAIL, mail_only_service, password_only_service,
+            MockUserRepository, TEST_EMAIL, mail_and_password_service, password_only_service,
         },
         test_utils::MockMailProvider,
     };
@@ -2900,7 +2819,7 @@ mod test_user_service_request_email_verification {
             .returning(|_| Ok(Some(UserInfo::new(email(), true, false))));
         user.expect_store_auth_link().times(0);
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
         let res = service
             .request_email_verification(&UserId::test_default())
@@ -2926,7 +2845,7 @@ mod test_user_service_request_email_verification {
             .withf(|link| link.user() == &UserId::test_default())
             .returning(|_| Ok(()));
 
-        let service = mail_only_service(user, mailer);
+        let service = mail_and_password_service(user, mailer);
 
         let res = service
             .request_email_verification(&UserId::test_default())
@@ -2943,7 +2862,7 @@ mod test_user_service_request_email_verification {
         user.expect_get_user_info().returning(|_| Err(()));
         user.expect_store_auth_link().times(0);
 
-        let service = mail_only_service(user, MockMailProvider::new());
+        let service = mail_and_password_service(user, MockMailProvider::new());
 
         let res = service
             .request_email_verification(&UserId::test_default())
@@ -2962,7 +2881,7 @@ mod test_user_service_request_email_verification {
             .times(1)
             .returning(|_| Err(anyhow::anyhow!("boom")));
 
-        let service = mail_only_service(user, MockMailProvider::new());
+        let service = mail_and_password_service(user, MockMailProvider::new());
 
         let res = service
             .request_email_verification(&UserId::test_default())
@@ -2976,7 +2895,7 @@ mod test_user_service_request_email_verification {
 mod test_user_service_revoke_sessions {
     use crate::inbound::auth::multi_user::{
         RevokeSessionsResult, SessionToken,
-        service::test_utils::{MockUserRepository, mail_only_service_with_session},
+        service::test_utils::{MockUserRepository, mail_and_password_service_with_session},
         test_utils::{MockMailProvider, MockSessionService},
     };
 
@@ -2993,7 +2912,7 @@ mod test_user_service_revoke_sessions {
             .withf(move |user, hash| user == &UserId::test_default() && hash == &expected)
             .returning(|_, _| Ok(()));
 
-        let service = mail_only_service_with_session(
+        let service = mail_and_password_service_with_session(
             MockUserRepository::new(),
             session,
             MockMailProvider::new(),
@@ -3013,7 +2932,7 @@ mod test_user_service_revoke_sessions {
             .expect_revoke_other_sessions()
             .returning(|_, _| Err(()));
 
-        let service = mail_only_service_with_session(
+        let service = mail_and_password_service_with_session(
             MockUserRepository::new(),
             session,
             MockMailProvider::new(),
@@ -3038,7 +2957,7 @@ mod test_user_service_revoke_sessions {
             .withf(|user| user == &UserId::test_default())
             .returning(|_| Ok(()));
 
-        let service = mail_only_service_with_session(
+        let service = mail_and_password_service_with_session(
             MockUserRepository::new(),
             session,
             MockMailProvider::new(),
@@ -3054,7 +2973,7 @@ mod test_user_service_revoke_sessions {
         let mut session = MockSessionService::new();
         session.expect_revoke_all_sessions().returning(|_| Err(()));
 
-        let service = mail_only_service_with_session(
+        let service = mail_and_password_service_with_session(
             MockUserRepository::new(),
             session,
             MockMailProvider::new(),

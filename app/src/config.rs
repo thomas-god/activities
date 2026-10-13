@@ -71,8 +71,11 @@ impl AppMode {
 }
 
 /// Multi-user mode is selected as soon as any email-based or password-based authentication
-/// environment variable is set (including explicitly disabling one, e.g. setting
-/// `ACTIVITIES_PASSWORD_AUTH_ENABLED=false` while configuring the mailer).
+/// environment variable is set. The password-auth variable is kept as a mode selector (e.g. to run
+/// password-only multi-user without a mailer), even though password auth can no longer be disabled.
+///
+/// Setting any of these variables while others are missing still keeps the application in
+/// multi-user mode, even if a valid single-user configuration could be loaded.
 fn is_multi_user_mode_selected<T: Environment>(env: &T) -> bool {
     [
         MULTI_USER_MAILER_FROM_KEY,
@@ -159,31 +162,34 @@ impl EmailAuthConfig {
     }
 }
 
-/// Password-based authentication configuration for multi-user mode.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct PasswordAuthConfig {}
-
-impl PasswordAuthConfig {
-    pub fn try_from_env<T: Environment>(env: &T) -> Result<Option<PasswordAuthConfig>, String> {
-        match load_env(env, MULTI_USER_PASSWORD_AUTH_ENABLED_KEY).as_string() {
-            None => Ok(None),
-            Some(value) => match value.to_ascii_lowercase().as_str() {
-                "true" | "1" => Ok(Some(PasswordAuthConfig {})),
-                "false" | "0" => Ok(None),
-                _ => Err(format!(
-                    "Invalid value for {MULTI_USER_PASSWORD_AUTH_ENABLED_KEY}: expected `true` or `false`, got `{value}`"
-                )),
-            },
-        }
+/// Validates the password-auth environment variable.
+///
+/// Password-based authentication is always enabled in multi-user mode, so the variable no longer
+/// toggles anything: it is only kept as a mode selector (see [`is_multi_user_mode_selected`]) and
+/// to fail fast on a typo. An explicit `false` (from an instance that used to run email-only with
+/// password auth disabled) is accepted but reported as ignored, so the instance keeps starting
+/// with password auth now on instead of breaking on upgrade.
+fn validate_password_auth_env<T: Environment>(env: &T) -> Result<(), String> {
+    match load_env(env, MULTI_USER_PASSWORD_AUTH_ENABLED_KEY).as_string() {
+        None => Ok(()),
+        Some(value) => match value.to_ascii_lowercase().as_str() {
+            "true" | "1" => Ok(()),
+            "false" | "0" => {
+                tracing::warn!(
+                    "{MULTI_USER_PASSWORD_AUTH_ENABLED_KEY}=false is ignored: password-based authentication can no longer be disabled. Email-based authentication remains optional."
+                );
+                Ok(())
+            }
+            _ => Err(format!(
+                "Invalid value for {MULTI_USER_PASSWORD_AUTH_ENABLED_KEY}: expected `true` or `false`, got `{value}`"
+            )),
+        },
     }
 }
 
-/// Authentication configuration for multi-user mode. Supports email-based and/or password-based
-/// authentication: one or both, but at least one.
 #[derive(Debug, Clone)]
 pub struct MultiUserConfig {
     pub email: Option<EmailAuthConfig>,
-    pub password: Option<PasswordAuthConfig>,
     pub allow_registration: bool,
 }
 impl MultiUserConfig {
@@ -203,18 +209,11 @@ impl MultiUserConfig {
             },
         };
 
+        validate_password_auth_env(env)?;
         let email = EmailAuthConfig::try_from_env(env)?;
-        let password = PasswordAuthConfig::try_from_env(env)?;
-
-        if email.is_none() && password.is_none() {
-            return Err(
-                "Invalid multi-user configuration: at least one authentication method must be configured."
-                .to_string());
-        }
 
         Ok(MultiUserConfig {
             email,
-            password,
             allow_registration,
         })
     }
@@ -446,36 +445,42 @@ mod test_config {
     }
 
     #[test]
-    fn test_multi_user_config_try_from_env_errs_when_no_auth_configured() {
+    fn test_multi_user_config_try_from_env_without_email_is_password_only() {
         let env = MockEnvironment::default();
 
-        let err = MultiUserConfig::try_from_env(&env).unwrap_err();
+        let config = MultiUserConfig::try_from_env(&env).unwrap();
 
-        assert!(err.contains("at least one authentication method"));
+        assert!(config.email.is_none());
+        assert!(config.allow_registration);
     }
 
     #[test]
-    fn test_multi_user_config_try_from_env_errs_when_all_auth_disabled() {
+    fn test_multi_user_config_try_from_env_ignores_password_auth_disabled() {
         let mut env = MockEnvironment::default();
         env.set_var(
             MULTI_USER_PASSWORD_AUTH_ENABLED_KEY,
             EnvironmentVariable::Set("false".to_string()),
         );
 
-        let err = MultiUserConfig::try_from_env(&env).unwrap_err();
+        // Password auth can no longer be disabled: the variable is accepted (with a warning) and
+        // password-only multi-user mode still starts.
+        let config = MultiUserConfig::try_from_env(&env).unwrap();
 
-        assert!(err.contains("at least one authentication method"));
+        assert!(config.email.is_none());
     }
 
     #[test]
-    fn test_app_mode_try_from_env_errs_when_multi_user_selected_but_no_auth_configured() {
+    fn test_app_mode_try_from_env_multi_user_password_only() {
         let mut env = MockEnvironment::default();
         env.set_var(
             MULTI_USER_PASSWORD_AUTH_ENABLED_KEY,
-            EnvironmentVariable::Set("false".to_string()),
+            EnvironmentVariable::Set("true".to_string()),
         );
 
-        assert!(AppMode::try_from_env(&env).is_err());
+        match AppMode::try_from_env(&env).unwrap() {
+            AppMode::MultiUser(config) => assert!(config.email.is_none()),
+            AppMode::SingleUser(_) => panic!("expected multi-user mode"),
+        }
     }
 
     #[test]
@@ -510,7 +515,6 @@ mod test_config {
         assert_eq!(email.password, "mailer-password");
         assert_eq!(email.relay, "smtp.example.com");
         assert_eq!(email.domain, "example.com");
-        assert!(config.password.is_none());
         assert!(config.allow_registration);
     }
 
@@ -525,7 +529,6 @@ mod test_config {
         let config = MultiUserConfig::try_from_env(&env).unwrap();
 
         assert!(config.email.is_none());
-        assert!(config.password.is_some());
         assert!(config.allow_registration);
     }
 
@@ -541,18 +544,6 @@ mod test_config {
         let config = MultiUserConfig::try_from_env(&env).unwrap();
 
         assert!(config.email.is_some());
-        assert!(config.password.is_some());
-    }
-
-    #[test]
-    fn test_multi_user_config_password_auth_disabled_by_default() {
-        let mut env = MockEnvironment::default();
-        set_full_multi_user_env(&mut env);
-
-        let config = MultiUserConfig::try_from_env(&env).unwrap();
-
-        assert!(config.email.is_some());
-        assert!(config.password.is_none());
     }
 
     #[test]
