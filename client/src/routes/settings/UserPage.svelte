@@ -4,7 +4,6 @@
 	import z from 'zod';
 	import { isSome, none, some, type Option } from '#lib/Options.js';
 	import { getAuthInfo } from '#lib/contexts/auth.js';
-	import Navbar from '#ui/navigation/Navbar.svelte';
 	import {
 		changePassword,
 		fetchUserInfo,
@@ -17,7 +16,7 @@
 		type UserInfo
 	} from '#lib/api/index.js';
 
-	let { data } = $props();
+	let { userInfo }: { userInfo: UserInfo | null } = $props();
 
 	let authInfo = getAuthInfo();
 	const authInfoValue = $derived(isSome(authInfo) && authInfo.value ? authInfo.value : undefined);
@@ -30,10 +29,6 @@
 	if (!isMultiUser) {
 		goto(resolve('/'));
 	}
-
-	// Intentional capture of the load result as the initial state; refreshed via refreshUserInfo().
-	// svelte-ignore state_referenced_locally
-	let userInfo: UserInfo | null = $state(data.userInfo);
 
 	const refreshUserInfo = async (): Promise<void> => {
 		try {
@@ -255,8 +250,6 @@
 	};
 </script>
 
-<Navbar />
-
 {#if !isMultiUser}
 	<!-- Redirecting away; nothing to render. -->
 {:else if userInfo === null}
@@ -285,153 +278,160 @@
 		</div>
 	{/await}
 {:else}
-	<div class="mx-2 mb-2 sm:mx-auto sm:w-sm">
+	<div class="mt-4 flex flex-col gap-4">
 		<fieldset class="fieldset rounded-box border border-base-300 bg-base-100 p-4">
-			<legend class="fieldset-legend">Email</legend>
+			<h1 class="text-xl font-bold">Manage your account</h1>
+			<fieldset class="fieldset rounded-box border border-base-300 bg-base-100 p-4">
+				<legend class="fieldset-legend">Email</legend>
 
-			<div class="flex items-center justify-between gap-2">
-				<p class="text-sm font-bold">{userInfo.email}</p>
-				<span
-					class={`badge badge-sm ${
-						userInfo.verified ? 'badge-success' : emailAuthEnabled ? 'badge-warning' : 'badge-ghost'
-					}`}
-				>
-					{userInfo.verified ? 'Verified' : 'Unverified'}
-				</span>
-			</div>
+				<div class="flex items-center justify-between gap-2">
+					<p class="text-sm font-bold">{userInfo.email}</p>
+					<span
+						class={`badge badge-sm ${
+							userInfo.verified
+								? 'badge-success'
+								: emailAuthEnabled
+									? 'badge-warning'
+									: 'badge-ghost'
+						}`}
+					>
+						{userInfo.verified ? 'Verified' : 'Unverified'}
+					</span>
+				</div>
 
-			{#if !emailAuthEnabled}
-				<p class="mt-2 text-xs opacity-70">
-					Your email address is only used as your sign-in identifier, you won't receive emails on
-					it.
-				</p>
-			{:else if !userInfo.verified}
-				<div class="mt-2 flex items-center gap-2">
+				{#if !emailAuthEnabled}
+					<p class="mt-2 text-xs opacity-70">
+						Your email address is only used as your sign-in identifier, you won't receive emails on
+						it.
+					</p>
+				{:else if !userInfo.verified}
+					<div class="mt-2 flex items-center gap-2">
+						<button
+							class="btn btn-primary btn-sm"
+							disabled={verifyEmailPending}
+							onclick={submitEmailVerification}>Verify email</button
+						>
+					</div>
+					{#if verifyEmailError}
+						<p class="text-error">{verifyEmailError}</p>
+					{:else if verifyEmailInfo}
+						<p class="text-info">{verifyEmailInfo}</p>
+					{:else}
+						<p class="text-xs opacity-70">
+							A verification link will be sent to this address; open it to confirm you own it.
+						</p>
+					{/if}
+				{/if}
+
+				<label class="label mt-4" for="settings-new-email">New email</label>
+				<input
+					type="email"
+					class="validator input"
+					placeholder="New email"
+					id="settings-new-email"
+					required
+					bind:value={newEmail}
+				/>
+
+				<div class="join mx-auto mt-4 w-full join-horizontal gap-4">
 					<button
-						class="btn btn-primary btn-sm"
-						disabled={verifyEmailPending}
-						onclick={submitEmailVerification}>Verify email</button
+						class="btn join-item rounded-xs btn-primary"
+						disabled={emailChangePending || !isEmailValid}
+						onclick={submitEmailChange}>Change email</button
 					>
 				</div>
-				{#if verifyEmailError}
-					<p class="text-error">{verifyEmailError}</p>
-				{:else if verifyEmailInfo}
-					<p class="text-info">{verifyEmailInfo}</p>
-				{:else}
+
+				{#if emailChangeError}
+					<p class="text-error">{emailChangeError}</p>
+				{:else if emailChangeInfo}
+					<p class="text-info">{emailChangeInfo}</p>
+				{:else if emailAuthEnabled}
 					<p class="text-xs opacity-70">
-						A verification link will be sent to this address; open it to confirm you own it.
+						A verification link will be sent to the new address: the change only takes effect once
+						you open it.
 					</p>
 				{/if}
-			{/if}
+			</fieldset>
 
-			<label class="label mt-4" for="settings-new-email">New email</label>
-			<input
-				type="email"
-				class="validator input"
-				placeholder="New email"
-				id="settings-new-email"
-				required
-				bind:value={newEmail}
-			/>
-
-			<div class="join mx-auto mt-4 join-horizontal gap-4">
-				<button
-					class="btn join-item rounded-xs btn-primary"
-					disabled={emailChangePending || !isEmailValid}
-					onclick={submitEmailChange}>Change email</button
+			<fieldset class="mt-4 fieldset rounded-box border border-base-300 bg-base-100 p-4">
+				<legend class="fieldset-legend"
+					>{userInfo.has_password ? 'Password' : 'Set a password'}</legend
 				>
-			</div>
 
-			{#if emailChangeError}
-				<p class="text-error">{emailChangeError}</p>
-			{:else if emailChangeInfo}
-				<p class="text-info">{emailChangeInfo}</p>
-			{:else if emailAuthEnabled}
-				<p class="text-xs opacity-70">
-					A verification link will be sent to the new address: the change only takes effect once you
-					open it.
-				</p>
-			{/if}
-		</fieldset>
+				{#if userInfo.has_password}
+					<label class="label" for="settings-current-password">Current password</label>
+					<input
+						type="password"
+						class="input"
+						placeholder="Current password"
+						id="settings-current-password"
+						required
+						bind:value={currentPassword}
+					/>
+				{/if}
 
-		<fieldset class="mt-4 fieldset rounded-box border border-base-300 bg-base-100 p-4">
-			<legend class="fieldset-legend"
-				>{userInfo.has_password ? 'Password' : 'Set a password'}</legend
-			>
-
-			{#if userInfo.has_password}
-				<label class="label" for="settings-current-password">Current password</label>
+				<label class="label" for="settings-new-password">
+					{userInfo.has_password ? 'New password' : 'Password'}
+				</label>
 				<input
 					type="password"
 					class="input"
-					placeholder="Current password"
-					id="settings-current-password"
+					placeholder="New password"
+					id="settings-new-password"
 					required
-					bind:value={currentPassword}
+					bind:value={newPassword}
+					onkeypress={(e) => {
+						if (e.key === 'Enter') {
+							submitPassword();
+						}
+					}}
 				/>
-			{/if}
 
-			<label class="label" for="settings-new-password">
-				{userInfo.has_password ? 'New password' : 'Password'}
-			</label>
-			<input
-				type="password"
-				class="input"
-				placeholder="New password"
-				id="settings-new-password"
-				required
-				bind:value={newPassword}
-				onkeypress={(e) => {
-					if (e.key === 'Enter') {
-						submitPassword();
-					}
-				}}
-			/>
+				<div class="join mx-auto mt-4 w-full join-horizontal gap-4">
+					<button
+						class="btn join-item rounded-xs btn-primary"
+						disabled={passwordPending ||
+							newPassword.length === 0 ||
+							(userInfo.has_password && currentPassword.length === 0)}
+						onclick={submitPassword}
+						>{userInfo.has_password ? 'Change password' : 'Set password'}</button
+					>
+				</div>
 
-			<div class="join mx-auto mt-4 join-horizontal gap-4">
-				<button
-					class="btn join-item rounded-xs btn-primary"
-					disabled={passwordPending ||
-						newPassword.length === 0 ||
-						(userInfo.has_password && currentPassword.length === 0)}
-					onclick={submitPassword}
-					>{userInfo.has_password ? 'Change password' : 'Set password'}</button
-				>
-			</div>
+				{#if passwordError}
+					<p class="text-error">{passwordError}</p>
+				{:else if passwordInfo}
+					<p class="text-info">{passwordInfo}</p>
+				{/if}
+			</fieldset>
 
-			{#if passwordError}
-				<p class="text-error">{passwordError}</p>
-			{:else if passwordInfo}
-				<p class="text-info">{passwordInfo}</p>
-			{/if}
-		</fieldset>
+			<fieldset class="mt-4 fieldset rounded-box border border-base-300 bg-base-100 p-4">
+				<legend class="fieldset-legend">Sessions</legend>
 
-		<fieldset class="mt-4 fieldset rounded-box border border-base-300 bg-base-100 p-4">
-			<legend class="fieldset-legend">Sessions</legend>
+				<p class="text-xs opacity-70">
+					Sign out other devices to revoke every session except this one. Sign out everywhere
+					revokes all sessions, including this one, and logs you out.
+				</p>
 
-			<p class="text-xs opacity-70">
-				Sign out other devices to revoke every session except this one. Sign out everywhere revokes
-				all sessions, including this one, and logs you out.
-			</p>
+				<div class="join mx-auto mt-4 join-horizontal gap-4">
+					<button
+						class="btn join-item rounded-xs btn-secondary btn-sm"
+						disabled={revokeOthersPending}
+						onclick={submitRevokeOtherSessions}>Sign out from other devices</button
+					>
+					<button
+						class="btn join-item rounded-xs btn-error btn-sm"
+						disabled={revokeAllPending}
+						onclick={submitRevokeAllSessions}>Sign out everywhere</button
+					>
+				</div>
 
-			<div class="join mx-auto mt-4 join-horizontal gap-4">
-				<button
-					class="btn join-item rounded-xs btn-secondary btn-sm"
-					disabled={revokeOthersPending}
-					onclick={submitRevokeOtherSessions}>Sign out from other devices</button
-				>
-				<button
-					class="btn join-item rounded-xs btn-error btn-sm"
-					disabled={revokeAllPending}
-					onclick={submitRevokeAllSessions}>Sign out everywhere</button
-				>
-			</div>
-
-			{#if sessionsError}
-				<p class="text-error">{sessionsError}</p>
-			{:else if sessionsInfo}
-				<p class="text-info">{sessionsInfo}</p>
-			{/if}
+				{#if sessionsError}
+					<p class="text-error">{sessionsError}</p>
+				{:else if sessionsInfo}
+					<p class="text-info">{sessionsInfo}</p>
+				{/if}
+			</fieldset>
 		</fieldset>
 	</div>
 {/if}
