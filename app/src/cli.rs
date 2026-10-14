@@ -13,7 +13,10 @@ use crate::{
     inbound::{
         auth::multi_user::{
             EmailAddress, Password,
-            admin::{AdminService, BootstrapAdminMode, BootstrapAdminOutcome, RevokeAdminOutcome},
+            admin::{
+                AdminService, BootstrapAdminMode, BootstrapAdminOutcome, PromoteAdminOutcome,
+                RevokeAdminOutcome,
+            },
         },
         http::SqliteUsersRepository,
     },
@@ -28,7 +31,6 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Administrative operations run directly against the users database.
     Admin {
         #[command(subcommand)]
         command: AdminCommand,
@@ -37,9 +39,8 @@ enum Command {
 
 #[derive(Debug, PartialEq, Subcommand)]
 pub enum AdminCommand {
-    /// Creates or promotes an admin account and sets its password.
     Bootstrap(BootstrapArgs),
-    /// Clears the admin flag of the given account.
+    Promote(PromoteArgs),
     Revoke(RevokeArgs),
 }
 
@@ -62,6 +63,13 @@ pub struct BootstrapArgs {
         required_unless_present = "password"
     )]
     pub password_file: Option<PathBuf>,
+}
+
+#[derive(Debug, PartialEq, Args)]
+pub struct PromoteArgs {
+    /// Email address of the admin to promote.
+    #[arg(long)]
+    pub email: String,
 }
 
 #[derive(Debug, PartialEq, Args)]
@@ -99,6 +107,7 @@ pub async fn run(command: AdminCommand) -> anyhow::Result<()> {
 
     match command {
         AdminCommand::Bootstrap(args) => bootstrap(&service, args).await,
+        AdminCommand::Promote(args) => promote(&service, args).await,
         AdminCommand::Revoke(args) => revoke(&service, args).await,
     }
 }
@@ -135,6 +144,23 @@ async fn bootstrap(
                 args.email
             )
         }
+    }
+
+    Ok(())
+}
+
+async fn promote(
+    service: &AdminService<SqliteUsersRepository>,
+    args: PromoteArgs,
+) -> anyhow::Result<()> {
+    let email = parse_email(&args.email)?;
+
+    match service.promote_admin(email).await? {
+        PromoteAdminOutcome::Promoted => println!("Promoted admin `{}`.", args.email),
+        PromoteAdminOutcome::AlreadyAdmin => {
+            println!("`{}` is already an admin, nothing to do.", args.email)
+        }
+        PromoteAdminOutcome::UnknownUser => anyhow::bail!("no user with email `{}`", args.email),
     }
 
     Ok(())
@@ -279,6 +305,25 @@ mod tests {
         .unwrap_err();
 
         assert_eq!(err.kind(), clap::error::ErrorKind::ArgumentConflict);
+    }
+
+    #[test]
+    fn test_parse_promote() {
+        let command = parse(&["app", "admin", "promote", "--email", "admin@example.com"]).unwrap();
+
+        assert_eq!(
+            command,
+            AdminCommand::Promote(PromoteArgs {
+                email: "admin@example.com".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn test_parse_promote_requires_email() {
+        let err = parse(&["app", "admin", "promote"]).unwrap_err();
+
+        assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
     }
 
     #[test]

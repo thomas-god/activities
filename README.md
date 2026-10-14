@@ -200,9 +200,16 @@ instance has no admin yet, either:
   cannot start or the current admin is locked out:
 
   ```bash
-  # Create or promote an admin. Prefer --password-file to keep the secret out of the process list.
+  # Create user an admin. Prefer --password-file to keep the secret out of the process list.
   docker exec -it <container> /app_bin admin bootstrap \
     --email admin@your.domain --password-file /run/secrets/admin
+
+  # Promote an existing user to admin. No-op if user is already an admin.
+  docker exec -it <container> /app_bin admin promote --email admin@your.domain
+
+  # Bootstrapping can be used to reset the password of an existing admin.
+   docker exec -it <container> /app_bin admin bootstrap \
+     --email existing_admin@your.domain --password-file /run/secrets/new_admin_pwd
 
   # Clear the admin flag (refused if it would leave the instance with no admin).
   docker exec -it <container> /app_bin admin revoke --email admin@your.domain

@@ -14,7 +14,8 @@ use crate::{
         HashedEmailChangeToken, HashedPassword, HashedSession, HashedSessionToken, UserInfo,
         admin::{
             AdminRepository, AdminUser, BootstrapAdminMode, BootstrapAdminOutcome,
-            CreateUserOutcome, RevokeAdminOutcome, SetAdminOutcome, SetUserPasswordOutcome,
+            CreateUserOutcome, PromoteAdminOutcome, RevokeAdminOutcome, SetAdminOutcome,
+            SetUserPasswordOutcome,
         },
         service::UserRepository,
         session::SessionRepository,
@@ -249,6 +250,49 @@ impl AdminRepository for SqliteUsersRepository {
         })?;
 
         Ok(outcome)
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn promote_admin(&self, email: &EmailAddress) -> Result<PromoteAdminOutcome, ()> {
+        let mut tx = self.writer.begin().await.map_err(|err| {
+            tracing::warn!("Unable to start transaction to promote admin: {}", err);
+        })?;
+
+        let existing: Option<(i64, bool)> = sqlx::query_as(
+            r#"
+        SELECT u.rowid, u.is_admin
+        FROM t_users u
+        JOIN t_emails e ON e.user = u.rowid
+        WHERE e.email = ?1
+        ;"#,
+        )
+        .bind(email.to_string())
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|err| {
+            tracing::warn!("Unable to look up user by email to promote admin: {}", err);
+        })?;
+
+        let Some((rowid, is_admin)) = existing else {
+            return Ok(PromoteAdminOutcome::UnknownUser);
+        };
+        if is_admin {
+            return Ok(PromoteAdminOutcome::AlreadyAdmin);
+        }
+
+        sqlx::query("UPDATE t_users SET is_admin = TRUE WHERE rowid = ?1;")
+            .bind(rowid)
+            .execute(&mut *tx)
+            .await
+            .map_err(|err| {
+                tracing::warn!("Unable to promote admin: {}", err);
+            })?;
+
+        tx.commit().await.map_err(|err| {
+            tracing::warn!("Unable to commit admin promote transaction: {}", err);
+        })?;
+
+        Ok(PromoteAdminOutcome::Promoted)
     }
 
     #[tracing::instrument(skip_all, err(Debug))]
@@ -1263,7 +1307,7 @@ mod test_sqlite_users_repository {
             HashedSessionToken, Password, Session, SessionToken,
             admin::{
                 AdminRepository, BootstrapAdminMode, BootstrapAdminOutcome, CreateUserOutcome,
-                RevokeAdminOutcome, SetAdminOutcome, SetUserPasswordOutcome,
+                PromoteAdminOutcome, RevokeAdminOutcome, SetAdminOutcome, SetUserPasswordOutcome,
             },
             service::UserRepository,
             session::SessionRepository,
@@ -1454,6 +1498,47 @@ mod test_sqlite_users_repository {
             HashedPassword::new(stored)
                 .verify_password(&Password::try_from("second".to_string()).unwrap())
         );
+    }
+
+    #[tokio::test]
+    async fn test_promote_admin_sets_flag() {
+        let (_db, repository) = repository_with_test_user().await;
+
+        let outcome = repository.promote_admin(&test_email()).await.unwrap();
+
+        assert_eq!(outcome, PromoteAdminOutcome::Promoted);
+        assert!(is_admin(&repository, &test_email()).await);
+        assert_eq!(user_count(&repository).await, 1);
+    }
+
+    #[tokio::test]
+    async fn test_promote_admin_already_admin() {
+        let (_db, repository) = repository_with_test_user().await;
+        repository
+            .create_or_promote_admin(
+                &test_email(),
+                password_hash("pw"),
+                BootstrapAdminMode::Force,
+            )
+            .await
+            .unwrap();
+
+        let outcome = repository.promote_admin(&test_email()).await.unwrap();
+
+        assert_eq!(outcome, PromoteAdminOutcome::AlreadyAdmin);
+        assert!(is_admin(&repository, &test_email()).await);
+    }
+
+    #[tokio::test]
+    async fn test_promote_admin_unknown_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .unwrap();
+
+        let outcome = repository.promote_admin(&test_email()).await.unwrap();
+
+        assert_eq!(outcome, PromoteAdminOutcome::UnknownUser);
     }
 
     #[tokio::test]

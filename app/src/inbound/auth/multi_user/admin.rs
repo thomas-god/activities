@@ -25,6 +25,13 @@ pub enum BootstrapAdminOutcome {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PromoteAdminOutcome {
+    Promoted,
+    AlreadyAdmin,
+    UnknownUser,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RevokeAdminOutcome {
     Revoked,
     NotAdmin,
@@ -120,6 +127,11 @@ pub trait AdminRepository: Clone + Send + Sync + 'static {
         password_hash: HashedPassword,
         mode: BootstrapAdminMode,
     ) -> impl Future<Output = Result<BootstrapAdminOutcome, ()>> + Send;
+
+    fn promote_admin(
+        &self,
+        email: &EmailAddress,
+    ) -> impl Future<Output = Result<PromoteAdminOutcome, ()>> + Send;
 
     fn revoke_admin(
         &self,
@@ -234,6 +246,16 @@ impl<AR: AdminRepository> AdminService<AR> {
         }
 
         Ok(outcome)
+    }
+
+    pub async fn promote_admin(
+        &self,
+        email: EmailAddress,
+    ) -> Result<PromoteAdminOutcome, AdminError> {
+        self.repository
+            .promote_admin(&email)
+            .await
+            .map_err(|()| AdminError::Storage)
     }
 
     pub async fn revoke_admin(
@@ -370,6 +392,11 @@ mod tests {
                 password_hash: HashedPassword,
                 mode: BootstrapAdminMode,
             ) -> Result<BootstrapAdminOutcome, ()>;
+
+            async fn promote_admin(
+                &self,
+                email: &EmailAddress,
+            ) -> Result<PromoteAdminOutcome, ()>;
 
             async fn revoke_admin(
                 &self,
