@@ -10,6 +10,7 @@ const ALLOW_ORIGIN_KEY: &str = "ALLOW_ORIGIN";
 const ACTIVITIES_DATA_PATH_KEY: &str = "ACTIVITIES_DATA_PATH";
 
 // Single user related keys
+const SINGLE_USER_MODE: &str = "ACTIVITIES_SINGLE_USER_MODE";
 const SINGLE_USER_PASSWORD_KEY: &str = "ACTIVITIES_SINGLE_USER_PASSWORD";
 
 // Multi user related keys
@@ -72,21 +73,25 @@ pub enum AppMode {
 
 impl AppMode {
     pub fn try_from_env<T: Environment>(env: &T) -> Result<AppMode, String> {
-        if is_multi_user_mode_selected(env) {
-            return Ok(AppMode::MultiUser(MultiUserConfig::try_from_env(env)?));
+        if is_single_user_mode_selected(env) {
+            return Ok(AppMode::SingleUser(SingleUserConfig::try_from_env(env)?));
         }
 
-        Ok(AppMode::SingleUser(SingleUserConfig::try_from_env(env)?))
+        if is_single_user_mode_selected_legacy(env) {
+            tracing::warn!(
+                "[DEPRECATED] App will start in multi-user mode by default in a future version. To continue starting in single-user mode set the environment variable {SINGLE_USER_MODE} to true."
+            );
+            return Ok(AppMode::SingleUser(SingleUserConfig::try_from_env(env)?));
+        }
+
+        Ok(AppMode::MultiUser(MultiUserConfig::try_from_env(env)?))
     }
 }
 
-/// Multi-user mode is selected as soon as any email-based or password-based authentication
-/// environment variable is set. The password-auth variable is kept as a mode selector (e.g. to run
-/// password-only multi-user without a mailer), even though password auth can no longer be disabled.
-///
-/// Setting any of these variables while others are missing still keeps the application in
-/// multi-user mode, even if a valid single-user configuration could be loaded.
-fn is_multi_user_mode_selected<T: Environment>(env: &T) -> bool {
+/// Legacy way to check for single-user mode.
+/// Multi-user mode was selected as soon as any email-based or password-based authentication
+/// environment variable was set. When none of them were set, the app started in single-user mode.
+fn is_single_user_mode_selected_legacy<T: Environment>(env: &T) -> bool {
     [
         MULTI_USER_MAILER_FROM_KEY,
         MULTI_USER_MAILER_USERNAME_KEY,
@@ -98,7 +103,14 @@ fn is_multi_user_mode_selected<T: Environment>(env: &T) -> bool {
         MULTI_USER_BOOTSTRAP_ADMIN_PASSWORD_KEY,
     ]
     .iter()
-    .any(|key| load_env(env, key).as_string().is_some())
+    .all(|key| load_env(env, key).as_string().is_none())
+}
+
+fn is_single_user_mode_selected<T: Environment>(env: &T) -> bool {
+    match load_env(env, SINGLE_USER_MODE) {
+        EnvironmentVariable::Set(value) if value.as_str() == "true" => true,
+        _ => false,
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -500,6 +512,143 @@ mod test_config {
     }
 
     #[test]
+    fn test_is_single_user_mode_selected_when_unset() {
+        let env = MockEnvironment::default();
+
+        assert!(!is_single_user_mode_selected(&env));
+    }
+
+    #[test]
+    fn test_is_single_user_mode_selected_when_true() {
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            SINGLE_USER_MODE,
+            EnvironmentVariable::Set("true".to_string()),
+        );
+
+        assert!(is_single_user_mode_selected(&env));
+    }
+
+    #[test]
+    fn test_is_single_user_mode_selected_when_false() {
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            SINGLE_USER_MODE,
+            EnvironmentVariable::Set("false".to_string()),
+        );
+
+        assert!(!is_single_user_mode_selected(&env));
+    }
+
+    #[test]
+    fn test_is_single_user_mode_selected_is_case_sensitive() {
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            SINGLE_USER_MODE,
+            EnvironmentVariable::Set("TRUE".to_string()),
+        );
+
+        assert!(!is_single_user_mode_selected(&env));
+    }
+
+    #[test]
+    fn test_is_single_user_mode_selected_when_invalid_value() {
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            SINGLE_USER_MODE,
+            EnvironmentVariable::Set("banana".to_string()),
+        );
+
+        assert!(!is_single_user_mode_selected(&env));
+    }
+
+    #[test]
+    fn test_is_single_user_mode_selected_from_file() {
+        let mut tmpfile = tempfile::NamedTempFile::new().unwrap();
+        write!(tmpfile, "true").unwrap();
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            &format!("{SINGLE_USER_MODE}_FILE"),
+            EnvironmentVariable::Set(tmpfile.path().to_str().unwrap().to_string()),
+        );
+
+        assert!(is_single_user_mode_selected(&env));
+    }
+
+    #[test]
+    fn test_is_single_user_mode_selected_legacy_when_no_selector_set() {
+        let env = MockEnvironment::default();
+
+        assert!(is_single_user_mode_selected_legacy(&env));
+    }
+
+    #[test]
+    fn test_is_single_user_mode_selected_legacy_when_any_selector_set() {
+        for key in [
+            MULTI_USER_MAILER_FROM_KEY,
+            MULTI_USER_MAILER_USERNAME_KEY,
+            MULTI_USER_MAILER_PASSWORD_KEY,
+            MULTI_USER_MAILER_RELAY_KEY,
+            MULTI_USER_MAILER_DOMAIN_KEY,
+            MULTI_USER_PASSWORD_AUTH_ENABLED_KEY,
+            MULTI_USER_BOOTSTRAP_ADMIN_EMAIL_KEY,
+            MULTI_USER_BOOTSTRAP_ADMIN_PASSWORD_KEY,
+        ] {
+            let mut env = MockEnvironment::default();
+            env.set_var(key, EnvironmentVariable::Set("value".to_string()));
+
+            assert!(
+                !is_single_user_mode_selected_legacy(&env),
+                "expected {key} to select multi-user mode"
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_single_user_mode_selected_legacy_when_all_selectors_set() {
+        let mut env = MockEnvironment::default();
+        set_full_multi_user_env(&mut env);
+        env.set_var(
+            MULTI_USER_PASSWORD_AUTH_ENABLED_KEY,
+            EnvironmentVariable::Set("true".to_string()),
+        );
+        env.set_var(
+            MULTI_USER_BOOTSTRAP_ADMIN_EMAIL_KEY,
+            EnvironmentVariable::Set("admin@example.com".to_string()),
+        );
+        env.set_var(
+            MULTI_USER_BOOTSTRAP_ADMIN_PASSWORD_KEY,
+            EnvironmentVariable::Set("s3cret".to_string()),
+        );
+
+        assert!(!is_single_user_mode_selected_legacy(&env));
+    }
+
+    #[test]
+    fn test_is_single_user_mode_selected_legacy_empty_value_selects_multi_user() {
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            MULTI_USER_PASSWORD_AUTH_ENABLED_KEY,
+            EnvironmentVariable::Set(String::new()),
+        );
+
+        assert!(!is_single_user_mode_selected_legacy(&env));
+    }
+
+    #[test]
+    fn test_is_single_user_mode_selected_legacy_reads_selector_from_file() {
+        let mut tmpfile = tempfile::NamedTempFile::new().unwrap();
+        write!(tmpfile, "true").unwrap();
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            &format!("{MULTI_USER_PASSWORD_AUTH_ENABLED_KEY}_FILE"),
+            EnvironmentVariable::Set(tmpfile.path().to_str().unwrap().to_string()),
+        );
+
+        assert!(!is_single_user_mode_selected_legacy(&env));
+    }
+
+    #[test]
     fn test_multi_user_config_try_from_env_without_email_is_password_only() {
         let env = MockEnvironment::default();
 
@@ -831,32 +980,13 @@ mod test_config {
     }
 
     #[test]
-    fn test_app_mode_try_from_env_prefers_multi_user() {
+    fn test_app_mode_try_from_env_multi_user_when_selectors_set() {
         let mut env = MockEnvironment::default();
         env.set_var(
             SINGLE_USER_PASSWORD_KEY,
             EnvironmentVariable::Set("single-user-secret".to_string()),
         );
-        env.set_var(
-            MULTI_USER_MAILER_FROM_KEY,
-            EnvironmentVariable::Set("noreply@example.com".to_string()),
-        );
-        env.set_var(
-            MULTI_USER_MAILER_USERNAME_KEY,
-            EnvironmentVariable::Set("mailer-user".to_string()),
-        );
-        env.set_var(
-            MULTI_USER_MAILER_PASSWORD_KEY,
-            EnvironmentVariable::Set("mailer-password".to_string()),
-        );
-        env.set_var(
-            MULTI_USER_MAILER_RELAY_KEY,
-            EnvironmentVariable::Set("smtp.example.com".to_string()),
-        );
-        env.set_var(
-            MULTI_USER_MAILER_DOMAIN_KEY,
-            EnvironmentVariable::Set("example.com".to_string()),
-        );
+        set_full_multi_user_env(&mut env);
 
         let mode = AppMode::try_from_env(&env).unwrap();
 
@@ -864,7 +994,71 @@ mod test_config {
     }
 
     #[test]
-    fn test_app_mode_try_from_env_falls_back_to_single_user() {
+    fn test_app_mode_try_from_env_explicit_single_user_beats_multi_user_selectors() {
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            SINGLE_USER_MODE,
+            EnvironmentVariable::Set("true".to_string()),
+        );
+        env.set_var(
+            SINGLE_USER_PASSWORD_KEY,
+            EnvironmentVariable::Set("single-user-secret".to_string()),
+        );
+        set_full_multi_user_env(&mut env);
+
+        let mode = AppMode::try_from_env(&env).unwrap();
+
+        match mode {
+            AppMode::SingleUser(config) => {
+                assert_eq!(config.password, Some("single-user-secret".to_string()));
+            }
+            AppMode::MultiUser(_) => panic!("expected single-user mode"),
+        }
+    }
+
+    #[test]
+    fn test_app_mode_try_from_env_explicit_single_user_without_selectors() {
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            SINGLE_USER_MODE,
+            EnvironmentVariable::Set("true".to_string()),
+        );
+        env.set_var(
+            SINGLE_USER_PASSWORD_KEY,
+            EnvironmentVariable::Set("single-user-secret".to_string()),
+        );
+
+        assert!(matches!(
+            AppMode::try_from_env(&env),
+            Ok(AppMode::SingleUser(_))
+        ));
+    }
+
+    #[test]
+    fn test_app_mode_try_from_env_single_user_mode_false_does_not_select_single_user() {
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            SINGLE_USER_MODE,
+            EnvironmentVariable::Set("false".to_string()),
+        );
+        // A multi-user selector is set, so the app must not fall back to single-user mode.
+        env.set_var(
+            MULTI_USER_BOOTSTRAP_ADMIN_EMAIL_KEY,
+            EnvironmentVariable::Set("admin@example.com".to_string()),
+        );
+        env.set_var(
+            MULTI_USER_BOOTSTRAP_ADMIN_PASSWORD_KEY,
+            EnvironmentVariable::Set("s3cret".to_string()),
+        );
+
+        assert!(matches!(
+            AppMode::try_from_env(&env),
+            Ok(AppMode::MultiUser(_))
+        ));
+    }
+
+    #[test]
+    fn test_app_mode_try_from_env_legacy_falls_back_to_single_user() {
         let mut env = MockEnvironment::default();
         env.set_var(
             SINGLE_USER_PASSWORD_KEY,
