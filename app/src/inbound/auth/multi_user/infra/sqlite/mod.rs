@@ -15,7 +15,7 @@ use crate::{
         admin::{
             AdminRepository, AdminUser, BootstrapAdminMode, BootstrapAdminOutcome,
             CreateUserOutcome, PromoteAdminOutcome, RevokeAdminOutcome, SetAdminOutcome,
-            SetUserPasswordOutcome,
+            SetUserEmailOutcome, SetUserPasswordOutcome,
         },
         service::UserRepository,
         session::SessionRepository,
@@ -483,6 +483,71 @@ impl AdminRepository for SqliteUsersRepository {
         } else {
             Ok(SetUserPasswordOutcome::Updated)
         }
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn set_user_email(
+        &self,
+        user: &UserId,
+        email: EmailAddress,
+    ) -> Result<SetUserEmailOutcome, ()> {
+        let mut tx = self.writer.begin().await.map_err(|err| {
+            tracing::warn!("Unable to start transaction to update user email: {}", err);
+        })?;
+
+        let user_row: Option<i64> =
+            sqlx::query_scalar("SELECT rowid FROM t_users WHERE user_id = ?1;")
+                .bind(user.to_string())
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(|err| {
+                    tracing::warn!("Unable to look up user to set email: {}", err);
+                })?;
+
+        let Some(rowid) = user_row else {
+            return Ok(SetUserEmailOutcome::UnknownUser);
+        };
+
+        let email_in_use_by_other: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM t_emails WHERE email = ?1 AND user != ?2);",
+        )
+        .bind(email.to_string())
+        .bind(rowid)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|err| {
+            tracing::warn!("Unable to check email availability: {}", err);
+        })?;
+
+        if email_in_use_by_other {
+            return Ok(SetUserEmailOutcome::EmailAddressTaken);
+        }
+
+        let updated = sqlx::query("UPDATE t_emails SET email = ?1 WHERE user = ?2;")
+            .bind(email.value())
+            .bind(rowid)
+            .execute(&mut *tx)
+            .await
+            .map_err(|err| {
+                tracing::warn!("Unable to update user email: {}", err);
+            })?;
+
+        if updated.rows_affected() == 0 {
+            sqlx::query("INSERT INTO t_emails (user, email) VALUES (?1, ?2);")
+                .bind(rowid)
+                .bind(email.value())
+                .execute(&mut *tx)
+                .await
+                .map_err(|err| {
+                    tracing::warn!("Unable to insert user email: {}", err);
+                })?;
+        }
+
+        tx.commit().await.map_err(|err| {
+            tracing::warn!("Unable to commit update user email transaction: {}", err);
+        })?;
+
+        Ok(SetUserEmailOutcome::Updated)
     }
 
     #[tracing::instrument(skip_all, err(Debug))]
@@ -1310,7 +1375,8 @@ mod test_sqlite_users_repository {
             HashedSessionToken, Password, Session, SessionToken,
             admin::{
                 AdminRepository, BootstrapAdminMode, BootstrapAdminOutcome, CreateUserOutcome,
-                PromoteAdminOutcome, RevokeAdminOutcome, SetAdminOutcome, SetUserPasswordOutcome,
+                PromoteAdminOutcome, RevokeAdminOutcome, SetAdminOutcome, SetUserEmailOutcome,
+                SetUserPasswordOutcome,
             },
             service::UserRepository,
             session::SessionRepository,
@@ -1788,6 +1854,120 @@ mod test_sqlite_users_repository {
             .unwrap();
 
         assert_eq!(outcome, SetUserPasswordOutcome::UnknownUser);
+    }
+
+    #[tokio::test]
+    async fn test_set_user_email_updates_existing_user() {
+        let (_db, repository) = repository_with_test_user().await;
+
+        let outcome = repository
+            .set_user_email(
+                &UserId::test_default(),
+                EmailAddress::try_from("new@mail.test").unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, SetUserEmailOutcome::Updated);
+
+        let stored: String = sqlx::query_scalar(
+            "SELECT email FROM t_emails WHERE user = (SELECT rowid FROM t_users WHERE user_id = ?1);",
+        )
+        .bind(UserId::test_default().to_string())
+        .fetch_one(&repository.writer)
+        .await
+        .unwrap();
+        assert_eq!(stored, "new@mail.test");
+
+        let users = repository.list_users().await.unwrap();
+        assert_eq!(users.len(), 1);
+        assert_eq!(users[0].email(), &Some("new@mail.test".to_string()));
+        // A changed address starts out unverified.
+        assert!(!users[0].verified());
+    }
+
+    #[tokio::test]
+    async fn test_set_user_email_rejects_taken_email() {
+        let (_db, repository) = repository_with_test_user().await;
+        repository
+            .create_user(
+                &EmailAddress::try_from("second@mail.test").unwrap(),
+                password_hash("pw"),
+            )
+            .await
+            .unwrap();
+
+        let outcome = repository
+            .set_user_email(
+                &UserId::test_default(),
+                EmailAddress::try_from("second@mail.test").unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, SetUserEmailOutcome::EmailAddressTaken);
+
+        // The original address is left untouched.
+        let users = repository.list_users().await.unwrap();
+        let test_user = users
+            .iter()
+            .find(|user| user.user_id() == &UserId::test_default())
+            .unwrap();
+        assert_eq!(test_user.email(), &Some("test@mail.test".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_set_user_email_unknown_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .unwrap();
+
+        let outcome = repository
+            .set_user_email(
+                &UserId::from("unknown"),
+                EmailAddress::try_from("new@mail.test").unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, SetUserEmailOutcome::UnknownUser);
+    }
+
+    #[tokio::test]
+    async fn test_set_user_email_inserts_for_user_without_email() {
+        let (_db, repository) = repository_with_test_user().await;
+        let user = UserId::from("no_email_user");
+        sqlx::query("INSERT INTO t_users (user_id) VALUES (?1);")
+            .bind(user.to_string())
+            .execute(&repository.writer)
+            .await
+            .unwrap();
+
+        let outcome = repository
+            .set_user_email(&user, EmailAddress::try_from("added@mail.test").unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, SetUserEmailOutcome::Updated);
+
+        let users = repository.list_users().await.unwrap();
+        let added = users.iter().find(|u| u.user_id() == &user).unwrap();
+        assert_eq!(added.email(), &Some("added@mail.test".to_string()));
+        assert!(!added.verified());
+    }
+
+    #[tokio::test]
+    async fn test_set_user_email_to_own_current_email_is_allowed() {
+        let (_db, repository) = repository_with_test_user().await;
+
+        let outcome = repository
+            .set_user_email(&UserId::test_default(), test_email())
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, SetUserEmailOutcome::Updated);
+        assert_eq!(repository.list_users().await.unwrap().len(), 1);
     }
 
     #[tokio::test]

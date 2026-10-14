@@ -45,6 +45,10 @@ export const createUser = (email: string, password: string): Promise<Response> =
 export const setUserPassword = (userId: string, password: string): Promise<Response> =>
 	postJson(`/api/admin/users/${encodeURIComponent(userId)}/password`, { password });
 
+/** Sets or resets a user's email. `404` when the user is unknown, `409` when already taken. */
+export const setUserEmail = (userId: string, email: string): Promise<Response> =>
+	postJson(`/api/admin/users/${encodeURIComponent(userId)}/email`, { email });
+
 /** Grants or revokes the admin flag. `409` when it would remove the last admin. */
 export const setAdmin = (userId: string, isAdmin: boolean): Promise<Response> =>
 	postJson(`/api/admin/users/${encodeURIComponent(userId)}/admin`, { is_admin: isAdmin });

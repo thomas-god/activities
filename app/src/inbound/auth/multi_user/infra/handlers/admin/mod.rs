@@ -4,6 +4,7 @@ mod create_user;
 mod list_users;
 mod revoke_user_sessions;
 mod set_admin;
+mod set_user_email;
 mod set_user_password;
 
 use std::{marker::PhantomData, sync::Arc, time::Duration};
@@ -39,6 +40,7 @@ pub use create_user::create_user;
 pub use list_users::list_users;
 pub use revoke_user_sessions::revoke_user_sessions;
 pub use set_admin::set_admin;
+pub use set_user_email::set_user_email;
 pub use set_user_password::set_user_password;
 
 /// State shared by the admin routes: the user service used by the cookie middleware and the admin
@@ -147,6 +149,7 @@ where
             "/admin/users/{user_id}/password",
             post(set_user_password::<AS>),
         )
+        .route("/admin/users/{user_id}/email", post(set_user_email::<AS>))
         .route("/admin/users/{user_id}/admin", post(set_admin::<AS>))
         .route(
             "/admin/users/{user_id}/sessions/revoke",
@@ -177,7 +180,8 @@ mod tests {
     use crate::inbound::auth::multi_user::{
         EmailAddress, Password,
         admin::{
-            AdminUser, CreateUserOutcome, IAdminService, SetAdminOutcome, SetUserPasswordOutcome,
+            AdminUser, CreateUserOutcome, IAdminService, SetAdminOutcome, SetUserEmailOutcome,
+            SetUserPasswordOutcome,
         },
         test_utils::MockUserService,
     };
@@ -207,6 +211,12 @@ mod tests {
                 user: UserId,
                 password: Password,
             ) -> Result<SetUserPasswordOutcome, AdminError>;
+
+            async fn set_user_email(
+                &self,
+                user: UserId,
+                email: EmailAddress,
+            ) -> Result<SetUserEmailOutcome, AdminError>;
 
             async fn set_admin(
                 &self,
@@ -243,6 +253,10 @@ mod tests {
             .route(
                 "/admin/users/{user_id}/password",
                 post(set_user_password::<MockAdminService>),
+            )
+            .route(
+                "/admin/users/{user_id}/email",
+                post(set_user_email::<MockAdminService>),
             )
             .route(
                 "/admin/users/{user_id}/admin",

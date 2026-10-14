@@ -5,11 +5,13 @@
 		listUsers,
 		revokeUserSessions,
 		setAdmin,
+		setUserEmail,
 		setUserPassword,
 		type AdminUser
 	} from '#lib/api/index.js';
 	import type { AdminInfo } from './+page';
 	import { isSome, map, unwrapOr, type Option } from '#lib/Options.ts';
+	import { CircleX, Shield, ShieldX, SquarePen } from '@lucide/svelte';
 
 	let { adminInfo }: { adminInfo: Option<AdminInfo> } = $props();
 
@@ -30,6 +32,10 @@
 	const setStatus = (message: string, isError = false) => {
 		statusMessage = message;
 		statusIsError = isError;
+	};
+	const clearStatus = () => {
+		statusMessage = null;
+		statusIsError = false;
 	};
 
 	const refresh = async () => {
@@ -87,6 +93,7 @@
 	const openPasswordDialog = (user: AdminUser) => {
 		passwordTarget = user;
 		passwordValue = '';
+		clearStatus();
 		passwordDialog.showModal();
 	};
 
@@ -98,7 +105,9 @@
 		try {
 			const res = await setUserPassword(passwordTarget.user_id, passwordValue);
 			if (res.status === 200) {
-				setStatus(`Password updated for ${passwordTarget.email}.`);
+				setStatus(
+					`Password updated for ${passwordTarget.email === null ? passwordTarget.user_id : passwordTarget.email}.`
+				);
 				passwordDialog.close();
 				await refresh();
 			} else if (res.status === 404) {
@@ -112,6 +121,50 @@
 			setStatus('Something went wrong, retry later.', true);
 		} finally {
 			passwordPending = false;
+		}
+	};
+
+	// --- Set / reset email address ---
+
+	// svelte-ignore non_reactive_update
+	let emailDialog: HTMLDialogElement;
+	let emailTarget: AdminUser | null = $state(null);
+	let emailValue = $state('');
+	let emailPending = $state(false);
+
+	const openEmailDialog = (user: AdminUser) => {
+		emailTarget = user;
+		emailValue = '';
+		clearStatus();
+		emailDialog.showModal();
+	};
+
+	const submitEmail = async () => {
+		if (!emailTarget || emailValue.length === 0 || emailPending) {
+			return;
+		}
+		emailPending = true;
+		try {
+			const res = await setUserEmail(emailTarget.user_id, emailValue);
+			if (res.status === 200) {
+				setStatus(
+					`Email updated for ${emailTarget.email === null ? emailTarget.user_id : emailTarget.email}.`
+				);
+				emailDialog.close();
+				await refresh();
+			} else if (res.status === 404) {
+				setStatus('This user no longer exists.', true);
+			} else if (res.status === 400) {
+				setStatus('Invalid email address.', true);
+			} else if (res.status === 409) {
+				setStatus('Email address already taken by another user.', true);
+			} else {
+				setStatus('Something went wrong, retry later.', true);
+			}
+		} catch {
+			setStatus('Something went wrong, retry later.', true);
+		} finally {
+			emailPending = false;
 		}
 	};
 
@@ -211,14 +264,26 @@
 									<td>{user.verified ? 'Yes' : 'No'}</td>
 									<td>{user.has_password ? 'Set' : 'None'}</td>
 									<td>{user.is_admin ? 'Yes' : 'No'}</td>
-									<td class="flex flex-wrap justify-end gap-1">
-										<button class="btn btn-ghost btn-xs" onclick={() => openPasswordDialog(user)}>
+									<td class="flex flex-wrap gap-1">
+										<button class="btn btn-xs" onclick={() => openEmailDialog(user)}>
+											<SquarePen class="size-3" />
+											Email
+										</button>
+										<button class="btn btn-xs" onclick={() => openPasswordDialog(user)}>
+											<SquarePen class="size-3" />
 											Password
 										</button>
-										<button class="btn btn-ghost btn-xs" onclick={() => toggleAdmin(user)}>
-											{user.is_admin ? 'Revoke admin' : 'Make admin'}
+										<button class="btn btn-xs" onclick={() => toggleAdmin(user)}>
+											{#if user.is_admin}
+												<ShieldX class="size-3" />
+												Revoke admin
+											{:else}
+												<Shield class="size-3" />
+												Make admin
+											{/if}
 										</button>
-										<button class="btn btn-ghost btn-xs" onclick={() => revokeSessions(user)}>
+										<button class="btn btn-xs" onclick={() => revokeSessions(user)}>
+											<CircleX class="size-3" />
 											Revoke sessions
 										</button>
 									</td>
@@ -238,7 +303,9 @@
 	<dialog class="modal" bind:this={passwordDialog}>
 		<div class="modal-box">
 			<h3 class="text-lg font-bold">
-				Set password{passwordTarget ? ` for ${passwordTarget.email}` : ''}
+				Set password{passwordTarget
+					? ` for ${passwordTarget.email === null ? passwordTarget.user_id : passwordTarget.email}`
+					: ''}
 			</h3>
 
 			<label class="label mt-2" for="admin-set-password">New password</label>
@@ -252,6 +319,40 @@
 					onclick={submitPassword}>Set password</button
 				>
 			</div>
+
+			{#if statusMessage && statusIsError}
+				<p class="text-error">{statusMessage}</p>
+			{/if}
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button>close</button>
+		</form>
+	</dialog>
+
+	<dialog class="modal" bind:this={emailDialog}>
+		<div class="modal-box">
+			<h3 class="text-lg font-bold">
+				Set email address{emailTarget
+					? ` for ${emailTarget.email === null ? emailTarget.user_id : emailTarget.email}`
+					: ''}
+			</h3>
+
+			<label class="label mt-2" for="admin-set-email">New email address</label>
+			<input id="admin-set-email" type="email" class="input" bind:value={emailValue} />
+
+			<div class="modal-action">
+				<button class="btn btn-ghost" onclick={() => emailDialog.close()}>Cancel</button>
+				<button
+					class="btn btn-primary"
+					disabled={emailValue.length === 0 || emailPending}
+					onclick={submitEmail}
+					>Set email address
+				</button>
+			</div>
+
+			{#if statusMessage && statusIsError}
+				<p class="text-error">{statusMessage}</p>
+			{/if}
 		</div>
 		<form method="dialog" class="modal-backdrop">
 			<button>close</button>

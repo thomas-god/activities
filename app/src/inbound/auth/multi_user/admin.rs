@@ -93,6 +93,13 @@ pub enum SetUserPasswordOutcome {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SetUserEmailOutcome {
+    Updated,
+    EmailAddressTaken,
+    UnknownUser,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SetAdminOutcome {
     Updated,
     UnknownUser,
@@ -154,6 +161,12 @@ pub trait AdminRepository: Clone + Send + Sync + 'static {
         password_hash: HashedPassword,
     ) -> impl Future<Output = Result<SetUserPasswordOutcome, ()>> + Send;
 
+    fn set_user_email(
+        &self,
+        user: &UserId,
+        email: EmailAddress,
+    ) -> impl Future<Output = Result<SetUserEmailOutcome, ()>> + Send;
+
     fn set_admin(
         &self,
         user: &UserId,
@@ -179,6 +192,12 @@ pub trait IAdminService: Clone + Send + Sync + 'static {
         user: UserId,
         password: Password,
     ) -> impl Future<Output = Result<SetUserPasswordOutcome, AdminError>> + Send;
+
+    fn set_user_email(
+        &self,
+        user: UserId,
+        email: EmailAddress,
+    ) -> impl Future<Output = Result<SetUserEmailOutcome, AdminError>> + Send;
 
     fn set_admin(
         &self,
@@ -314,6 +333,17 @@ impl<AR: AdminRepository> IAdminService for AdminService<AR> {
             .map_err(|()| AdminError::Storage)
     }
 
+    async fn set_user_email(
+        &self,
+        user: UserId,
+        email: EmailAddress,
+    ) -> Result<SetUserEmailOutcome, AdminError> {
+        self.repository
+            .set_user_email(&user, email)
+            .await
+            .map_err(|()| AdminError::Storage)
+    }
+
     async fn set_admin(&self, user: UserId, is_admin: bool) -> Result<SetAdminOutcome, AdminError> {
         self.repository
             .set_admin(&user, is_admin)
@@ -356,6 +386,14 @@ impl IAdminService for DisabledAdminService {
         _user: UserId,
         _password: Password,
     ) -> Result<SetUserPasswordOutcome, AdminError> {
+        Err(AdminError::Storage)
+    }
+
+    async fn set_user_email(
+        &self,
+        _user: UserId,
+        _email: EmailAddress,
+    ) -> Result<SetUserEmailOutcome, AdminError> {
         Err(AdminError::Storage)
     }
 
@@ -418,6 +456,12 @@ mod tests {
                 user: &UserId,
                 password_hash: HashedPassword,
             ) -> Result<SetUserPasswordOutcome, ()>;
+
+            async fn set_user_email(
+                &self,
+                user: &UserId,
+                email: EmailAddress,
+            ) -> Result<SetUserEmailOutcome, ()>;
 
             async fn set_admin(
                 &self,
