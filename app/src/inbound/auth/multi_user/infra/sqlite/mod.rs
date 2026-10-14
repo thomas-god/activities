@@ -368,12 +368,12 @@ impl AdminRepository for SqliteUsersRepository {
 
     #[tracing::instrument(skip_all, err(Debug))]
     async fn list_users(&self) -> Result<Vec<AdminUser>, ()> {
-        type UserRow = (String, String, bool, bool, bool);
+        type UserRow = (String, Option<String>, bool, bool, bool);
         let rows: Result<Vec<UserRow>, sqlx::Error> = sqlx::query_as(
             r#"
-        SELECT u.user_id, e.email, e.verified, u.password_hash IS NOT NULL, u.is_admin
+        SELECT u.user_id, e.email, COALESCE(e.verified, false), u.password_hash IS NOT NULL, u.is_admin
         FROM t_users u
-        JOIN t_emails e ON e.user = u.rowid
+        LEFT JOIN t_emails e ON e.user = u.rowid
         ORDER BY e.email
         ;"#,
         )
@@ -390,7 +390,10 @@ impl AdminRepository for SqliteUsersRepository {
 
         let mut users = Vec::with_capacity(rows.len());
         for (user_id, email, verified, has_password, is_admin) in rows {
-            let email_valid = EmailAddress::try_from(email.as_str()).is_ok();
+            let email_valid = email
+                .as_ref()
+                .map(|e| EmailAddress::try_from(e.as_str()).is_ok())
+                .unwrap_or_default();
             if !email_valid {
                 tracing::warn!(%user_id, "Stored user email is not a valid email address");
             }
@@ -1646,8 +1649,8 @@ mod test_sqlite_users_repository {
 
         assert_eq!(users.len(), 2);
         // Ordered by email.
-        assert_eq!(users[0].email(), "second@mail.test");
-        assert_eq!(users[1].email(), "test@mail.test");
+        assert_eq!(users[0].email(), &Some("second@mail.test".to_string()));
+        assert_eq!(users[1].email(), &Some("test@mail.test".to_string()));
 
         let second = &users[0];
         assert!(!second.verified());
@@ -1681,10 +1684,33 @@ mod test_sqlite_users_repository {
             .iter()
             .find(|user| user.user_id() == &UserId::from("broken_user"))
             .expect("the broken user should be listed");
-        assert_eq!(broken.email(), "not-an-email");
+        assert_eq!(broken.email(), &Some("not-an-email".to_string()));
         assert!(!broken.email_valid());
 
         assert_eq!(users.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_list_users_includes_users_without_email() {
+        let (_db, repository) = repository_with_test_user().await;
+
+        sqlx::query("INSERT INTO t_users (user_id) VALUES ('no_email_user');")
+            .execute(&repository.writer)
+            .await
+            .unwrap();
+
+        let users = repository.list_users().await.unwrap();
+
+        assert_eq!(users.len(), 2);
+        let without_email = users
+            .iter()
+            .find(|user| user.user_id() == &UserId::from("no_email_user"))
+            .expect("a user without an email should be listed");
+        assert_eq!(without_email.email(), &None);
+        assert!(!without_email.email_valid());
+        assert!(!without_email.verified());
+        assert!(!without_email.has_password());
+        assert!(!without_email.is_admin());
     }
 
     #[tokio::test]
@@ -1708,7 +1734,7 @@ mod test_sqlite_users_repository {
         assert_eq!(users.len(), 1);
         let user = &users[0];
         assert_eq!(user.user_id(), &user_id);
-        assert_eq!(user.email(), "new@mail.test");
+        assert_eq!(user.email(), &Some("new@mail.test".to_string()));
         assert!(!user.verified());
         assert!(user.has_password());
         assert!(!user.is_admin());
@@ -1800,7 +1826,7 @@ mod test_sqlite_users_repository {
             .await
             .unwrap()
             .into_iter()
-            .find(|user| user.email() == "second@mail.test")
+            .find(|user| user.email() == &Some("second@mail.test".to_string()))
             .unwrap()
             .user_id()
             .clone();
@@ -1850,7 +1876,7 @@ mod test_sqlite_users_repository {
             .await
             .unwrap()
             .into_iter()
-            .find(|user| user.email() == "second@mail.test")
+            .find(|user| user.email() == &Some("second@mail.test".to_string()))
             .unwrap()
             .user_id()
             .clone();

@@ -3,7 +3,7 @@ import { PUBLIC_APP_URL } from '$app/env/public';
 /** A user as returned by the admin user-management API (`GET /api/admin/users`). */
 export interface AdminUser {
 	user_id: string;
-	email: string;
+	email: string | null;
 	/** Whether the stored email still parses as an email address. */
 	email_valid: boolean;
 	verified: boolean;

@@ -8,7 +8,7 @@ use super::{AdminGuard, AdminServiceHandle, admin_error_status};
 #[derive(Debug, Serialize, PartialEq)]
 pub struct AdminUserResponse {
     user_id: String,
-    email: String,
+    email: Option<String>,
     email_valid: bool,
     verified: bool,
     has_password: bool,
@@ -19,7 +19,7 @@ impl From<AdminUser> for AdminUserResponse {
     fn from(user: AdminUser) -> Self {
         Self {
             user_id: user.user_id().to_string(),
-            email: user.email().to_string(),
+            email: user.email().clone(),
             email_valid: user.email_valid(),
             verified: user.verified(),
             has_password: user.has_password(),

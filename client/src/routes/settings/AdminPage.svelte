@@ -190,6 +190,7 @@
 					<table class="table table-sm">
 						<thead>
 							<tr>
+								<th>User id</th>
 								<th>Email</th>
 								<th>Verified</th>
 								<th>Password</th>
@@ -200,8 +201,9 @@
 						<tbody>
 							{#each visibleUsers as user (user.user_id)}
 								<tr>
+									<td>{user.user_id}</td>
 									<td>
-										{user.email}
+										{user.email === null ? 'no email' : user.email}
 										{#if !user.email_valid}
 											<span class="ml-1 badge badge-sm badge-warning">invalid</span>
 										{/if}

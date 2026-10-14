@@ -47,7 +47,7 @@ pub enum RevokeAdminOutcome {
 #[derive(Debug, Clone, PartialEq, Eq, Constructor)]
 pub struct AdminUser {
     user_id: UserId,
-    email: String,
+    email: Option<String>,
     email_valid: bool,
     verified: bool,
     has_password: bool,
@@ -59,7 +59,7 @@ impl AdminUser {
         &self.user_id
     }
 
-    pub fn email(&self) -> &str {
+    pub fn email(&self) -> &Option<String> {
         &self.email
     }
 
@@ -549,7 +549,7 @@ mod tests {
         repository.expect_list_users().times(1).returning(|| {
             Ok(vec![AdminUser::new(
                 user("target"),
-                "user@mail.test".to_string(),
+                Some("user@mail.test".to_string()),
                 true,
                 true,
                 false,
@@ -560,7 +560,7 @@ mod tests {
         let users = AdminService::new(repository).list_users().await.unwrap();
 
         assert_eq!(users.len(), 1);
-        assert_eq!(users[0].email(), "user@mail.test");
+        assert_eq!(users[0].email(), &Some("user@mail.test".to_string()));
     }
 
     #[tokio::test]

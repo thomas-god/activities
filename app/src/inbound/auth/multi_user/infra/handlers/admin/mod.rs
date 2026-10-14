@@ -261,7 +261,7 @@ mod tests {
     fn admin_user() -> AdminUser {
         AdminUser::new(
             UserId::from("user_1"),
-            "user@mail.test".to_string(),
+            Some("user@mail.test".to_string()),
             true,
             false,
             true,
