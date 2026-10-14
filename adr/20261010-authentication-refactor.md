@@ -23,13 +23,27 @@ configuration. When email-based authentication is enabled users can chose to log
 their password or by receiving a login link to their email (the current authentication flow), thus
 not breaking existing instances.
 
-### Email as the user-facing identifier
+#### Trade-offs and alternatives considered
+
+- Having the ability to enable both modes independently was considered, but it introduced too many
+  cases of possibly locking out users when changing authentication mode, and increased code
+  complexity for no meaningful added value.
+
+### Email address as the user-facing identifier
 
 Email has been chosen as the user-facing identifier. This allows migrating existing instances (that
 necessarily has an email per user) and to more easily enable email-based authentication to new
 instances. New instances start with only password-based authentication won't have their users' email
 verified since no mailer would have been setup. When enabling email-based authentication users are
 still able to login using their previously registered password.
+
+#### Trade-offs and alternatives considered
+
+- Using an email address to register without receiving any email might be awkward from the user
+  point of view. This quirk is explicitly explained in the client when email-based authentication is
+  disabled.
+- A more classic username/password was considered but it would have complicated the migration of
+  existing instances and the switch of the mail-based authentication mode for no real benefit.
 
 ### Support for not set (NULL) passwords
 
@@ -40,13 +54,20 @@ enable. It is possible to lock users out of their account if email-based authent
 while they are still users without a password. A warning is logged at startup is there is still such
 users, plus the admin page show the same information (see [admin role](#new-admin-role)).
 
-### Verifying existing email
+### Verifying existing email addresses
 
 When enabling email-based authentication to a password-only instance there might be users with
 invalid (as in unreachable) email. To provide a way to detect those early an email is considered
 `unverified` until it has gone through an email authentication flow (receiving an authentication
 link). Users can see from their settings page is their email is considered `unverified` and can
 manually trigger a verification email.
+
+#### Trade-offs and alternatives considered
+
+- Considering every email addresses as valid and verified per default was considered as it reduced
+  user action, but it introduced some risk as users would realized their email address is invalid
+  only when they needed it to receive an authentication link. Surfacing invalid email address early
+  diminish the risk of users being locked out of their account.
 
 ### Management of existing sessions
 
