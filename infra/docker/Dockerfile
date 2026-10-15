@@ -27,13 +27,16 @@ COPY Cargo.toml Cargo.lock ./
 COPY app/ app/
 COPY fit-parser/ fit-parser/
 COPY fit-codegen/ fit-codegen/
-RUN cargo build --release -p app
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/app/backend/target \
+    cargo build --release -p app && \
+    cp target/release/app /app/app_bin
 
 # Runtime stage
 FROM nginx:alpine
 RUN apk add --no-cache nginx
 
-COPY --from=backend-builder /app/backend/target/release/app ./app_bin
+COPY --from=backend-builder /app/app_bin ./app_bin
 COPY infra/docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=frontend-builder --chown=nginx:nginx /app/frontend/build /usr/share/nginx/html
 COPY --chmod=0755 infra/docker/start.sh ./

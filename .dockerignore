@@ -1,0 +1,26 @@
+# Version control
+.git
+.gitignore
+
+# Rust build artifacts
+target/
+**/target/
+
+# Node / frontend build artifacts
+client/node_modules/
+client/build/
+client/.svelte-kit/
+
+# Python caches
+**/__pycache__/
+**/.ruff_cache/
+
+# Local fixtures / data that are not needed to build the image
+*.fit
+infra/demo/*.tcx
+infra/demo/*.fit
+data/
+tmp/
+
+# Tooling
+.vscode/

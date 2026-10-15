@@ -13,11 +13,9 @@ jobs:
           - arch: amd64
             runs_on: ubuntu-24.04
             platform: linux/amd64
-            cache_key: service-amd64-buildx-cache
           - arch: arm64
             runs_on: ubuntu-24.04-arm
             platform: linux/arm64
-            cache_key: service-arm64-buildx-cache
     runs-on: ${{ matrix.runs_on }}
     steps:
       - name: Prepare
@@ -38,12 +36,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Cache the Cargo dependencies
-        uses: actions/cache@v6
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ matrix.cache_key }}
-
       - name: Build and push Docker image
         id: build
         uses: docker/build-push-action@v7
@@ -54,13 +46,8 @@ jobs:
           push: true
           tags: |
             ghcr.io/thomas-god/activities:${{ github.event.release.tag_name }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new
-
-      - name: Move cache to original location
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
 
       - name: Export digest
         run: |
@@ -81,9 +68,6 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       - build-docker-image
-    strategy:
-      matrix:
-        feature: ["single-user", "multi-user"]
     steps:
       - name: Download digests
         uses: actions/download-artifact@v8
