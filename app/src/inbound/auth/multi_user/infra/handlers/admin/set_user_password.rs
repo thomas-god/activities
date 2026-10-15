@@ -10,7 +10,7 @@ use crate::{
     domain::models::UserId,
     inbound::auth::multi_user::{
         Password,
-        admin::{IAdminService, SetUserPasswordOutcome},
+        admin::{AdminActor, IAdminService, SetUserPasswordOutcome},
     },
 };
 
@@ -25,7 +25,7 @@ pub struct SetUserPasswordBody {
 #[tracing::instrument(skip_all)]
 pub async fn set_user_password<AS: IAdminService>(
     State(admin): State<AdminServiceHandle<AS>>,
-    _admin: AdminGuard<AS>,
+    guard: AdminGuard<AS>,
     Path(user_id): Path<String>,
     Json(body): Json<SetUserPasswordBody>,
 ) -> impl IntoResponse {
@@ -33,9 +33,10 @@ pub async fn set_user_password<AS: IAdminService>(
         return StatusCode::BAD_REQUEST.into_response();
     };
 
+    let actor = AdminActor::Web(guard.user().clone());
     match admin
         .service()
-        .set_user_password(UserId::from(user_id), password)
+        .set_user_password(&actor, UserId::from(user_id), password)
         .await
     {
         Ok(SetUserPasswordOutcome::Updated) => StatusCode::OK.into_response(),

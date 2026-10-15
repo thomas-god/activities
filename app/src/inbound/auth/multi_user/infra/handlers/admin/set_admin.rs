@@ -8,7 +8,7 @@ use serde::Deserialize;
 
 use crate::{
     domain::models::UserId,
-    inbound::auth::multi_user::admin::{IAdminService, SetAdminOutcome},
+    inbound::auth::multi_user::admin::{AdminActor, IAdminService, SetAdminOutcome},
 };
 
 use super::{AdminGuard, AdminServiceHandle, admin_error_status};
@@ -22,13 +22,14 @@ pub struct SetAdminBody {
 #[tracing::instrument(skip_all)]
 pub async fn set_admin<AS: IAdminService>(
     State(admin): State<AdminServiceHandle<AS>>,
-    _admin: AdminGuard<AS>,
+    guard: AdminGuard<AS>,
     Path(user_id): Path<String>,
     Json(body): Json<SetAdminBody>,
 ) -> impl IntoResponse {
+    let actor = AdminActor::Web(guard.user().clone());
     match admin
         .service()
-        .set_admin(UserId::from(user_id), body.is_admin)
+        .set_admin(&actor, UserId::from(user_id), body.is_admin)
         .await
     {
         Ok(SetAdminOutcome::Updated) => StatusCode::OK.into_response(),

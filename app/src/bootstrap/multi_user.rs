@@ -50,7 +50,7 @@ type ActualUserService = MultiUserService<
     SessionService<SqliteUsersRepository>,
     MaybeMailProvider<SMTPEmailProvider>,
 >;
-type ActualAdminService = AdminService<SqliteUsersRepository>;
+type ActualAdminService = AdminService<SqliteUsersRepository, Clock>;
 type ActualSearchService =
     SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService, Clock>;
 
@@ -232,7 +232,7 @@ async fn build_user_service(
     );
 
     if let Some(admin_bootstrap) = mode_config.admin_bootstrap.as_ref() {
-        AdminService::new(users_repository.as_ref().clone())
+        AdminService::new(users_repository.as_ref().clone(), Clock::new())
             .apply_bootstrap_config(admin_bootstrap)
             .await
             .map_err(|err| {
@@ -279,7 +279,7 @@ async fn build_user_service(
         );
     }
 
-    let admin_service = AdminService::new(users_repository.as_ref().clone());
+    let admin_service = AdminService::new(users_repository.as_ref().clone(), Clock::new());
 
     let session_service = SessionService::new(users_repository.clone());
     let auth_methods = AuthMethods::from(mode_config);

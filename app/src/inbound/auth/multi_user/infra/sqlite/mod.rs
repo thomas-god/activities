@@ -13,9 +13,9 @@ use crate::{
         EmailAddress, EmailChangeFinalizeResult, HashedAuthLink, HashedAuthToken,
         HashedEmailChangeToken, HashedPassword, HashedSession, HashedSessionToken, UserInfo,
         admin::{
-            AdminRepository, AdminUser, BootstrapAdminMode, BootstrapAdminOutcome,
-            CreateUserOutcome, PromoteAdminOutcome, RevokeAdminOutcome, SetAdminOutcome,
-            SetUserEmailOutcome, SetUserPasswordOutcome,
+            AdminAction, AdminAuditContext, AdminAuditEntry, AdminRepository, AdminUser,
+            BootstrapAdminMode, BootstrapAdminOutcome, CreateUserOutcome, PromoteAdminOutcome,
+            RevokeAdminOutcome, SetAdminOutcome, SetUserEmailOutcome, SetUserPasswordOutcome,
         },
         service::UserRepository,
         session::SessionRepository,
@@ -150,12 +150,43 @@ impl SqliteUsersRepository {
         }
         Ok(())
     }
+
+    /// Inserts one admin audit row within the caller's transaction, so a mutation and its audit
+    /// entry commit (or roll back) together.
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn insert_admin_audit(
+        tx: &mut Transaction<'_, Sqlite>,
+        entry: &AdminAuditEntry,
+    ) -> Result<(), ()> {
+        sqlx::query(
+            r#"
+        INSERT INTO t_admin_audit_log (
+            occurred_at, origin, actor_user_id, action, target_user_id, target_email, outcome, details
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8);
+        "#,
+        )
+        .bind(entry.occurred_at().to_rfc3339())
+        .bind(entry.origin())
+        .bind(entry.actor_user_id().map(|user| user.to_string()))
+        .bind(entry.action().as_str())
+        .bind(entry.target_user_id().map(|user| user.to_string()))
+        .bind(entry.target_email().map(|email| email.to_string()))
+        .bind(entry.outcome())
+        .bind(entry.details().map(|details| details.to_string()))
+        .execute(&mut **tx)
+        .await
+        .map_err(|err| {
+            tracing::warn!("Unable to insert admin audit log entry: {}", err);
+        })?;
+        Ok(())
+    }
 }
 
 impl AdminRepository for SqliteUsersRepository {
     #[tracing::instrument(skip_all, err(Debug))]
     async fn create_or_promote_admin(
         &self,
+        audit: &AdminAuditContext,
         email: &EmailAddress,
         password_hash: HashedPassword,
         mode: BootstrapAdminMode,
@@ -163,6 +194,11 @@ impl AdminRepository for SqliteUsersRepository {
         let mut tx = self.writer.begin().await.map_err(|err| {
             tracing::warn!("Unable to start transaction to bootstrap admin: {}", err);
         })?;
+
+        let mode_str = match mode {
+            BootstrapAdminMode::IfNoAdmin => "if_no_admin",
+            BootstrapAdminMode::Force => "force",
+        };
 
         if mode == BootstrapAdminMode::IfNoAdmin {
             let admins_exist: bool =
@@ -173,13 +209,27 @@ impl AdminRepository for SqliteUsersRepository {
                         tracing::warn!("Unable to check for an existing admin: {}", err);
                     })?;
             if admins_exist {
+                Self::insert_admin_audit(
+                    &mut tx,
+                    &audit.entry(
+                        AdminAction::BootstrapAdmin,
+                        None,
+                        Some(email.clone()),
+                        "skipped_admin_exists",
+                        Some(serde_json::json!({ "mode": mode_str })),
+                    ),
+                )
+                .await?;
+                tx.commit().await.map_err(|err| {
+                    tracing::warn!("Unable to commit admin bootstrap transaction: {}", err);
+                })?;
                 return Ok(BootstrapAdminOutcome::SkippedAdminExists);
             }
         }
 
-        let existing: Option<(i64, bool)> = sqlx::query_as(
+        let existing: Option<(i64, String, bool)> = sqlx::query_as(
             r#"
-        SELECT u.rowid, u.is_admin
+        SELECT u.rowid, u.user_id, u.is_admin
         FROM t_users u
         JOIN t_emails e ON e.user = u.rowid
         WHERE e.email = ?1
@@ -195,7 +245,7 @@ impl AdminRepository for SqliteUsersRepository {
             );
         })?;
 
-        let outcome = match existing {
+        let (outcome, target_user_id) = match existing {
             None => {
                 let user = UserId::new();
                 sqlx::query(
@@ -223,9 +273,9 @@ impl AdminRepository for SqliteUsersRepository {
                     tracing::warn!("Unable to insert admin user email: {}", err);
                 })?;
 
-                BootstrapAdminOutcome::Created
+                (BootstrapAdminOutcome::Created, Some(user))
             }
-            Some((rowid, was_admin)) => {
+            Some((rowid, user_id, was_admin)) => {
                 sqlx::query(
                     "UPDATE t_users SET is_admin = TRUE, password_hash = ?1 WHERE rowid = ?2;",
                 )
@@ -237,13 +287,34 @@ impl AdminRepository for SqliteUsersRepository {
                     tracing::warn!("Unable to promote user to admin: {}", err);
                 })?;
 
-                if was_admin {
-                    BootstrapAdminOutcome::PasswordUpdated
-                } else {
-                    BootstrapAdminOutcome::Promoted
-                }
+                (
+                    if was_admin {
+                        BootstrapAdminOutcome::PasswordUpdated
+                    } else {
+                        BootstrapAdminOutcome::Promoted
+                    },
+                    Some(UserId::from(user_id)),
+                )
             }
         };
+
+        let outcome_str = match outcome {
+            BootstrapAdminOutcome::Created => "created",
+            BootstrapAdminOutcome::Promoted => "promoted",
+            BootstrapAdminOutcome::PasswordUpdated => "password_updated",
+            BootstrapAdminOutcome::SkippedAdminExists => "skipped_admin_exists",
+        };
+        Self::insert_admin_audit(
+            &mut tx,
+            &audit.entry(
+                AdminAction::BootstrapAdmin,
+                target_user_id,
+                Some(email.clone()),
+                outcome_str,
+                Some(serde_json::json!({ "mode": mode_str })),
+            ),
+        )
+        .await?;
 
         tx.commit().await.map_err(|err| {
             tracing::warn!("Unable to commit admin bootstrap transaction: {}", err);
@@ -253,14 +324,18 @@ impl AdminRepository for SqliteUsersRepository {
     }
 
     #[tracing::instrument(skip_all, err(Debug))]
-    async fn promote_admin(&self, email: &EmailAddress) -> Result<PromoteAdminOutcome, ()> {
+    async fn promote_admin(
+        &self,
+        audit: &AdminAuditContext,
+        email: &EmailAddress,
+    ) -> Result<PromoteAdminOutcome, ()> {
         let mut tx = self.writer.begin().await.map_err(|err| {
             tracing::warn!("Unable to start transaction to promote admin: {}", err);
         })?;
 
-        let existing: Option<(i64, bool)> = sqlx::query_as(
+        let existing: Option<(i64, String, bool)> = sqlx::query_as(
             r#"
-        SELECT u.rowid, u.is_admin
+        SELECT u.rowid, u.user_id, u.is_admin
         FROM t_users u
         JOIN t_emails e ON e.user = u.rowid
         WHERE e.email = ?1
@@ -273,10 +348,39 @@ impl AdminRepository for SqliteUsersRepository {
             tracing::warn!("Unable to look up user by email to promote admin: {}", err);
         })?;
 
-        let Some((rowid, is_admin)) = existing else {
+        let Some((rowid, user_id, is_admin)) = existing else {
+            Self::insert_admin_audit(
+                &mut tx,
+                &audit.entry(
+                    AdminAction::PromoteAdmin,
+                    None,
+                    Some(email.clone()),
+                    "unknown_user",
+                    None,
+                ),
+            )
+            .await?;
+            tx.commit().await.map_err(|err| {
+                tracing::warn!("Unable to commit admin promote transaction: {}", err);
+            })?;
             return Ok(PromoteAdminOutcome::UnknownUser);
         };
+        let target_user_id = UserId::from(user_id);
         if is_admin {
+            Self::insert_admin_audit(
+                &mut tx,
+                &audit.entry(
+                    AdminAction::PromoteAdmin,
+                    Some(target_user_id),
+                    Some(email.clone()),
+                    "already_admin",
+                    None,
+                ),
+            )
+            .await?;
+            tx.commit().await.map_err(|err| {
+                tracing::warn!("Unable to commit admin promote transaction: {}", err);
+            })?;
             return Ok(PromoteAdminOutcome::AlreadyAdmin);
         }
 
@@ -288,6 +392,18 @@ impl AdminRepository for SqliteUsersRepository {
                 tracing::warn!("Unable to promote admin: {}", err);
             })?;
 
+        Self::insert_admin_audit(
+            &mut tx,
+            &audit.entry(
+                AdminAction::PromoteAdmin,
+                Some(target_user_id),
+                Some(email.clone()),
+                "promoted",
+                None,
+            ),
+        )
+        .await?;
+
         tx.commit().await.map_err(|err| {
             tracing::warn!("Unable to commit admin promote transaction: {}", err);
         })?;
@@ -296,14 +412,18 @@ impl AdminRepository for SqliteUsersRepository {
     }
 
     #[tracing::instrument(skip_all, err(Debug))]
-    async fn revoke_admin(&self, email: &EmailAddress) -> Result<RevokeAdminOutcome, ()> {
+    async fn revoke_admin(
+        &self,
+        audit: &AdminAuditContext,
+        email: &EmailAddress,
+    ) -> Result<RevokeAdminOutcome, ()> {
         let mut tx = self.writer.begin().await.map_err(|err| {
             tracing::warn!("Unable to start transaction to revoke admin: {}", err);
         })?;
 
-        let existing: Option<(i64, bool)> = sqlx::query_as(
+        let existing: Option<(i64, String, bool)> = sqlx::query_as(
             r#"
-        SELECT u.rowid, u.is_admin
+        SELECT u.rowid, u.user_id, u.is_admin
         FROM t_users u
         JOIN t_emails e ON e.user = u.rowid
         WHERE e.email = ?1
@@ -316,10 +436,39 @@ impl AdminRepository for SqliteUsersRepository {
             tracing::warn!("Unable to look up user by email to revoke admin: {}", err);
         })?;
 
-        let Some((rowid, is_admin)) = existing else {
+        let Some((rowid, user_id, is_admin)) = existing else {
+            Self::insert_admin_audit(
+                &mut tx,
+                &audit.entry(
+                    AdminAction::RevokeAdmin,
+                    None,
+                    Some(email.clone()),
+                    "unknown_user",
+                    None,
+                ),
+            )
+            .await?;
+            tx.commit().await.map_err(|err| {
+                tracing::warn!("Unable to commit admin revoke transaction: {}", err);
+            })?;
             return Ok(RevokeAdminOutcome::UnknownUser);
         };
+        let target_user_id = UserId::from(user_id);
         if !is_admin {
+            Self::insert_admin_audit(
+                &mut tx,
+                &audit.entry(
+                    AdminAction::RevokeAdmin,
+                    Some(target_user_id),
+                    Some(email.clone()),
+                    "not_admin",
+                    None,
+                ),
+            )
+            .await?;
+            tx.commit().await.map_err(|err| {
+                tracing::warn!("Unable to commit admin revoke transaction: {}", err);
+            })?;
             return Ok(RevokeAdminOutcome::NotAdmin);
         }
 
@@ -331,6 +480,20 @@ impl AdminRepository for SqliteUsersRepository {
                     tracing::warn!("Unable to count admins before revoking: {}", err);
                 })?;
         if admin_count <= 1 {
+            Self::insert_admin_audit(
+                &mut tx,
+                &audit.entry(
+                    AdminAction::RevokeAdmin,
+                    Some(target_user_id),
+                    Some(email.clone()),
+                    "last_admin",
+                    None,
+                ),
+            )
+            .await?;
+            tx.commit().await.map_err(|err| {
+                tracing::warn!("Unable to commit admin revoke transaction: {}", err);
+            })?;
             return Ok(RevokeAdminOutcome::LastAdmin);
         }
 
@@ -341,6 +504,18 @@ impl AdminRepository for SqliteUsersRepository {
             .map_err(|err| {
                 tracing::warn!("Unable to revoke admin: {}", err);
             })?;
+
+        Self::insert_admin_audit(
+            &mut tx,
+            &audit.entry(
+                AdminAction::RevokeAdmin,
+                Some(target_user_id),
+                Some(email.clone()),
+                "revoked",
+                None,
+            ),
+        )
+        .await?;
 
         tx.commit().await.map_err(|err| {
             tracing::warn!("Unable to commit admin revoke transaction: {}", err);
@@ -413,6 +588,7 @@ impl AdminRepository for SqliteUsersRepository {
     #[tracing::instrument(skip_all, err(Debug))]
     async fn create_user(
         &self,
+        audit: &AdminAuditContext,
         email: &EmailAddress,
         password_hash: HashedPassword,
     ) -> Result<CreateUserOutcome, ()> {
@@ -429,6 +605,20 @@ impl AdminRepository for SqliteUsersRepository {
                     tracing::warn!("Unable to check email availability: {}", err);
                 })?;
         if email_in_use {
+            Self::insert_admin_audit(
+                &mut tx,
+                &audit.entry(
+                    AdminAction::CreateUser,
+                    None,
+                    Some(email.clone()),
+                    "email_already_used",
+                    None,
+                ),
+            )
+            .await?;
+            tx.commit().await.map_err(|err| {
+                tracing::warn!("Unable to commit create user transaction: {}", err);
+            })?;
             return Ok(CreateUserOutcome::EmailAlreadyUsed);
         }
 
@@ -456,6 +646,18 @@ impl AdminRepository for SqliteUsersRepository {
             tracing::warn!("Unable to insert user email: {}", err);
         })?;
 
+        Self::insert_admin_audit(
+            &mut tx,
+            &audit.entry(
+                AdminAction::CreateUser,
+                Some(user.clone()),
+                Some(email.clone()),
+                "created",
+                None,
+            ),
+        )
+        .await?;
+
         tx.commit().await.map_err(|err| {
             tracing::warn!("Unable to commit create user transaction: {}", err);
         })?;
@@ -466,28 +668,56 @@ impl AdminRepository for SqliteUsersRepository {
     #[tracing::instrument(skip_all, err(Debug))]
     async fn set_user_password(
         &self,
+        audit: &AdminAuditContext,
         user: &UserId,
         password_hash: HashedPassword,
     ) -> Result<SetUserPasswordOutcome, ()> {
+        let mut tx = self.writer.begin().await.map_err(|err| {
+            tracing::warn!("Unable to start transaction to set user password: {}", err);
+        })?;
+
         let res = sqlx::query("UPDATE t_users SET password_hash = ?1 WHERE user_id = ?2;")
             .bind(password_hash.to_string())
             .bind(user.to_string())
-            .execute(&self.writer)
+            .execute(&mut *tx)
             .await
             .map_err(|err| {
                 tracing::warn!("Unable to set user password: {}", err);
             })?;
 
-        if res.rows_affected() == 0 {
-            Ok(SetUserPasswordOutcome::UnknownUser)
+        let outcome = if res.rows_affected() == 0 {
+            SetUserPasswordOutcome::UnknownUser
         } else {
-            Ok(SetUserPasswordOutcome::Updated)
-        }
+            SetUserPasswordOutcome::Updated
+        };
+        let outcome_str = match outcome {
+            SetUserPasswordOutcome::Updated => "updated",
+            SetUserPasswordOutcome::UnknownUser => "unknown_user",
+        };
+
+        Self::insert_admin_audit(
+            &mut tx,
+            &audit.entry(
+                AdminAction::SetUserPassword,
+                Some(user.clone()),
+                None,
+                outcome_str,
+                None,
+            ),
+        )
+        .await?;
+
+        tx.commit().await.map_err(|err| {
+            tracing::warn!("Unable to commit set user password transaction: {}", err);
+        })?;
+
+        Ok(outcome)
     }
 
     #[tracing::instrument(skip_all, err(Debug))]
     async fn set_user_email(
         &self,
+        audit: &AdminAuditContext,
         user: &UserId,
         email: EmailAddress,
     ) -> Result<SetUserEmailOutcome, ()> {
@@ -505,6 +735,20 @@ impl AdminRepository for SqliteUsersRepository {
                 })?;
 
         let Some(rowid) = user_row else {
+            Self::insert_admin_audit(
+                &mut tx,
+                &audit.entry(
+                    AdminAction::SetUserEmail,
+                    Some(user.clone()),
+                    Some(email.clone()),
+                    "unknown_user",
+                    None,
+                ),
+            )
+            .await?;
+            tx.commit().await.map_err(|err| {
+                tracing::warn!("Unable to commit update user email transaction: {}", err);
+            })?;
             return Ok(SetUserEmailOutcome::UnknownUser);
         };
 
@@ -520,6 +764,20 @@ impl AdminRepository for SqliteUsersRepository {
         })?;
 
         if email_in_use_by_other {
+            Self::insert_admin_audit(
+                &mut tx,
+                &audit.entry(
+                    AdminAction::SetUserEmail,
+                    Some(user.clone()),
+                    Some(email.clone()),
+                    "email_address_taken",
+                    None,
+                ),
+            )
+            .await?;
+            tx.commit().await.map_err(|err| {
+                tracing::warn!("Unable to commit update user email transaction: {}", err);
+            })?;
             return Ok(SetUserEmailOutcome::EmailAddressTaken);
         }
 
@@ -543,6 +801,18 @@ impl AdminRepository for SqliteUsersRepository {
                 })?;
         }
 
+        Self::insert_admin_audit(
+            &mut tx,
+            &audit.entry(
+                AdminAction::SetUserEmail,
+                Some(user.clone()),
+                Some(email),
+                "updated",
+                None,
+            ),
+        )
+        .await?;
+
         tx.commit().await.map_err(|err| {
             tracing::warn!("Unable to commit update user email transaction: {}", err);
         })?;
@@ -551,7 +821,12 @@ impl AdminRepository for SqliteUsersRepository {
     }
 
     #[tracing::instrument(skip_all, err(Debug))]
-    async fn set_admin(&self, user: &UserId, is_admin: bool) -> Result<SetAdminOutcome, ()> {
+    async fn set_admin(
+        &self,
+        audit: &AdminAuditContext,
+        user: &UserId,
+        is_admin: bool,
+    ) -> Result<SetAdminOutcome, ()> {
         let mut tx = self.writer.begin().await.map_err(|err| {
             tracing::warn!("Unable to start transaction to set admin flag: {}", err);
         })?;
@@ -566,9 +841,37 @@ impl AdminRepository for SqliteUsersRepository {
                 })?;
 
         let Some(current) = current else {
+            Self::insert_admin_audit(
+                &mut tx,
+                &audit.entry(
+                    AdminAction::SetAdmin,
+                    Some(user.clone()),
+                    None,
+                    "unknown_user",
+                    Some(serde_json::json!({ "is_admin": is_admin })),
+                ),
+            )
+            .await?;
+            tx.commit().await.map_err(|err| {
+                tracing::warn!("Unable to commit set admin transaction: {}", err);
+            })?;
             return Ok(SetAdminOutcome::UnknownUser);
         };
         if current == is_admin {
+            Self::insert_admin_audit(
+                &mut tx,
+                &audit.entry(
+                    AdminAction::SetAdmin,
+                    Some(user.clone()),
+                    None,
+                    "updated",
+                    Some(serde_json::json!({ "is_admin": is_admin })),
+                ),
+            )
+            .await?;
+            tx.commit().await.map_err(|err| {
+                tracing::warn!("Unable to commit set admin transaction: {}", err);
+            })?;
             return Ok(SetAdminOutcome::Updated);
         }
 
@@ -581,6 +884,20 @@ impl AdminRepository for SqliteUsersRepository {
                         tracing::warn!("Unable to count admins before revoking: {}", err);
                     })?;
             if admin_count <= 1 {
+                Self::insert_admin_audit(
+                    &mut tx,
+                    &audit.entry(
+                        AdminAction::SetAdmin,
+                        Some(user.clone()),
+                        None,
+                        "last_admin",
+                        Some(serde_json::json!({ "is_admin": is_admin })),
+                    ),
+                )
+                .await?;
+                tx.commit().await.map_err(|err| {
+                    tracing::warn!("Unable to commit set admin transaction: {}", err);
+                })?;
                 return Ok(SetAdminOutcome::LastAdmin);
             }
         }
@@ -594,6 +911,18 @@ impl AdminRepository for SqliteUsersRepository {
                 tracing::warn!("Unable to set admin flag: {}", err);
             })?;
 
+        Self::insert_admin_audit(
+            &mut tx,
+            &audit.entry(
+                AdminAction::SetAdmin,
+                Some(user.clone()),
+                None,
+                "updated",
+                Some(serde_json::json!({ "is_admin": is_admin })),
+            ),
+        )
+        .await?;
+
         tx.commit().await.map_err(|err| {
             tracing::warn!("Unable to commit set admin transaction: {}", err);
         })?;
@@ -602,20 +931,49 @@ impl AdminRepository for SqliteUsersRepository {
     }
 
     #[tracing::instrument(skip_all, err(Debug))]
-    async fn revoke_user_sessions(&self, user: &UserId) -> Result<u64, ()> {
-        sqlx::query(
+    async fn revoke_user_sessions(
+        &self,
+        audit: &AdminAuditContext,
+        user: &UserId,
+    ) -> Result<u64, ()> {
+        let mut tx = self.writer.begin().await.map_err(|err| {
+            tracing::warn!(
+                "Unable to start transaction to revoke user sessions: {}",
+                err
+            );
+        })?;
+
+        let revoked = sqlx::query(
             r#"
         DELETE FROM t_sessions
         WHERE user = (SELECT rowid FROM t_users WHERE user_id = ?1)
         ;"#,
         )
         .bind(user.to_string())
-        .execute(&self.writer)
+        .execute(&mut *tx)
         .await
         .map(|res| res.rows_affected())
         .map_err(|err| {
             tracing::warn!("Unable to revoke user sessions: {}", err);
-        })
+        })?;
+
+        Self::insert_admin_audit(
+            &mut tx,
+            &audit.entry(
+                AdminAction::RevokeUserSessions,
+                Some(user.clone()),
+                None,
+                "revoked",
+                Some(serde_json::json!({ "revoked": revoked })),
+            ),
+        )
+        .await?;
+
+        tx.commit().await.map_err(|err| {
+            tracing::warn!("Unable to commit revoke user sessions transaction: {}", err);
+        })?;
+
+        Ok(revoked)
     }
 }
 
@@ -1374,9 +1732,9 @@ mod test_sqlite_users_repository {
             AuthLink, AuthToken, EmailAddress, EmailChangeFinalizeResult, HashedEmailChangeToken,
             HashedSessionToken, Password, Session, SessionToken,
             admin::{
-                AdminRepository, BootstrapAdminMode, BootstrapAdminOutcome, CreateUserOutcome,
-                PromoteAdminOutcome, RevokeAdminOutcome, SetAdminOutcome, SetUserEmailOutcome,
-                SetUserPasswordOutcome,
+                AdminActor, AdminAuditContext, AdminRepository, BootstrapAdminMode,
+                BootstrapAdminOutcome, CreateUserOutcome, PromoteAdminOutcome, RevokeAdminOutcome,
+                SetAdminOutcome, SetUserEmailOutcome, SetUserPasswordOutcome,
             },
             service::UserRepository,
             session::SessionRepository,
@@ -1411,6 +1769,11 @@ mod test_sqlite_users_repository {
             .unwrap()
     }
 
+    /// An audit context usable by the repository tests that call mutating admin methods.
+    fn web_audit() -> AdminAuditContext {
+        AdminAuditContext::new(AdminActor::Web(UserId::test_default()), Utc::now())
+    }
+
     async fn is_admin(repository: &SqliteUsersRepository, email: &EmailAddress) -> bool {
         sqlx::query_scalar(
             r#"
@@ -1442,6 +1805,7 @@ mod test_sqlite_users_repository {
 
         let outcome = repository
             .create_or_promote_admin(
+                &web_audit(),
                 &test_email(),
                 password_hash("s3cret"),
                 BootstrapAdminMode::IfNoAdmin,
@@ -1471,6 +1835,7 @@ mod test_sqlite_users_repository {
         let (_db, repository) = repository_with_test_user().await;
         repository
             .create_or_promote_admin(
+                &web_audit(),
                 &test_email(),
                 password_hash("s3cret"),
                 BootstrapAdminMode::IfNoAdmin,
@@ -1481,6 +1846,7 @@ mod test_sqlite_users_repository {
         let other = EmailAddress::try_from("other@mail.test").unwrap();
         let outcome = repository
             .create_or_promote_admin(
+                &web_audit(),
                 &other,
                 password_hash("other"),
                 BootstrapAdminMode::IfNoAdmin,
@@ -1497,6 +1863,7 @@ mod test_sqlite_users_repository {
         let (_db, repository) = repository_with_test_user().await;
         repository
             .create_or_promote_admin(
+                &web_audit(),
                 &test_email(),
                 password_hash("s3cret"),
                 BootstrapAdminMode::IfNoAdmin,
@@ -1506,6 +1873,7 @@ mod test_sqlite_users_repository {
 
         let outcome = repository
             .create_or_promote_admin(
+                &web_audit(),
                 &test_email(),
                 password_hash("s3cret"),
                 BootstrapAdminMode::IfNoAdmin,
@@ -1523,6 +1891,7 @@ mod test_sqlite_users_repository {
 
         let outcome = repository
             .create_or_promote_admin(
+                &web_audit(),
                 &test_email(),
                 password_hash("s3cret"),
                 BootstrapAdminMode::Force,
@@ -1540,6 +1909,7 @@ mod test_sqlite_users_repository {
         let (_db, repository) = repository_with_test_user().await;
         repository
             .create_or_promote_admin(
+                &web_audit(),
                 &test_email(),
                 password_hash("first"),
                 BootstrapAdminMode::Force,
@@ -1549,6 +1919,7 @@ mod test_sqlite_users_repository {
 
         let outcome = repository
             .create_or_promote_admin(
+                &web_audit(),
                 &test_email(),
                 password_hash("second"),
                 BootstrapAdminMode::Force,
@@ -1573,7 +1944,10 @@ mod test_sqlite_users_repository {
     async fn test_promote_admin_sets_flag() {
         let (_db, repository) = repository_with_test_user().await;
 
-        let outcome = repository.promote_admin(&test_email()).await.unwrap();
+        let outcome = repository
+            .promote_admin(&web_audit(), &test_email())
+            .await
+            .unwrap();
 
         assert_eq!(outcome, PromoteAdminOutcome::Promoted);
         assert!(is_admin(&repository, &test_email()).await);
@@ -1585,6 +1959,7 @@ mod test_sqlite_users_repository {
         let (_db, repository) = repository_with_test_user().await;
         repository
             .create_or_promote_admin(
+                &web_audit(),
                 &test_email(),
                 password_hash("pw"),
                 BootstrapAdminMode::Force,
@@ -1592,7 +1967,10 @@ mod test_sqlite_users_repository {
             .await
             .unwrap();
 
-        let outcome = repository.promote_admin(&test_email()).await.unwrap();
+        let outcome = repository
+            .promote_admin(&web_audit(), &test_email())
+            .await
+            .unwrap();
 
         assert_eq!(outcome, PromoteAdminOutcome::AlreadyAdmin);
         assert!(is_admin(&repository, &test_email()).await);
@@ -1605,7 +1983,10 @@ mod test_sqlite_users_repository {
             .await
             .unwrap();
 
-        let outcome = repository.promote_admin(&test_email()).await.unwrap();
+        let outcome = repository
+            .promote_admin(&web_audit(), &test_email())
+            .await
+            .unwrap();
 
         assert_eq!(outcome, PromoteAdminOutcome::UnknownUser);
     }
@@ -1619,15 +2000,25 @@ mod test_sqlite_users_repository {
         let first = EmailAddress::try_from("first@mail.test").unwrap();
         let second = EmailAddress::try_from("second@mail.test").unwrap();
         repository
-            .create_or_promote_admin(&first, password_hash("pw"), BootstrapAdminMode::Force)
+            .create_or_promote_admin(
+                &web_audit(),
+                &first,
+                password_hash("pw"),
+                BootstrapAdminMode::Force,
+            )
             .await
             .unwrap();
         repository
-            .create_or_promote_admin(&second, password_hash("pw"), BootstrapAdminMode::Force)
+            .create_or_promote_admin(
+                &web_audit(),
+                &second,
+                password_hash("pw"),
+                BootstrapAdminMode::Force,
+            )
             .await
             .unwrap();
 
-        let outcome = repository.revoke_admin(&first).await.unwrap();
+        let outcome = repository.revoke_admin(&web_audit(), &first).await.unwrap();
 
         assert_eq!(outcome, RevokeAdminOutcome::Revoked);
         assert!(!is_admin(&repository, &first).await);
@@ -1639,6 +2030,7 @@ mod test_sqlite_users_repository {
         let (_db, repository) = repository_with_test_user().await;
         repository
             .create_or_promote_admin(
+                &web_audit(),
                 &test_email(),
                 password_hash("pw"),
                 BootstrapAdminMode::Force,
@@ -1646,7 +2038,10 @@ mod test_sqlite_users_repository {
             .await
             .unwrap();
 
-        let outcome = repository.revoke_admin(&test_email()).await.unwrap();
+        let outcome = repository
+            .revoke_admin(&web_audit(), &test_email())
+            .await
+            .unwrap();
 
         assert_eq!(outcome, RevokeAdminOutcome::LastAdmin);
         assert!(is_admin(&repository, &test_email()).await);
@@ -1659,7 +2054,10 @@ mod test_sqlite_users_repository {
             .await
             .unwrap();
 
-        let outcome = repository.revoke_admin(&test_email()).await.unwrap();
+        let outcome = repository
+            .revoke_admin(&web_audit(), &test_email())
+            .await
+            .unwrap();
 
         assert_eq!(outcome, RevokeAdminOutcome::UnknownUser);
     }
@@ -1668,7 +2066,10 @@ mod test_sqlite_users_repository {
     async fn test_revoke_admin_not_admin() {
         let (_db, repository) = repository_with_test_user().await;
 
-        let outcome = repository.revoke_admin(&test_email()).await.unwrap();
+        let outcome = repository
+            .revoke_admin(&web_audit(), &test_email())
+            .await
+            .unwrap();
 
         assert_eq!(outcome, RevokeAdminOutcome::NotAdmin);
     }
@@ -1682,6 +2083,7 @@ mod test_sqlite_users_repository {
 
         repository
             .create_or_promote_admin(
+                &web_audit(),
                 &test_email(),
                 password_hash("pw"),
                 BootstrapAdminMode::Force,
@@ -1697,6 +2099,7 @@ mod test_sqlite_users_repository {
         let (_db, repository) = repository_with_test_user().await;
         repository
             .create_user(
+                &web_audit(),
                 &EmailAddress::try_from("second@mail.test").unwrap(),
                 password_hash("pw"),
             )
@@ -1704,6 +2107,7 @@ mod test_sqlite_users_repository {
             .unwrap();
         repository
             .create_or_promote_admin(
+                &web_audit(),
                 &test_email(),
                 password_hash("pw"),
                 BootstrapAdminMode::Force,
@@ -1788,7 +2192,7 @@ mod test_sqlite_users_repository {
 
         let email = EmailAddress::try_from("new@mail.test").unwrap();
         let outcome = repository
-            .create_user(&email, password_hash("s3cret"))
+            .create_user(&web_audit(), &email, password_hash("s3cret"))
             .await
             .unwrap();
 
@@ -1811,7 +2215,7 @@ mod test_sqlite_users_repository {
         let (_db, repository) = repository_with_test_user().await;
 
         let outcome = repository
-            .create_user(&test_email(), password_hash("s3cret"))
+            .create_user(&web_audit(), &test_email(), password_hash("s3cret"))
             .await
             .unwrap();
 
@@ -1824,7 +2228,7 @@ mod test_sqlite_users_repository {
         let (_db, repository) = repository_with_test_user().await;
 
         let outcome = repository
-            .set_user_password(&UserId::test_default(), password_hash("new"))
+            .set_user_password(&web_audit(), &UserId::test_default(), password_hash("new"))
             .await
             .unwrap();
 
@@ -1849,7 +2253,7 @@ mod test_sqlite_users_repository {
             .unwrap();
 
         let outcome = repository
-            .set_user_password(&UserId::from("unknown"), password_hash("new"))
+            .set_user_password(&web_audit(), &UserId::from("unknown"), password_hash("new"))
             .await
             .unwrap();
 
@@ -1862,6 +2266,7 @@ mod test_sqlite_users_repository {
 
         let outcome = repository
             .set_user_email(
+                &web_audit(),
                 &UserId::test_default(),
                 EmailAddress::try_from("new@mail.test").unwrap(),
             )
@@ -1891,6 +2296,7 @@ mod test_sqlite_users_repository {
         let (_db, repository) = repository_with_test_user().await;
         repository
             .create_user(
+                &web_audit(),
                 &EmailAddress::try_from("second@mail.test").unwrap(),
                 password_hash("pw"),
             )
@@ -1899,6 +2305,7 @@ mod test_sqlite_users_repository {
 
         let outcome = repository
             .set_user_email(
+                &web_audit(),
                 &UserId::test_default(),
                 EmailAddress::try_from("second@mail.test").unwrap(),
             )
@@ -1925,6 +2332,7 @@ mod test_sqlite_users_repository {
 
         let outcome = repository
             .set_user_email(
+                &web_audit(),
                 &UserId::from("unknown"),
                 EmailAddress::try_from("new@mail.test").unwrap(),
             )
@@ -1945,7 +2353,11 @@ mod test_sqlite_users_repository {
             .unwrap();
 
         let outcome = repository
-            .set_user_email(&user, EmailAddress::try_from("added@mail.test").unwrap())
+            .set_user_email(
+                &web_audit(),
+                &user,
+                EmailAddress::try_from("added@mail.test").unwrap(),
+            )
             .await
             .unwrap();
 
@@ -1962,7 +2374,7 @@ mod test_sqlite_users_repository {
         let (_db, repository) = repository_with_test_user().await;
 
         let outcome = repository
-            .set_user_email(&UserId::test_default(), test_email())
+            .set_user_email(&web_audit(), &UserId::test_default(), test_email())
             .await
             .unwrap();
 
@@ -1975,6 +2387,7 @@ mod test_sqlite_users_repository {
         let (_db, repository) = repository_with_test_user().await;
         repository
             .create_user(
+                &web_audit(),
                 &EmailAddress::try_from("second@mail.test").unwrap(),
                 password_hash("pw"),
             )
@@ -1983,7 +2396,7 @@ mod test_sqlite_users_repository {
 
         assert_eq!(
             repository
-                .set_admin(&UserId::test_default(), true)
+                .set_admin(&web_audit(), &UserId::test_default(), true)
                 .await
                 .unwrap(),
             SetAdminOutcome::Updated
@@ -1993,7 +2406,7 @@ mod test_sqlite_users_repository {
         // A single admin cannot be demoted.
         assert_eq!(
             repository
-                .set_admin(&UserId::test_default(), false)
+                .set_admin(&web_audit(), &UserId::test_default(), false)
                 .await
                 .unwrap(),
             SetAdminOutcome::LastAdmin
@@ -2012,12 +2425,15 @@ mod test_sqlite_users_repository {
             .clone();
 
         assert_eq!(
-            repository.set_admin(&second, true).await.unwrap(),
+            repository
+                .set_admin(&web_audit(), &second, true)
+                .await
+                .unwrap(),
             SetAdminOutcome::Updated
         );
         assert_eq!(
             repository
-                .set_admin(&UserId::test_default(), false)
+                .set_admin(&web_audit(), &UserId::test_default(), false)
                 .await
                 .unwrap(),
             SetAdminOutcome::Updated
@@ -2034,7 +2450,7 @@ mod test_sqlite_users_repository {
 
         assert_eq!(
             repository
-                .set_admin(&UserId::from("unknown"), true)
+                .set_admin(&web_audit(), &UserId::from("unknown"), true)
                 .await
                 .unwrap(),
             SetAdminOutcome::UnknownUser
@@ -2046,6 +2462,7 @@ mod test_sqlite_users_repository {
         let (_db, repository) = repository_with_test_user().await;
         repository
             .create_user(
+                &web_audit(),
                 &EmailAddress::try_from("second@mail.test").unwrap(),
                 password_hash("pw"),
             )
@@ -2075,7 +2492,7 @@ mod test_sqlite_users_repository {
         }
 
         let revoked = repository
-            .revoke_user_sessions(&UserId::test_default())
+            .revoke_user_sessions(&web_audit(), &UserId::test_default())
             .await
             .unwrap();
 
@@ -2093,6 +2510,176 @@ mod test_sqlite_users_repository {
         .await
         .unwrap();
         assert_eq!(remaining, second.to_string());
+    }
+
+    async fn audit_rows(
+        repository: &SqliteUsersRepository,
+    ) -> Vec<(
+        String,
+        String,
+        Option<String>,
+        String,
+        Option<String>,
+        Option<String>,
+        String,
+    )> {
+        sqlx::query_as(
+            r#"
+        SELECT occurred_at, origin, actor_user_id, action, target_user_id, target_email, outcome
+        FROM t_admin_audit_log
+        ORDER BY id
+        ;"#,
+        )
+        .fetch_all(&repository.readers)
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_create_user_is_audited_with_its_actor() {
+        let (_db, repository) = repository_with_test_user().await;
+        let actor = UserId::from("acting_admin");
+        let audit = AdminAuditContext::new(AdminActor::Web(actor.clone()), Utc::now());
+
+        let email = EmailAddress::try_from("new@mail.test").unwrap();
+        let CreateUserOutcome::Created(target) = repository
+            .create_user(&audit, &email, password_hash("s3cret"))
+            .await
+            .unwrap()
+        else {
+            panic!("expected the user to be created");
+        };
+
+        let rows = audit_rows(&repository).await;
+        assert_eq!(rows.len(), 1);
+        let (occurred_at, origin, actor_user_id, action, target_user_id, target_email, outcome) =
+            &rows[0];
+        assert!(!occurred_at.is_empty());
+        assert_eq!(origin, "web");
+        assert_eq!(actor_user_id, &Some(actor.to_string()));
+        assert_eq!(action, "create_user");
+        assert_eq!(target_user_id, &Some(target.to_string()));
+        assert_eq!(target_email.as_deref(), Some("new@mail.test"));
+        assert_eq!(outcome, "created");
+    }
+
+    #[tokio::test]
+    async fn test_cli_actions_are_audited_without_an_actor() {
+        let (_db, repository) = repository_with_test_user().await;
+        let audit = AdminAuditContext::new(AdminActor::Cli, Utc::now());
+
+        repository
+            .promote_admin(&audit, &test_email())
+            .await
+            .unwrap();
+
+        let rows = audit_rows(&repository).await;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].1, "cli");
+        assert_eq!(rows[0].2, None);
+        assert_eq!(rows[0].3, "promote_admin");
+        assert_eq!(rows[0].6, "promoted");
+    }
+
+    #[tokio::test]
+    async fn test_refused_admin_actions_are_audited() {
+        let (_db, repository) = repository_with_test_user().await;
+
+        // Unknown user: refused promotion.
+        let unknown = EmailAddress::try_from("ghost@mail.test").unwrap();
+        assert_eq!(
+            repository
+                .promote_admin(&web_audit(), &unknown)
+                .await
+                .unwrap(),
+            PromoteAdminOutcome::UnknownUser
+        );
+
+        // Last admin: refused demotion.
+        repository
+            .create_or_promote_admin(
+                &web_audit(),
+                &test_email(),
+                password_hash("pw"),
+                BootstrapAdminMode::Force,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            repository
+                .set_admin(&web_audit(), &UserId::test_default(), false)
+                .await
+                .unwrap(),
+            SetAdminOutcome::LastAdmin
+        );
+
+        let outcomes: Vec<(String, String)> =
+            sqlx::query_as("SELECT action, outcome FROM t_admin_audit_log ORDER BY id;")
+                .fetch_all(&repository.readers)
+                .await
+                .unwrap();
+
+        assert_eq!(
+            outcomes,
+            vec![
+                ("promote_admin".to_string(), "unknown_user".to_string()),
+                ("bootstrap_admin".to_string(), "promoted".to_string()),
+                ("set_admin".to_string(), "last_admin".to_string()),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_password_audit_does_not_leak_secrets() {
+        let (_db, repository) = repository_with_test_user().await;
+
+        repository
+            .set_user_password(
+                &web_audit(),
+                &UserId::test_default(),
+                password_hash("super-secret"),
+            )
+            .await
+            .unwrap();
+
+        let details: Option<String> = sqlx::query_scalar("SELECT details FROM t_admin_audit_log;")
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap();
+        assert_eq!(details, None);
+
+        let everything: String = sqlx::query_scalar(
+            r#"
+        SELECT group_concat(
+            COALESCE(details, '') || ' ' || COALESCE(target_email, '') || ' ' || COALESCE(outcome, ''),
+            ' '
+        ) FROM t_admin_audit_log;"#,
+        )
+        .fetch_one(&repository.readers)
+        .await
+        .unwrap();
+        assert!(!everything.contains("super-secret"));
+    }
+
+    #[tokio::test]
+    async fn test_audit_rows_survive_user_deletion() {
+        let (_db, repository) = repository_with_test_user().await;
+
+        repository
+            .promote_admin(&web_audit(), &test_email())
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM t_users WHERE user_id = ?1;")
+            .bind(UserId::test_default().to_string())
+            .execute(&repository.writer)
+            .await
+            .unwrap();
+
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM t_admin_audit_log;")
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap();
+        assert_eq!(count, 1, "the audit trail must outlive the user");
     }
 
     #[tokio::test]
@@ -2115,6 +2702,10 @@ mod test_sqlite_users_repository {
             .await
             .unwrap();
         sqlx::query("select count(*) from t_emails;")
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap();
+        sqlx::query("select count(*) from t_admin_audit_log;")
             .fetch_one(&repository.readers)
             .await
             .unwrap();

@@ -13,6 +13,7 @@ use rand::RngExt;
 use sha2::{Digest, Sha256};
 
 pub mod admin;
+pub mod admin_audit;
 pub mod infra;
 pub mod service;
 pub mod session;

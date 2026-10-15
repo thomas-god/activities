@@ -9,13 +9,14 @@ use anyhow::anyhow;
 use clap::{Args, Parser, Subcommand};
 
 use crate::{
+    clock::Clock,
     config::{StdEnvironment, data_path_from_env},
     inbound::{
         auth::multi_user::{
             EmailAddress, Password,
             admin::{
-                AdminService, BootstrapAdminMode, BootstrapAdminOutcome, PromoteAdminOutcome,
-                RevokeAdminOutcome,
+                AdminActor, AdminService, BootstrapAdminMode, BootstrapAdminOutcome,
+                PromoteAdminOutcome, RevokeAdminOutcome,
             },
         },
         http::SqliteUsersRepository,
@@ -103,7 +104,7 @@ where
 pub async fn run(command: AdminCommand) -> anyhow::Result<()> {
     let data_path = data_path_from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
     let repository = open_users_repository(&data_path).await?;
-    let service = AdminService::new(repository);
+    let service = AdminService::new(repository, Clock::new());
 
     match command {
         AdminCommand::Bootstrap(args) => bootstrap(&service, args).await,
@@ -123,14 +124,14 @@ async fn open_users_repository(data_path: &str) -> anyhow::Result<SqliteUsersRep
 }
 
 async fn bootstrap(
-    service: &AdminService<SqliteUsersRepository>,
+    service: &AdminService<SqliteUsersRepository, Clock>,
     args: BootstrapArgs,
 ) -> anyhow::Result<()> {
     let email = parse_email(&args.email)?;
     let password = read_password(&args)?;
 
     match service
-        .bootstrap_admin(email, password, BootstrapAdminMode::Force)
+        .bootstrap_admin(&AdminActor::Cli, email, password, BootstrapAdminMode::Force)
         .await?
     {
         BootstrapAdminOutcome::Created => println!("Created admin `{}`.", args.email),
@@ -150,12 +151,12 @@ async fn bootstrap(
 }
 
 async fn promote(
-    service: &AdminService<SqliteUsersRepository>,
+    service: &AdminService<SqliteUsersRepository, Clock>,
     args: PromoteArgs,
 ) -> anyhow::Result<()> {
     let email = parse_email(&args.email)?;
 
-    match service.promote_admin(email).await? {
+    match service.promote_admin(&AdminActor::Cli, email).await? {
         PromoteAdminOutcome::Promoted => println!("Promoted admin `{}`.", args.email),
         PromoteAdminOutcome::AlreadyAdmin => {
             println!("`{}` is already an admin, nothing to do.", args.email)
@@ -167,12 +168,12 @@ async fn promote(
 }
 
 async fn revoke(
-    service: &AdminService<SqliteUsersRepository>,
+    service: &AdminService<SqliteUsersRepository, Clock>,
     args: RevokeArgs,
 ) -> anyhow::Result<()> {
     let email = parse_email(&args.email)?;
 
-    match service.revoke_admin(email).await? {
+    match service.revoke_admin(&AdminActor::Cli, email).await? {
         RevokeAdminOutcome::Revoked => println!("Revoked admin `{}`.", args.email),
         RevokeAdminOutcome::NotAdmin => {
             println!("`{}` is not an admin, nothing to do.", args.email)

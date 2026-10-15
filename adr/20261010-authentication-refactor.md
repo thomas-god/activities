@@ -83,3 +83,15 @@ password, managing admin user, and revoking user's sessions.
 A first admin can be bootstrap via configuration from an existing user (or created), and a basic
 admin CLI has been added for break-glass access (requires access to the deployment environment, see
 the [README](../README.md#admin-role))
+
+#### Admin action audit log
+
+Every admin action — through the web API, the break-glass CLI or the startup bootstrap — is
+recorded in `t_admin_audit_log`. Rows capture the origin, the acting user id (when there is one),
+the action, the target and the outcome, including refused operations (unknown user, last admin, …).
+
+The actor and the target are denormalized snapshots without a foreign key to `t_users`: the CLI and
+the bootstrap have no user account, and the trail must survive the deletion or renaming of the
+users it mentions. Each row is written in the same transaction as the mutation it describes, so an
+action and its audit entry always stay consistent. Secrets (passwords, hashes, tokens) are never
+stored.

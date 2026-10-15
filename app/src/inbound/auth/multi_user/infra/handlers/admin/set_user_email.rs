@@ -10,7 +10,7 @@ use crate::{
     domain::models::UserId,
     inbound::auth::multi_user::{
         EmailAddress,
-        admin::{IAdminService, SetUserEmailOutcome},
+        admin::{AdminActor, IAdminService, SetUserEmailOutcome},
     },
 };
 
@@ -24,7 +24,7 @@ pub struct SetUserEmailBody {
 #[tracing::instrument(skip_all)]
 pub async fn set_user_email<AS: IAdminService>(
     State(admin): State<AdminServiceHandle<AS>>,
-    _admin: AdminGuard<AS>,
+    guard: AdminGuard<AS>,
     Path(user_id): Path<String>,
     Json(body): Json<SetUserEmailBody>,
 ) -> impl IntoResponse {
@@ -32,9 +32,10 @@ pub async fn set_user_email<AS: IAdminService>(
         return StatusCode::BAD_REQUEST.into_response();
     };
 
+    let actor = AdminActor::Web(guard.user().clone());
     match admin
         .service()
-        .set_user_email(UserId::from(user_id), email)
+        .set_user_email(&actor, UserId::from(user_id), email)
         .await
     {
         Ok(SetUserEmailOutcome::Updated) => StatusCode::OK.into_response(),

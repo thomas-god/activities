@@ -8,7 +8,12 @@
 use derive_more::Constructor;
 
 use super::{EmailAddress, HashedPassword, Password};
-use crate::{config::AdminBootstrapConfig, domain::models::UserId};
+use crate::{
+    config::AdminBootstrapConfig,
+    domain::{models::UserId, ports::IClock},
+};
+
+pub use super::admin_audit::{AdminAction, AdminActor, AdminAuditContext, AdminAuditEntry};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BootstrapAdminMode {
@@ -130,6 +135,7 @@ impl std::error::Error for AdminError {}
 pub trait AdminRepository: Clone + Send + Sync + 'static {
     fn create_or_promote_admin(
         &self,
+        audit: &AdminAuditContext,
         email: &EmailAddress,
         password_hash: HashedPassword,
         mode: BootstrapAdminMode,
@@ -137,11 +143,13 @@ pub trait AdminRepository: Clone + Send + Sync + 'static {
 
     fn promote_admin(
         &self,
+        audit: &AdminAuditContext,
         email: &EmailAddress,
     ) -> impl Future<Output = Result<PromoteAdminOutcome, ()>> + Send;
 
     fn revoke_admin(
         &self,
+        audit: &AdminAuditContext,
         email: &EmailAddress,
     ) -> impl Future<Output = Result<RevokeAdminOutcome, ()>> + Send;
 
@@ -151,29 +159,37 @@ pub trait AdminRepository: Clone + Send + Sync + 'static {
 
     fn create_user(
         &self,
+        audit: &AdminAuditContext,
         email: &EmailAddress,
         password_hash: HashedPassword,
     ) -> impl Future<Output = Result<CreateUserOutcome, ()>> + Send;
 
     fn set_user_password(
         &self,
+        audit: &AdminAuditContext,
         user: &UserId,
         password_hash: HashedPassword,
     ) -> impl Future<Output = Result<SetUserPasswordOutcome, ()>> + Send;
 
     fn set_user_email(
         &self,
+        audit: &AdminAuditContext,
         user: &UserId,
         email: EmailAddress,
     ) -> impl Future<Output = Result<SetUserEmailOutcome, ()>> + Send;
 
     fn set_admin(
         &self,
+        audit: &AdminAuditContext,
         user: &UserId,
         is_admin: bool,
     ) -> impl Future<Output = Result<SetAdminOutcome, ()>> + Send;
 
-    fn revoke_user_sessions(&self, user: &UserId) -> impl Future<Output = Result<u64, ()>> + Send;
+    fn revoke_user_sessions(
+        &self,
+        audit: &AdminAuditContext,
+        user: &UserId,
+    ) -> impl Future<Output = Result<u64, ()>> + Send;
 }
 
 pub trait IAdminService: Clone + Send + Sync + 'static {
@@ -183,46 +199,57 @@ pub trait IAdminService: Clone + Send + Sync + 'static {
 
     fn create_user(
         &self,
+        actor: &AdminActor,
         email: EmailAddress,
         password: Password,
     ) -> impl Future<Output = Result<CreateUserOutcome, AdminError>> + Send;
 
     fn set_user_password(
         &self,
+        actor: &AdminActor,
         user: UserId,
         password: Password,
     ) -> impl Future<Output = Result<SetUserPasswordOutcome, AdminError>> + Send;
 
     fn set_user_email(
         &self,
+        actor: &AdminActor,
         user: UserId,
         email: EmailAddress,
     ) -> impl Future<Output = Result<SetUserEmailOutcome, AdminError>> + Send;
 
     fn set_admin(
         &self,
+        actor: &AdminActor,
         user: UserId,
         is_admin: bool,
     ) -> impl Future<Output = Result<SetAdminOutcome, AdminError>> + Send;
 
     fn revoke_user_sessions(
         &self,
+        actor: &AdminActor,
         user: UserId,
     ) -> impl Future<Output = Result<u64, AdminError>> + Send;
 }
 
 #[derive(Debug, Clone)]
-pub struct AdminService<AR> {
+pub struct AdminService<AR, C> {
     repository: AR,
+    clock: C,
 }
 
-impl<AR: AdminRepository> AdminService<AR> {
-    pub fn new(repository: AR) -> Self {
-        Self { repository }
+impl<AR: AdminRepository, C: IClock> AdminService<AR, C> {
+    pub fn new(repository: AR, clock: C) -> Self {
+        Self { repository, clock }
+    }
+
+    fn audit_context(&self, actor: &AdminActor) -> AdminAuditContext {
+        AdminAuditContext::new(actor.clone(), self.clock.now())
     }
 
     pub async fn bootstrap_admin(
         &self,
+        actor: &AdminActor,
         email: EmailAddress,
         password: Password,
         mode: BootstrapAdminMode,
@@ -231,8 +258,9 @@ impl<AR: AdminRepository> AdminService<AR> {
             return Err(AdminError::HashingFailed);
         };
 
+        let audit = self.audit_context(actor);
         self.repository
-            .create_or_promote_admin(&email, password_hash, mode)
+            .create_or_promote_admin(&audit, &email, password_hash, mode)
             .await
             .map_err(|()| AdminError::Storage)
     }
@@ -251,7 +279,12 @@ impl<AR: AdminRepository> AdminService<AR> {
             Password::try_from(config.password.clone()).map_err(|()| AdminError::EmptyPassword)?;
 
         let outcome = self
-            .bootstrap_admin(email, password, BootstrapAdminMode::IfNoAdmin)
+            .bootstrap_admin(
+                &AdminActor::Bootstrap,
+                email,
+                password,
+                BootstrapAdminMode::IfNoAdmin,
+            )
             .await?;
 
         match outcome {
@@ -269,26 +302,30 @@ impl<AR: AdminRepository> AdminService<AR> {
 
     pub async fn promote_admin(
         &self,
+        actor: &AdminActor,
         email: EmailAddress,
     ) -> Result<PromoteAdminOutcome, AdminError> {
+        let audit = self.audit_context(actor);
         self.repository
-            .promote_admin(&email)
+            .promote_admin(&audit, &email)
             .await
             .map_err(|()| AdminError::Storage)
     }
 
     pub async fn revoke_admin(
         &self,
+        actor: &AdminActor,
         email: EmailAddress,
     ) -> Result<RevokeAdminOutcome, AdminError> {
+        let audit = self.audit_context(actor);
         self.repository
-            .revoke_admin(&email)
+            .revoke_admin(&audit, &email)
             .await
             .map_err(|()| AdminError::Storage)
     }
 }
 
-impl<AR: AdminRepository> IAdminService for AdminService<AR> {
+impl<AR: AdminRepository, C: IClock> IAdminService for AdminService<AR, C> {
     async fn is_admin(&self, user: UserId) -> Result<bool, AdminError> {
         self.repository
             .is_admin(&user)
@@ -305,6 +342,7 @@ impl<AR: AdminRepository> IAdminService for AdminService<AR> {
 
     async fn create_user(
         &self,
+        actor: &AdminActor,
         email: EmailAddress,
         password: Password,
     ) -> Result<CreateUserOutcome, AdminError> {
@@ -312,14 +350,16 @@ impl<AR: AdminRepository> IAdminService for AdminService<AR> {
             return Err(AdminError::HashingFailed);
         };
 
+        let audit = self.audit_context(actor);
         self.repository
-            .create_user(&email, password_hash)
+            .create_user(&audit, &email, password_hash)
             .await
             .map_err(|()| AdminError::Storage)
     }
 
     async fn set_user_password(
         &self,
+        actor: &AdminActor,
         user: UserId,
         password: Password,
     ) -> Result<SetUserPasswordOutcome, AdminError> {
@@ -327,33 +367,47 @@ impl<AR: AdminRepository> IAdminService for AdminService<AR> {
             return Err(AdminError::HashingFailed);
         };
 
+        let audit = self.audit_context(actor);
         self.repository
-            .set_user_password(&user, password_hash)
+            .set_user_password(&audit, &user, password_hash)
             .await
             .map_err(|()| AdminError::Storage)
     }
 
     async fn set_user_email(
         &self,
+        actor: &AdminActor,
         user: UserId,
         email: EmailAddress,
     ) -> Result<SetUserEmailOutcome, AdminError> {
+        let audit = self.audit_context(actor);
         self.repository
-            .set_user_email(&user, email)
+            .set_user_email(&audit, &user, email)
             .await
             .map_err(|()| AdminError::Storage)
     }
 
-    async fn set_admin(&self, user: UserId, is_admin: bool) -> Result<SetAdminOutcome, AdminError> {
+    async fn set_admin(
+        &self,
+        actor: &AdminActor,
+        user: UserId,
+        is_admin: bool,
+    ) -> Result<SetAdminOutcome, AdminError> {
+        let audit = self.audit_context(actor);
         self.repository
-            .set_admin(&user, is_admin)
+            .set_admin(&audit, &user, is_admin)
             .await
             .map_err(|()| AdminError::Storage)
     }
 
-    async fn revoke_user_sessions(&self, user: UserId) -> Result<u64, AdminError> {
+    async fn revoke_user_sessions(
+        &self,
+        actor: &AdminActor,
+        user: UserId,
+    ) -> Result<u64, AdminError> {
+        let audit = self.audit_context(actor);
         self.repository
-            .revoke_user_sessions(&user)
+            .revoke_user_sessions(&audit, &user)
             .await
             .map_err(|()| AdminError::Storage)
     }
@@ -375,6 +429,7 @@ impl IAdminService for DisabledAdminService {
 
     async fn create_user(
         &self,
+        _actor: &AdminActor,
         _email: EmailAddress,
         _password: Password,
     ) -> Result<CreateUserOutcome, AdminError> {
@@ -383,6 +438,7 @@ impl IAdminService for DisabledAdminService {
 
     async fn set_user_password(
         &self,
+        _actor: &AdminActor,
         _user: UserId,
         _password: Password,
     ) -> Result<SetUserPasswordOutcome, AdminError> {
@@ -391,6 +447,7 @@ impl IAdminService for DisabledAdminService {
 
     async fn set_user_email(
         &self,
+        _actor: &AdminActor,
         _user: UserId,
         _email: EmailAddress,
     ) -> Result<SetUserEmailOutcome, AdminError> {
@@ -399,13 +456,18 @@ impl IAdminService for DisabledAdminService {
 
     async fn set_admin(
         &self,
+        _actor: &AdminActor,
         _user: UserId,
         _is_admin: bool,
     ) -> Result<SetAdminOutcome, AdminError> {
         Err(AdminError::Storage)
     }
 
-    async fn revoke_user_sessions(&self, _user: UserId) -> Result<u64, AdminError> {
+    async fn revoke_user_sessions(
+        &self,
+        _actor: &AdminActor,
+        _user: UserId,
+    ) -> Result<u64, AdminError> {
         Err(AdminError::Storage)
     }
 }
@@ -413,6 +475,8 @@ impl IAdminService for DisabledAdminService {
 #[cfg(test)]
 mod tests {
     use mockall::mock;
+
+    use crate::clock::clock_test_utils::FakeClock;
 
     use super::*;
 
@@ -426,6 +490,7 @@ mod tests {
         impl AdminRepository for AdminRepository {
             async fn create_or_promote_admin(
                 &self,
+                audit: &AdminAuditContext,
                 email: &EmailAddress,
                 password_hash: HashedPassword,
                 mode: BootstrapAdminMode,
@@ -433,11 +498,13 @@ mod tests {
 
             async fn promote_admin(
                 &self,
+                audit: &AdminAuditContext,
                 email: &EmailAddress,
             ) -> Result<PromoteAdminOutcome, ()>;
 
             async fn revoke_admin(
                 &self,
+                audit: &AdminAuditContext,
                 email: &EmailAddress,
             ) -> Result<RevokeAdminOutcome, ()>;
 
@@ -447,29 +514,37 @@ mod tests {
 
             async fn create_user(
                 &self,
+                audit: &AdminAuditContext,
                 email: &EmailAddress,
                 password_hash: HashedPassword,
             ) -> Result<CreateUserOutcome, ()>;
 
             async fn set_user_password(
                 &self,
+                audit: &AdminAuditContext,
                 user: &UserId,
                 password_hash: HashedPassword,
             ) -> Result<SetUserPasswordOutcome, ()>;
 
             async fn set_user_email(
                 &self,
+                audit: &AdminAuditContext,
                 user: &UserId,
                 email: EmailAddress,
             ) -> Result<SetUserEmailOutcome, ()>;
 
             async fn set_admin(
                 &self,
+                audit: &AdminAuditContext,
                 user: &UserId,
                 is_admin: bool,
             ) -> Result<SetAdminOutcome, ()>;
 
-            async fn revoke_user_sessions(&self, user: &UserId) -> Result<u64, ()>;
+            async fn revoke_user_sessions(
+                &self,
+                audit: &AdminAuditContext,
+                user: &UserId,
+            ) -> Result<u64, ()>;
         }
     }
 
@@ -484,18 +559,24 @@ mod tests {
         Password::try_from(password.to_string()).unwrap()
     }
 
+    fn service(repository: MockAdminRepository) -> AdminService<MockAdminRepository, FakeClock> {
+        AdminService::new(repository, FakeClock::default())
+    }
+
     #[tokio::test]
     async fn test_apply_bootstrap_config_parses_and_uses_if_no_admin() {
         let mut repository = MockAdminRepository::new();
         repository
             .expect_create_or_promote_admin()
             .times(1)
-            .withf(|email, _hash, mode| {
-                email.value() == "admin@example.com" && *mode == BootstrapAdminMode::IfNoAdmin
+            .withf(|audit, email, _hash, mode| {
+                audit.actor() == &AdminActor::Bootstrap
+                    && email.value() == "admin@example.com"
+                    && *mode == BootstrapAdminMode::IfNoAdmin
             })
-            .returning(|_, _, _| Ok(BootstrapAdminOutcome::Created));
+            .returning(|_, _, _, _| Ok(BootstrapAdminOutcome::Created));
 
-        let outcome = AdminService::new(repository)
+        let outcome = service(repository)
             .apply_bootstrap_config(&bootstrap_config("admin@example.com", "s3cret"))
             .await
             .unwrap();
@@ -505,7 +586,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_apply_bootstrap_config_rejects_invalid_email() {
-        let err = AdminService::new(MockAdminRepository::new())
+        let err = service(MockAdminRepository::new())
             .apply_bootstrap_config(&bootstrap_config("not-an-email", "s3cret"))
             .await
             .unwrap_err();
@@ -515,7 +596,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_apply_bootstrap_config_rejects_empty_password() {
-        let err = AdminService::new(MockAdminRepository::new())
+        let err = service(MockAdminRepository::new())
             .apply_bootstrap_config(&bootstrap_config("admin@example.com", ""))
             .await
             .unwrap_err();
@@ -529,15 +610,17 @@ mod tests {
         repository
             .expect_create_or_promote_admin()
             .times(1)
-            .withf(|email, hash, mode| {
-                email.value() == "admin@example.com"
+            .withf(|audit, email, hash, mode| {
+                audit.actor() == &AdminActor::Cli
+                    && email.value() == "admin@example.com"
                     && *mode == BootstrapAdminMode::Force
                     && hash.verify_password(&parsed_password("s3cret"))
             })
-            .returning(|_, _, _| Ok(BootstrapAdminOutcome::Promoted));
+            .returning(|_, _, _, _| Ok(BootstrapAdminOutcome::Promoted));
 
-        let outcome = AdminService::new(repository)
+        let outcome = service(repository)
             .bootstrap_admin(
+                &AdminActor::Cli,
                 EmailAddress::try_from("admin@example.com").unwrap(),
                 parsed_password("s3cret"),
                 BootstrapAdminMode::Force,
@@ -565,12 +648,7 @@ mod tests {
             .withf(|u| u == &user("target"))
             .returning(|_| Ok(true));
 
-        assert!(
-            AdminService::new(repository)
-                .is_admin(user("target"))
-                .await
-                .unwrap()
-        );
+        assert!(service(repository).is_admin(user("target")).await.unwrap());
     }
 
     #[tokio::test]
@@ -579,7 +657,7 @@ mod tests {
         repository.expect_is_admin().returning(|_| Err(()));
 
         assert_eq!(
-            AdminService::new(repository)
+            service(repository)
                 .is_admin(user("target"))
                 .await
                 .unwrap_err(),
@@ -601,7 +679,7 @@ mod tests {
             )])
         });
 
-        let users = AdminService::new(repository).list_users().await.unwrap();
+        let users = service(repository).list_users().await.unwrap();
 
         assert_eq!(users.len(), 1);
         assert_eq!(users[0].email(), &Some("user@mail.test".to_string()));
@@ -613,13 +691,19 @@ mod tests {
         repository
             .expect_create_user()
             .times(1)
-            .withf(|email, hash| {
-                email.value() == "new@mail.test" && hash.verify_password(&parsed_password("s3cret"))
+            .withf(|audit, email, hash| {
+                audit.actor() == &AdminActor::Web(user("actor"))
+                    && email.value() == "new@mail.test"
+                    && hash.verify_password(&parsed_password("s3cret"))
             })
-            .returning(|_, _| Ok(CreateUserOutcome::Created(user("new"))));
+            .returning(|_, _, _| Ok(CreateUserOutcome::Created(user("new"))));
 
-        let outcome = AdminService::new(repository)
-            .create_user(email("new@mail.test"), parsed_password("s3cret"))
+        let outcome = service(repository)
+            .create_user(
+                &AdminActor::Web(user("actor")),
+                email("new@mail.test"),
+                parsed_password("s3cret"),
+            )
             .await
             .unwrap();
 
@@ -632,13 +716,17 @@ mod tests {
         repository
             .expect_set_user_password()
             .times(1)
-            .withf(|u, hash| {
+            .withf(|_audit, u, hash| {
                 u == &user("target") && hash.verify_password(&parsed_password("s3cret"))
             })
-            .returning(|_, _| Ok(SetUserPasswordOutcome::Updated));
+            .returning(|_, _, _| Ok(SetUserPasswordOutcome::Updated));
 
-        let outcome = AdminService::new(repository)
-            .set_user_password(user("target"), parsed_password("s3cret"))
+        let outcome = service(repository)
+            .set_user_password(
+                &AdminActor::Web(user("actor")),
+                user("target"),
+                parsed_password("s3cret"),
+            )
             .await
             .unwrap();
 
@@ -651,11 +739,11 @@ mod tests {
         repository
             .expect_set_admin()
             .times(1)
-            .withf(|u, is_admin| u == &user("target") && *is_admin)
-            .returning(|_, _| Ok(SetAdminOutcome::LastAdmin));
+            .withf(|_audit, u, is_admin| u == &user("target") && *is_admin)
+            .returning(|_, _, _| Ok(SetAdminOutcome::LastAdmin));
 
-        let outcome = AdminService::new(repository)
-            .set_admin(user("target"), true)
+        let outcome = service(repository)
+            .set_admin(&AdminActor::Web(user("actor")), user("target"), true)
             .await
             .unwrap();
 
@@ -668,12 +756,12 @@ mod tests {
         repository
             .expect_revoke_user_sessions()
             .times(1)
-            .withf(|u| u == &user("target"))
-            .returning(|_| Ok(2));
+            .withf(|_audit, u| u == &user("target"))
+            .returning(|_, _| Ok(2));
 
         assert_eq!(
-            AdminService::new(repository)
-                .revoke_user_sessions(user("target"))
+            service(repository)
+                .revoke_user_sessions(&AdminActor::Web(user("actor")), user("target"))
                 .await
                 .unwrap(),
             2

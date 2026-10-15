@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::inbound::auth::multi_user::{
     EmailAddress, Password,
-    admin::{CreateUserOutcome, IAdminService},
+    admin::{AdminActor, CreateUserOutcome, IAdminService},
 };
 
 use super::{AdminGuard, AdminServiceHandle, admin_error_status};
@@ -23,7 +23,7 @@ pub struct CreateUserResponse {
 #[tracing::instrument(skip_all)]
 pub async fn create_user<AS: IAdminService>(
     State(admin): State<AdminServiceHandle<AS>>,
-    _admin: AdminGuard<AS>,
+    guard: AdminGuard<AS>,
     Json(body): Json<CreateUserBody>,
 ) -> impl IntoResponse {
     let Ok(email) = EmailAddress::try_from(body.email.as_str()) else {
@@ -33,7 +33,8 @@ pub async fn create_user<AS: IAdminService>(
         return StatusCode::BAD_REQUEST.into_response();
     };
 
-    match admin.service().create_user(email, password).await {
+    let actor = AdminActor::Web(guard.user().clone());
+    match admin.service().create_user(&actor, email, password).await {
         Ok(CreateUserOutcome::Created(user_id)) => (
             StatusCode::CREATED,
             Json(CreateUserResponse {

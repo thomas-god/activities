@@ -5,7 +5,10 @@ use axum::{
 };
 use serde::Serialize;
 
-use crate::{domain::models::UserId, inbound::auth::multi_user::admin::IAdminService};
+use crate::{
+    domain::models::UserId,
+    inbound::auth::multi_user::admin::{AdminActor, IAdminService},
+};
 
 use super::{AdminGuard, AdminServiceHandle, admin_error_status};
 
@@ -18,12 +21,13 @@ pub struct RevokeSessionsResponse {
 #[tracing::instrument(skip_all)]
 pub async fn revoke_user_sessions<AS: IAdminService>(
     State(admin): State<AdminServiceHandle<AS>>,
-    _admin: AdminGuard<AS>,
+    guard: AdminGuard<AS>,
     Path(user_id): Path<String>,
 ) -> impl IntoResponse {
+    let actor = AdminActor::Web(guard.user().clone());
     match admin
         .service()
-        .revoke_user_sessions(UserId::from(user_id))
+        .revoke_user_sessions(&actor, UserId::from(user_id))
         .await
     {
         Ok(revoked) => Json(RevokeSessionsResponse { revoked }).into_response(),

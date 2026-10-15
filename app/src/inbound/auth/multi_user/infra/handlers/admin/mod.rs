@@ -180,8 +180,8 @@ mod tests {
     use crate::inbound::auth::multi_user::{
         EmailAddress, Password,
         admin::{
-            AdminUser, CreateUserOutcome, IAdminService, SetAdminOutcome, SetUserEmailOutcome,
-            SetUserPasswordOutcome,
+            AdminActor, AdminUser, CreateUserOutcome, IAdminService, SetAdminOutcome,
+            SetUserEmailOutcome, SetUserPasswordOutcome,
         },
         test_utils::MockUserService,
     };
@@ -202,29 +202,37 @@ mod tests {
 
             async fn create_user(
                 &self,
+                actor: &AdminActor,
                 email: EmailAddress,
                 password: Password,
             ) -> Result<CreateUserOutcome, AdminError>;
 
             async fn set_user_password(
                 &self,
+                actor: &AdminActor,
                 user: UserId,
                 password: Password,
             ) -> Result<SetUserPasswordOutcome, AdminError>;
 
             async fn set_user_email(
                 &self,
+                actor: &AdminActor,
                 user: UserId,
                 email: EmailAddress,
             ) -> Result<SetUserEmailOutcome, AdminError>;
 
             async fn set_admin(
                 &self,
+                actor: &AdminActor,
                 user: UserId,
                 is_admin: bool,
             ) -> Result<SetAdminOutcome, AdminError>;
 
-            async fn revoke_user_sessions(&self, user: UserId) -> Result<u64, AdminError>;
+            async fn revoke_user_sessions(
+                &self,
+                actor: &AdminActor,
+                user: UserId,
+            ) -> Result<u64, AdminError>;
         }
     }
 
@@ -323,7 +331,7 @@ mod tests {
         admin
             .expect_create_user()
             .times(1)
-            .returning(|_, _| Ok(CreateUserOutcome::Created(UserId::from("new_user"))));
+            .returning(|_, _, _| Ok(CreateUserOutcome::Created(UserId::from("new_user"))));
 
         let response = build_server(admin)
             .post("/admin/users")
@@ -355,7 +363,7 @@ mod tests {
         admin
             .expect_create_user()
             .times(1)
-            .returning(|_, _| Ok(CreateUserOutcome::EmailAlreadyUsed));
+            .returning(|_, _, _| Ok(CreateUserOutcome::EmailAlreadyUsed));
 
         let response = build_server(admin)
             .post("/admin/users")
@@ -372,7 +380,7 @@ mod tests {
         admin
             .expect_set_user_password()
             .times(1)
-            .returning(|_, _| Ok(SetUserPasswordOutcome::Updated));
+            .returning(|_, _, _| Ok(SetUserPasswordOutcome::Updated));
 
         let response = build_server(admin)
             .post("/admin/users/user_1/password")
@@ -389,7 +397,7 @@ mod tests {
         admin
             .expect_set_user_password()
             .times(1)
-            .returning(|_, _| Ok(SetUserPasswordOutcome::UnknownUser));
+            .returning(|_, _, _| Ok(SetUserPasswordOutcome::UnknownUser));
 
         let response = build_server(admin)
             .post("/admin/users/ghost/password")
@@ -406,7 +414,7 @@ mod tests {
         admin
             .expect_set_admin()
             .times(1)
-            .returning(|_, _| Ok(SetAdminOutcome::LastAdmin));
+            .returning(|_, _, _| Ok(SetAdminOutcome::LastAdmin));
 
         let response = build_server(admin)
             .post("/admin/users/user_1/admin")
@@ -423,7 +431,7 @@ mod tests {
         admin
             .expect_revoke_user_sessions()
             .times(1)
-            .returning(|_| Ok(2));
+            .returning(|_, _| Ok(2));
 
         let response = build_server(admin)
             .post("/admin/users/user_1/sessions/revoke")
