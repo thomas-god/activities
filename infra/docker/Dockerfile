@@ -18,25 +18,36 @@ ENV NODE_ENV=production
 ENV PUBLIC_APP_URL=
 RUN npm run build
 
-# Build stage for Rust backend
-FROM rust:1.96-alpine AS backend-builder
-
+FROM rust:1.96-alpine AS chef
 RUN apk add --no-cache musl-dev
+RUN cargo install cargo-chef --locked
 WORKDIR /app/backend
+
+# Analyse the workspace and emit a recipe describing its dependencies.
+FROM chef AS planner
 COPY Cargo.toml Cargo.lock ./
 COPY app/ app/
 COPY fit-parser/ fit-parser/
 COPY fit-codegen/ fit-codegen/
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/app/backend/target \
-    cargo build --release -p app && \
-    cp target/release/app /app/app_bin
+RUN cargo chef prepare --recipe-path recipe.json
+
+# Build stage for Rust backend
+FROM chef AS backend-builder
+COPY --from=planner /app/backend/recipe.json recipe.json
+# Compile only the dependencies.
+RUN cargo chef cook --release --recipe-path recipe.json
+# Compile the workspace crates themselves.
+COPY Cargo.toml Cargo.lock ./
+COPY app/ app/
+COPY fit-parser/ fit-parser/
+COPY fit-codegen/ fit-codegen/
+RUN cargo build --release -p app
 
 # Runtime stage
 FROM nginx:alpine
 RUN apk add --no-cache nginx
 
-COPY --from=backend-builder /app/app_bin ./app_bin
+COPY --from=backend-builder /app/backend/target/release/app ./app_bin
 COPY infra/docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=frontend-builder --chown=nginx:nginx /app/frontend/build /usr/share/nginx/html
 COPY --chmod=0755 infra/docker/start.sh ./
