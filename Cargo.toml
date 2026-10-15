@@ -5,3 +5,14 @@ default-members = ["app"]
 
 [profile.dev]
 debug = "line-tables-only"
+
+# Argon2 is intentionally memory-hard and therefore extremely slow when the
+# `argon2`/`blake2` crates are compiled without optimizations (the default for
+# `cargo test`). Optimize just these crates in the dev profile so the
+# password-hashing auth tests stay fast while production keeps the default
+# (secure) Argon2 parameters.
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3
