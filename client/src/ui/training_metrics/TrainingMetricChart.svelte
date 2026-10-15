@@ -118,7 +118,15 @@
 		{/if}
 	{:else if metric.source.type === 'durationCurve'}
 		{@const curve_type = metric.source.metric === 'Running' ? 'pace' : 'power'}
-		<DurationCurve kind={curve_type} curveValues={durationCurveValues} {width} {height} />
+		<DurationCurve
+			bind:this={chartRef}
+			kind={curve_type}
+			curveValues={durationCurveValues}
+			{width}
+			{height}
+			{yMax}
+			bind:syncHoveredBin
+		/>
 	{:else if metric.granularity !== null}
 		{#if metric.source.type === 'weightAndNutrition' && (metric.source.metric === 'BodyComposition' || metric.source.metric === 'Macros')}
 			<StackedArea

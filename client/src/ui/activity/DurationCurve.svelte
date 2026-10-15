@@ -1,6 +1,7 @@
 <script lang="ts">
 	import * as d3 from 'd3';
-	import { isSome, none, type Option, type Some } from '#lib/Options.js';
+	import { isNone, isSome, none, some, unwrapOr, type Option, type Some } from '#lib/Options.js';
+	import type { ChartHandle, HoveredBin } from '#ui/training_metrics/TrainingMetricChart.svelte';
 
 	type Kind = 'power' | 'pace';
 
@@ -17,6 +18,8 @@
 		width: number;
 		height: number;
 		weight?: Option<number>;
+		yMax?: Option<number>;
+		syncHoveredBin?: Option<HoveredBin>;
 	}
 
 	let {
@@ -27,8 +30,14 @@
 		averageValue = null,
 		width,
 		height,
-		weight = none()
+		weight = none(),
+		yMax = none(),
+		syncHoveredBin = $bindable(none())
 	}: Props = $props();
+
+	const uid = $props.id();
+	const gradientId = `${uid}-gradient`;
+	const clipId = `${uid}-clip`;
 
 	let isPace = $derived(kind === 'pace');
 
@@ -130,10 +139,21 @@
 		)
 	);
 
-	let yScale = $derived.by(() => {
-		const maxValue = d3.max([...displayedData, ...displayedBestData], (d) => d.value) ?? 100;
-		return d3.scaleLinear([0, maxValue * 1.05], [height - marginBottom, marginTop]);
-	});
+	let internalMaxValue = $derived(
+		d3.max([...displayedData, ...displayedBestData], (d) => d.value) ?? 0
+	);
+
+	export function getYMax(): number {
+		return internalMaxValue;
+	}
+	export function getYMin(): number {
+		return 0;
+	}
+	({ getYMax, getYMin }) satisfies ChartHandle;
+
+	let maxValue = $derived(unwrapOr(yMax, internalMaxValue));
+
+	let yScale = $derived(d3.scaleLinear([0, maxValue * 1.05], [height - marginBottom, marginTop]));
 
 	let bestLinePath = $derived.by(() => {
 		if (displayedBestData.length === 0) return '';
@@ -218,16 +238,57 @@
 	let yTicks = $derived(yScale.ticks(5));
 
 	// Tooltip
-	let tooltipX = $state<number | undefined>(undefined);
+	// Whether the current cursor originates from this chart or from a sibling
+	// chart through `syncHoveredBin`.
+	let hoverSource = $state<'local' | 'external'>('local');
+	// Duration (in seconds) currently hovered. Storing the duration rather than a
+	// pixel position keeps sibling charts in sync even when some durations are
+	// missing from one of the curves.
+	let hoveredDuration = $state<number | undefined>(undefined);
+
 	const bisector = d3.bisector<CurvePoint, number>((d) => d.duration);
-	let tooltipData = $derived.by(() => {
-		if (tooltipX === undefined || displayedData.length === 0) return null;
-		const duration = xScale.invert(tooltipX);
-		const idx = Math.max(
+	const fixedDurationBisector = d3.bisector<number, number>((d) => d);
+
+	const indexAtX = (px: number): number | null => {
+		if (displayedData.length === 0) return null;
+		const duration = xScale.invert(px);
+		return Math.max(
 			0,
 			Math.min(bisector.center(displayedData, duration), displayedData.length - 1)
 		);
-		return displayedData[idx] ?? null;
+	};
+
+	// Index of the fixed duration closest to `duration`, used as the shared hover
+	// bin between sibling curves.
+	const fixedIndexFor = (duration: number): number =>
+		Math.max(
+			0,
+			Math.min(fixedDurationBisector.center(FIXED_DURATIONS, duration), FIXED_DURATIONS.length - 1)
+		);
+
+	let tooltipData = $derived.by(() => {
+		if (hoveredDuration === undefined) return null;
+		return displayedData.find((point) => point.duration === hoveredDuration) ?? null;
+	});
+
+	// Reflect a hover coming from a sibling chart (e.g. the training periods
+	// comparison) without echoing it back and overriding the local cursor.
+	$effect(() => {
+		const bin = syncHoveredBin;
+		if (isNone(bin)) {
+			if (hoverSource === 'external') {
+				hoverSource = 'local';
+				hoveredDuration = undefined;
+			}
+			return;
+		}
+		if (hoverSource === 'local' && hoveredDuration !== undefined) {
+			return;
+		}
+		const duration = FIXED_DURATIONS[bin.value.bin];
+		if (duration === undefined) return;
+		hoverSource = 'external';
+		hoveredDuration = duration;
 	});
 
 	// The best curve only covers the fixed durations, so it is only shown when the
@@ -238,11 +299,22 @@
 	});
 
 	const handleMouseMove = (e: MouseEvent) => {
-		tooltipX = Math.min(Math.max(e.offsetX, marginLeft), width - marginRight);
+		const x = Math.min(Math.max(e.offsetX, marginLeft), width - marginRight);
+		const idx = indexAtX(x);
+		if (idx === null) return;
+		const point = displayedData[idx];
+		if (point === undefined) return;
+		hoverSource = 'local';
+		hoveredDuration = point.duration;
+		syncHoveredBin = some({ bin: fixedIndexFor(point.duration) });
 	};
 
 	const handleMouseLeave = () => {
-		tooltipX = undefined;
+		hoveredDuration = undefined;
+		hoverSource = 'local';
+		if (isSome(syncHoveredBin)) {
+			syncHoveredBin = none();
+		}
 	};
 </script>
 
@@ -303,11 +375,11 @@
 		style="max-width: 100%; height: auto; display: block;"
 	>
 		<defs>
-			<linearGradient id="power-curve-gradient" x1="0" x2="0" y1="0" y2="1">
+			<linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
 				<stop offset="0%" stop-color="var(--color-power-chart)" stop-opacity="0.5" />
 				<stop offset="100%" stop-color="var(--color-power-chart)" stop-opacity="0.1" />
 			</linearGradient>
-			<clipPath id="power-curve-clip">
+			<clipPath id={clipId}>
 				<rect
 					x={marginLeft}
 					y={marginTop}
@@ -337,7 +409,7 @@
 		{/each}
 
 		<!-- Area fill -->
-		<path d={areaPath} fill="url(#power-curve-gradient)" clip-path="url(#power-curve-clip)" />
+		<path d={areaPath} fill="url(#{gradientId})" clip-path="url(#{clipId})" />
 
 		<!-- Curve line -->
 		<path
@@ -345,7 +417,7 @@
 			fill="none"
 			stroke="var(--color-power-chart)"
 			stroke-width="1.5"
-			clip-path="url(#power-curve-clip)"
+			clip-path="url(#{clipId})"
 		/>
 
 		<!-- Best curve line (12-week comparison) -->
@@ -356,7 +428,7 @@
 				stroke="var(--color-best-power-chart)"
 				stroke-width="1.5"
 				stroke-dasharray="5,3"
-				clip-path="url(#power-curve-clip)"
+				clip-path="url(#{clipId})"
 			/>
 		{/if}
 
@@ -388,10 +460,10 @@
 		{/each}
 
 		<!-- Tooltip cursor line and dot -->
-		{#if tooltipX !== undefined && tooltipData}
+		{#if tooltipData}
 			<line
-				x1={tooltipX}
-				x2={tooltipX}
+				x1={xScale(tooltipData.duration)}
+				x2={xScale(tooltipData.duration)}
 				y1={marginTop}
 				y2={height - marginBottom}
 				class="stroke-current"
