@@ -1,7 +1,8 @@
-//! Break-glass admin command line interface.
+//! Command line interface.
 //!
-//! Invoked as `app admin <command>`. It operates directly on the users database, so it works even
-//! when the server is not running and does not require a session or the full server configuration.
+//! Invoked as `app admin <command>` or `app backup run`. These commands operate directly on the
+//! application's data, so they work even when the server is not running and do not require a
+//! session or the full server configuration.
 
 use std::{ffi::OsStr, ffi::OsString, path::PathBuf};
 
@@ -9,8 +10,9 @@ use anyhow::anyhow;
 use clap::{Args, Parser, Subcommand};
 
 use crate::{
+    backup::BackupService,
     clock::Clock,
-    config::{StdEnvironment, data_path_from_env},
+    config::{BackupConfig, StdEnvironment, data_path_from_env},
     inbound::{
         auth::multi_user::{
             EmailAddress, Password,
@@ -36,6 +38,16 @@ enum Command {
         #[command(subcommand)]
         command: AdminCommand,
     },
+    Backup {
+        #[command(subcommand)]
+        command: BackupCommand,
+    },
+}
+
+#[derive(Debug, PartialEq)]
+pub enum CliCommand {
+    Admin(AdminCommand),
+    Backup(BackupCommand),
 }
 
 #[derive(Debug, PartialEq, Subcommand)]
@@ -43,6 +55,11 @@ pub enum AdminCommand {
     Bootstrap(BootstrapArgs),
     Promote(PromoteArgs),
     Revoke(RevokeArgs),
+}
+
+#[derive(Debug, PartialEq, Subcommand)]
+pub enum BackupCommand {
+    Run,
 }
 
 #[derive(Debug, PartialEq, Args)]
@@ -80,13 +97,26 @@ pub struct RevokeArgs {
     pub email: String,
 }
 
-/// Parses the process arguments, returning `None` when they do not request an admin command.
-pub fn parse_env() -> Option<Result<AdminCommand, clap::Error>> {
-    if std::env::args_os().nth(1).as_deref() != Some(OsStr::new("admin")) {
-        return None;
+/// Parses the process arguments, returning `None` when they do not request a command.
+pub fn parse_env() -> Option<Result<CliCommand, clap::Error>> {
+    match std::env::args_os().nth(1).as_deref() {
+        Some(command) if command == OsStr::new("admin") || command == OsStr::new("backup") => {
+            Some(parse_from(std::env::args_os()))
+        }
+        _ => None,
     }
+}
 
-    Some(parse_admin_from(std::env::args_os()))
+/// Parses any `app <command> ...` invocation from the given arguments.
+pub fn parse_from<I, T>(args: I) -> Result<CliCommand, clap::Error>
+where
+    I: IntoIterator<Item = T>,
+    T: Into<OsString> + Clone,
+{
+    Cli::try_parse_from(args).map(|cli| match cli.command {
+        Command::Admin { command } => CliCommand::Admin(command),
+        Command::Backup { command } => CliCommand::Backup(command),
+    })
 }
 
 /// Parses `app admin <command> ...` from the given arguments.
@@ -95,13 +125,22 @@ where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
 {
-    Cli::try_parse_from(args).map(|cli| match cli.command {
-        Command::Admin { command } => command,
+    parse_from(args).map(|command| match command {
+        CliCommand::Admin(command) => command,
+        CliCommand::Backup(_) => unreachable!("expected an admin command"),
     })
 }
 
+/// Runs a command line command.
+pub async fn run(command: CliCommand) -> anyhow::Result<()> {
+    match command {
+        CliCommand::Admin(command) => run_admin(command).await,
+        CliCommand::Backup(command) => run_backup(command).await,
+    }
+}
+
 /// Runs an admin command against the users database.
-pub async fn run(command: AdminCommand) -> anyhow::Result<()> {
+async fn run_admin(command: AdminCommand) -> anyhow::Result<()> {
     let data_path = data_path_from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
     let repository = open_users_repository(&data_path).await?;
     let service = AdminService::new(repository, Clock::new());
@@ -111,6 +150,19 @@ pub async fn run(command: AdminCommand) -> anyhow::Result<()> {
         AdminCommand::Promote(args) => promote(&service, args).await,
         AdminCommand::Revoke(args) => revoke(&service, args).await,
     }
+}
+
+/// Runs a backup command against the databases.
+async fn run_backup(command: BackupCommand) -> anyhow::Result<()> {
+    let BackupCommand::Run = command;
+
+    let config = BackupConfig::from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
+    let service = BackupService::new(config, Clock::new());
+    let archive = service.run_once().await?;
+
+    println!("Backup written to {}.", archive.display());
+
+    Ok(())
 }
 
 async fn open_users_repository(data_path: &str) -> anyhow::Result<SqliteUsersRepository> {
@@ -342,6 +394,34 @@ mod tests {
     #[test]
     fn test_parse_unknown_command_errors() {
         assert!(parse(&["app", "admin", "nope"]).is_err());
+    }
+
+    #[test]
+    fn test_parse_backup_run() {
+        assert_eq!(
+            parse_from(["app", "backup", "run"]).unwrap(),
+            CliCommand::Backup(BackupCommand::Run)
+        );
+    }
+
+    #[test]
+    fn test_parse_backup_requires_a_subcommand() {
+        assert!(parse_from(["app", "backup"]).is_err());
+    }
+
+    #[test]
+    fn test_parse_unknown_backup_subcommand_errors() {
+        assert!(parse_from(["app", "backup", "nope"]).is_err());
+    }
+
+    #[test]
+    fn test_parse_admin_wraps_admin_command() {
+        assert_eq!(
+            parse_from(["app", "admin", "promote", "--email", "admin@example.com"]).unwrap(),
+            CliCommand::Admin(AdminCommand::Promote(PromoteArgs {
+                email: "admin@example.com".to_string()
+            }))
+        );
     }
 
     #[test]
