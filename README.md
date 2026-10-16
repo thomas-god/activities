@@ -41,7 +41,8 @@ volumes:
 ```
 
 The application will store all its data at the location pointed by `ACTIVITIES_DATA_PATH`, so use a
-docker volume to persist your data between restarts and to facilitate backups.
+docker volume to persist your data between restarts and to facilitate backups. The application can
+also [back up its databases automatically](#database-backups) on a schedule.
 
 ### HTTPS is recommended, plain HTTP is still possible on a trusted network
 
@@ -124,6 +125,44 @@ The application accepts the following environment variables. Each environment va
 | ACTIVITIES_MAILER_DOMAIN            | for email-based auth | The domain on which your instance is hosted. Used to craft the auth link url. Can be a different domain than the one used by your SMTP server.                                     | https://app.your.domain |
 | ACTIVITIES_BOOTSTRAP_ADMIN_EMAIL    | no                   | Email of the account to create or promote as the first admin at startup. Must be set together with the password variable; the bootstrap only runs while the instance has no admin. | admin@your.domain       |
 | ACTIVITIES_BOOTSTRAP_ADMIN_PASSWORD | no                   | Password for the bootstrapped admin account. Set together with the email variable. A `*_FILE` variant is recommended to keep the secret out of the deployment configuration.       |                         |
+
+#### Database backups
+
+The application can automatically back up its SQLite databases on a schedule. Prefer using this
+feature rather than just doing direct backups of the database files, as this might not preserve
+SQLite internal invariant and result in corrupted or inconsistent backups.
+
+Backups are opt-in: set `ACTIVITIES_DB_BACKUP_CRON` to enable them.
+
+Each run writes a single `backup-<timestamp>.zip` archive to `ACTIVITIES_DB_BACKUP_PATH` (which
+defaults to `<ACTIVITIES_DATA_PATH>/backups`). The archive contains the databases plus a
+`manifest.json` with the timestamp, the application and SQLite versions, and each database's size.
+
+Raw activity files (`activities/`) are not part of these archives: they are regular binary files
+that can be backed up with any file copy tool.
+
+> Backups are written inside the data volume by default. This protects against database corruption
+> but **not** against the loss of that volume: point `ACTIVITIES_DB_BACKUP_PATH` at a separate mount
+> and/or replicate the archives elsewhere (e.g. with `restic` or `rsync`) to survive disk or host
+> failure.
+
+To restore a backup: stop the application, replace the files in `<ACTIVITIES_DATA_PATH>/db/` with
+the databases extracted from the archive, then start it again. Restoring an older `user.db` may
+invalidate sessions created after the backup.
+
+| Variable name                  | Required | Purpose                                                                                 | Example     |
+| ------------------------------ | -------- | --------------------------------------------------------------------------------------- | ----------- |
+| ACTIVITIES_DB_BACKUP_CRON      | no       | Cron expression enabling automatic backups (5, 6 or 7 fields). Unset disables them.     | `0 3 * * *` |
+| ACTIVITIES_DB_BACKUP_PATH      | no       | Directory where the archives are written. Defaults to `<ACTIVITIES_DATA_PATH>/backups`. | /backups    |
+| ACTIVITIES_DB_BACKUP_RETENTION | no       | Number of most recent archives to keep (`0` keeps all of them). Defaults to `7`.        | 14          |
+
+Backups can also be triggered manually with `app backup run`, which is useful before an upgrade or
+from an existing host scheduler:
+
+```bash
+# Backup all the databases once (the archive path and duration are printed).
+docker exec -it <container> /app_bin backup run
+```
 
 #### Admin role
 

@@ -2,8 +2,6 @@
 
 _Date:_ 2026-10-16
 
-_Status:_ Draft
-
 ## Context
 
 All of _activities_' data lives under a single directory pointed to by `ACTIVITIES_DATA_PATH`, split
@@ -111,8 +109,9 @@ and eventually fill the disk, which is itself a cause of database corruption.
 
 The backup logic is implemented as a single "run once" operation, exposed both as the
 `app backup run` command and called by a small in-process scheduler when `ACTIVITIES_DB_BACKUP_CRON`
-is set (a standard cron expression, e.g. `0 3 * * *`). When the variable is unset, no scheduler is
-started at all.
+is set (a cron expression, e.g. `0 3 * * *`; 5-, 6- and 7-field forms are accepted, with a 5-field
+expression treated as a standard crontab one). When the variable is unset, no scheduler is started
+at all.
 
 This keeps the backup and scheduling concerns separate: the command is the engine, the scheduler is
 a thin loop that waits for the next occurrence and calls it. It also serves operators who already
@@ -130,12 +129,12 @@ serialized. The only cost is a temporarily higher peak disk usage while two snap
   scheduler.
 - **Command only (delegate all scheduling to the host).** Would require every deployment to
   configure an external scheduler, raising the barrier to entry for the default Docker deployment.
-- **Serializing runs with a cross-process lock.** Considered, to cap peak disk usage and fail fast
-  when a run overlaps another. Rejected: it is not needed for correctness (see the concurrency
-  note above), the worst retention race only results in a missing-file warning or keeping slightly
-  fewer archives, and it would introduce a user-visible failure mode where a manual run fails
-  because a scheduled one happens to be in progress.
   Providing both keeps the simple case simple.
+- **Serializing runs with a cross-process lock.** Considered, to cap peak disk usage and fail fast
+  when a run overlaps another. Rejected: it is not needed for correctness (see the concurrency note
+  above), the worst retention race only results in a missing-file warning or keeping slightly fewer
+  archives, and it would introduce a user-visible failure mode where a manual run fails because a
+  scheduled one happens to be in progress.
 - **`tokio-cron-scheduler`.** A heavier dependency than needed; a cron parser plus a `sleep_until`
   loop reuses the scheduling style already used by the application's other background tasks.
 
