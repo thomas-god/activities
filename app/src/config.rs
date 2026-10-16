@@ -1,7 +1,7 @@
 use std::{
     env::{self},
     fs,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 // Base config keys
@@ -60,6 +60,48 @@ impl BaseConfig {
             allow_origin,
             activities_data_path,
         })
+    }
+}
+
+/// Default number of backup archives to keep.
+pub const DEFAULT_BACKUP_RETENTION: usize = 7;
+
+/// Name of the sub-directory holding the databases, relative to `ACTIVITIES_DATA_PATH`.
+pub const DATABASES_DIR_NAME: &str = "db";
+
+/// Name of the default sub-directory holding the backups, relative to `ACTIVITIES_DATA_PATH`.
+pub const DEFAULT_BACKUP_DIR_NAME: &str = "backups";
+
+/// Source-of-truth databases backed up by default, relative to the databases directory.
+///
+/// `search.db` is deliberately absent: it is a derived index that can be rebuilt. It can be opted
+/// in with `include_search`.
+pub const DEFAULT_BACKED_UP_DATABASES: &[&str] = &[
+    "activities.db",
+    "training_metrics.db",
+    "preferences.db",
+    "user.db",
+];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BackupConfig {
+    pub data_path: String,
+    pub backup_path: String,
+    pub retention: usize,
+    pub include_search: bool,
+}
+
+impl BackupConfig {
+    pub fn databases_path(&self) -> PathBuf {
+        PathBuf::from(&self.data_path).join(DATABASES_DIR_NAME)
+    }
+
+    pub fn databases(&self) -> Vec<&'static str> {
+        let mut databases = DEFAULT_BACKED_UP_DATABASES.to_vec();
+        if self.include_search {
+            databases.push("search.db");
+        }
+        databases
     }
 }
 

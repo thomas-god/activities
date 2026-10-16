@@ -118,8 +118,10 @@ This keeps the backup and scheduling concerns separate: the command is the engin
 a thin loop that waits for the next occurrence and calls it. It also serves operators who already
 have a host scheduler (host crontab, a systemd timer, Docker `ofelia`, a Swarm or Kubernetes
 `CronJob`): they can invoke `app backup run` from their existing tooling instead of relying on the
-application's own timer. A lock ensures an in-process scheduled run and a manually triggered run
-cannot overlap.
+application's own timer. Runs are allowed to overlap: each is self-contained (a unique staging
+directory and archive name) and SQLite permits concurrent read snapshots of a live database, so a
+scheduled run and a manually triggered one — typically a separate process — do not need to be
+serialized. The only cost is a temporarily higher peak disk usage while two snapshots coexist.
 
 #### Trade-offs and alternatives considered
 
@@ -128,6 +130,11 @@ cannot overlap.
   scheduler.
 - **Command only (delegate all scheduling to the host).** Would require every deployment to
   configure an external scheduler, raising the barrier to entry for the default Docker deployment.
+- **Serializing runs with a cross-process lock.** Considered, to cap peak disk usage and fail fast
+  when a run overlaps another. Rejected: it is not needed for correctness (see the concurrency
+  note above), the worst retention race only results in a missing-file warning or keeping slightly
+  fewer archives, and it would introduce a user-visible failure mode where a manual run fails
+  because a scheduled one happens to be in progress.
   Providing both keeps the simple case simple.
 - **`tokio-cron-scheduler`.** A heavier dependency than needed; a cron parser plus a `sleep_until`
   loop reuses the scheduling style already used by the application's other background tasks.
