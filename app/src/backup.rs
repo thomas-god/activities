@@ -12,6 +12,7 @@ use std::{
 use anyhow::{Context, anyhow};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     config::BackupConfig,
@@ -49,30 +50,89 @@ struct BackupManifestEntry {
 pub struct BackupService<C> {
     config: BackupConfig,
     clock: C,
+    shutdown: CancellationToken,
 }
 
 impl<C: IClock> BackupService<C> {
-    pub fn new(config: BackupConfig, clock: C) -> Self {
-        Self { config, clock }
+    pub fn new(config: BackupConfig, clock: C, shutdown: CancellationToken) -> Self {
+        Self {
+            config,
+            clock,
+            shutdown,
+        }
     }
 
     pub fn config(&self) -> &BackupConfig {
         &self.config
     }
 
-    #[tracing::instrument(skip_all, err)]
-    pub async fn run_once(&self) -> anyhow::Result<PathBuf> {
-        let destination_dir = PathBuf::from(&self.config.backup_path);
-        tokio::fs::create_dir_all(&destination_dir)
-            .await
-            .with_context(|| {
-                format!(
-                    "Unable to create backup directory `{}`",
-                    destination_dir.display()
-                )
-            })?;
+    #[tracing::instrument(skip_all)]
+    pub async fn run(&self) {
+        let schedule = match self.config.schedule() {
+            Ok(Some(schedule)) => schedule,
+            Ok(None) => {
+                tracing::debug!("Database backups are disabled: no cron configured");
+                return;
+            }
+            Err(err) => {
+                tracing::error!("Invalid database backup cron expression: {err}");
+                return;
+            }
+        };
 
-        self.run_once_inner(&destination_dir).await
+        loop {
+            let now = self.clock.now();
+            let Some(next) = schedule.after(&now).next() else {
+                tracing::warn!(
+                    "Database backup schedule has no upcoming occurrence, stopping automatic backups"
+                );
+                return;
+            };
+
+            let delay = (next - now).to_std().unwrap_or(std::time::Duration::ZERO);
+            tracing::info!("Next database backup scheduled at {next}");
+
+            tokio::select! {
+                _ = tokio::time::sleep(delay) => {}
+                _ = self.shutdown.cancelled() => return,
+            }
+
+            let _ = self.run_once().await;
+        }
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub async fn run_once(&self) -> anyhow::Result<PathBuf> {
+        let started = std::time::Instant::now();
+
+        let result = async {
+            let destination_dir = PathBuf::from(&self.config.backup_path);
+            tokio::fs::create_dir_all(&destination_dir)
+                .await
+                .with_context(|| {
+                    format!(
+                        "Unable to create backup directory `{}`",
+                        destination_dir.display()
+                    )
+                })?;
+
+            self.run_once_inner(&destination_dir).await
+        }
+        .await;
+
+        match &result {
+            Ok(path) => tracing::info!(
+                "Database backup written to {} in {:.2?}",
+                path.display(),
+                started.elapsed()
+            ),
+            Err(err) => tracing::error!(
+                "Database backup failed after {:.2?}: {err}",
+                started.elapsed()
+            ),
+        }
+
+        result
     }
 
     async fn run_once_inner(&self, destination_dir: &Path) -> anyhow::Result<PathBuf> {
@@ -301,11 +361,12 @@ mod tests {
             backup_path: data_path.join("backups").to_string_lossy().to_string(),
             retention,
             include_search,
+            cron: None,
         }
     }
 
     fn service(config: BackupConfig, timestamp: DateTime<Utc>) -> BackupService<FakeClock> {
-        BackupService::new(config, FakeClock::new(timestamp))
+        BackupService::new(config, FakeClock::new(timestamp), CancellationToken::new())
     }
 
     async fn archive_names(destination_dir: &Path) -> Vec<String> {
@@ -488,5 +549,33 @@ mod tests {
                 "staging directory `{name}` was not cleaned up"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_run_returns_immediately_without_cron() {
+        let tmp = TempDir::new().unwrap();
+        let service = service(config(tmp.path(), 7, false), Utc::now());
+
+        tokio::time::timeout(std::time::Duration::from_secs(1), service.run())
+            .await
+            .expect("run should return immediately when no cron is configured");
+    }
+
+    #[tokio::test]
+    async fn test_run_stops_on_shutdown() {
+        let tmp = TempDir::new().unwrap();
+        let mut config = config(tmp.path(), 7, false);
+        config.cron = Some("0 0 3 * * *".to_string());
+        let shutdown = CancellationToken::new();
+        let service = BackupService::new(config, FakeClock::new(Utc::now()), shutdown.clone());
+
+        let handle = tokio::spawn(async move { service.run().await });
+        tokio::task::yield_now().await;
+        shutdown.cancel();
+
+        tokio::time::timeout(std::time::Duration::from_secs(1), handle)
+            .await
+            .expect("run should stop when shutdown is cancelled")
+            .unwrap();
     }
 }

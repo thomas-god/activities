@@ -3,8 +3,9 @@ use std::{path::PathBuf, sync::Arc};
 use anyhow::{Ok, anyhow};
 
 use crate::{
+    backup::BackupService,
     clock::Clock,
-    config::{AppMode, BaseConfig, EmailAuthConfig, MultiUserConfig, StdEnvironment},
+    config::{AppMode, BackupConfig, BaseConfig, EmailAuthConfig, MultiUserConfig, StdEnvironment},
     domain::services::{
         activity::ActivityService, preferences::PreferencesService, search::SearchService,
         training::TrainingService,
@@ -53,6 +54,7 @@ type ActualUserService = MultiUserService<
 type ActualAdminService = AdminService<SqliteUsersRepository, Clock>;
 type ActualSearchService =
     SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService, Clock>;
+type ActualBackupService = BackupService<Clock>;
 
 const EXPIRED_AUTH_STATE_CLEANUP_INTERVAL: std::time::Duration =
     std::time::Duration::from_secs(3600 * 24);
@@ -72,6 +74,7 @@ pub async fn bootstrap_multi_user(
     ActualSearchService,
     ActualTrainingService,
     ActualActivityService,
+    ActualBackupService,
 )> {
     tracing::info!("Starting multi-user app");
 
@@ -102,6 +105,12 @@ pub async fn bootstrap_multi_user(
     )
     .await?;
 
+    let backup_service = BackupService::new(
+        BackupConfig::from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?,
+        Clock::new(),
+        tokio_util::sync::CancellationToken::new(),
+    );
+
     let http_server = HttpServer::new(
         &mode,
         activity_service.clone(),
@@ -119,6 +128,7 @@ pub async fn bootstrap_multi_user(
         search_service,
         training_service,
         activity_service,
+        backup_service,
     ))
 }
 

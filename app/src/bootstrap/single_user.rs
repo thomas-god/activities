@@ -3,8 +3,9 @@ use std::{path::PathBuf, sync::Arc};
 use anyhow::anyhow;
 
 use crate::{
+    backup::BackupService,
     clock::Clock,
-    config::{AppMode, BaseConfig, SingleUserConfig, StdEnvironment},
+    config::{AppMode, BackupConfig, BaseConfig, SingleUserConfig, StdEnvironment},
     domain::services::{
         activity::ActivityService, preferences::PreferencesService, search::SearchService,
         training::TrainingService,
@@ -37,6 +38,7 @@ type ActualTrainingService = TrainingService<
 >;
 type ActualSearchService =
     SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService, Clock>;
+type ActualBackupService = BackupService<Clock>;
 
 pub async fn bootstrap_single_user(
     _mode_config: SingleUserConfig,
@@ -53,6 +55,7 @@ pub async fn bootstrap_single_user(
     ActualSearchService,
     ActualTrainingService,
     ActualActivityService,
+    ActualBackupService,
 )> {
     tracing::info!("Starting single-user app");
 
@@ -119,6 +122,12 @@ pub async fn bootstrap_single_user(
     )
     .await?;
 
+    let backup_service = BackupService::new(
+        BackupConfig::from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?,
+        Clock::new(),
+        tokio_util::sync::CancellationToken::new(),
+    );
+
     let http_server = HttpServer::new(
         &mode,
         activity_service.clone(),
@@ -137,6 +146,7 @@ pub async fn bootstrap_single_user(
         search_service,
         training_service,
         activity_service.clone(),
+        backup_service,
     ))
 }
 

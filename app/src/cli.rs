@@ -157,10 +157,19 @@ async fn run_backup(command: BackupCommand) -> anyhow::Result<()> {
     let BackupCommand::Run = command;
 
     let config = BackupConfig::from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
-    let service = BackupService::new(config, Clock::new());
+    let service = BackupService::new(
+        config,
+        Clock::new(),
+        tokio_util::sync::CancellationToken::new(),
+    );
+    let started = std::time::Instant::now();
     let archive = service.run_once().await?;
 
-    println!("Backup written to {}.", archive.display());
+    println!(
+        "Backup written to {} in {:.2?}.",
+        archive.display(),
+        started.elapsed()
+    );
 
     Ok(())
 }

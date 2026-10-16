@@ -2,7 +2,10 @@ use std::{
     env::{self},
     fs,
     path::{Path, PathBuf},
+    str::FromStr,
 };
+
+use cron::Schedule;
 
 // Base config keys
 const SERVER_PORT_KEY: &str = "SERVER_PORT";
@@ -13,6 +16,7 @@ const ACTIVITIES_DATA_PATH_KEY: &str = "ACTIVITIES_DATA_PATH";
 const DB_BACKUP_PATH_KEY: &str = "ACTIVITIES_DB_BACKUP_PATH";
 const DB_BACKUP_RETENTION_KEY: &str = "ACTIVITIES_DB_BACKUP_RETENTION";
 const DB_BACKUP_INCLUDE_SEARCH_KEY: &str = "ACTIVITIES_DB_BACKUP_INCLUDE_SEARCH";
+const DB_BACKUP_CRON_KEY: &str = "ACTIVITIES_DB_BACKUP_CRON";
 
 // Single user related keys
 const SINGLE_USER_PASSWORD_KEY: &str = "ACTIVITIES_SINGLE_USER_PASSWORD";
@@ -94,6 +98,7 @@ pub struct BackupConfig {
     pub backup_path: String,
     pub retention: usize,
     pub include_search: bool,
+    pub cron: Option<String>,
 }
 
 impl BackupConfig {
@@ -102,7 +107,8 @@ impl BackupConfig {
     /// `ACTIVITIES_DB_BACKUP_PATH` defaults to `<ACTIVITIES_DATA_PATH>/backups`,
     /// `ACTIVITIES_DB_BACKUP_RETENTION` defaults to [`DEFAULT_BACKUP_RETENTION`], and
     /// `ACTIVITIES_DB_BACKUP_INCLUDE_SEARCH` defaults to `false`. An empty value is treated as
-    /// unset for all three.
+    /// unset for all of them. `ACTIVITIES_DB_BACKUP_CRON`, when set, must be a valid cron
+    /// expression and enables automatic backups.
     pub fn from_env<T: Environment>(env: &T) -> Result<BackupConfig, String> {
         let data_path = data_path_from_env(env)?;
 
@@ -137,12 +143,34 @@ impl BackupConfig {
             Some(value) => parse_bool(DB_BACKUP_INCLUDE_SEARCH_KEY, &value)?,
         };
 
-        Ok(BackupConfig {
+        let cron = load_env(env, DB_BACKUP_CRON_KEY)
+            .as_string()
+            .filter(|value| !value.is_empty());
+
+        let config = BackupConfig {
             data_path,
             backup_path,
             retention,
             include_search,
-        })
+            cron,
+        };
+
+        // Validate the cron expression now so a typo fails at startup rather than at the first
+        // scheduled run (or silently, if the schedule never matches).
+        if let Err(err) = config.schedule() {
+            return Err(format!("Invalid value for {DB_BACKUP_CRON_KEY}: {err}"));
+        }
+
+        Ok(config)
+    }
+
+    /// Parses the configured cron expression, if any.
+    pub fn schedule(&self) -> Result<Option<Schedule>, cron::error::Error> {
+        let Some(expression) = self.cron.as_deref() else {
+            return Ok(None);
+        };
+
+        Schedule::from_str(&normalize_cron_expression(expression)).map(Some)
     }
 
     /// Directory containing the live databases.
@@ -380,6 +408,20 @@ fn parse_bool(key: &str, value: &str) -> Result<bool, String> {
         _ => Err(format!(
             "Invalid value for {key}: expected `true` or `false`, got `{value}`"
         )),
+    }
+}
+
+/// Normalizes a cron expression to the 6-or-7-field syntax understood by the [`cron`] crate.
+///
+/// The crate expects a leading seconds field, whereas the usual crontab syntax has only five
+/// fields (minutes, hours, day of month, month, day of week). A five-field expression is therefore
+/// completed with a `0` seconds field, so both `0 3 * * *` and `0 0 3 * * *` are accepted.
+fn normalize_cron_expression(expression: &str) -> String {
+    let fields: Vec<&str> = expression.split_whitespace().collect();
+    if fields.len() == 5 {
+        format!("0 {}", fields.join(" "))
+    } else {
+        fields.join(" ")
     }
 }
 
@@ -1010,6 +1052,7 @@ mod test_config {
                 backup_path: "/tmp/activities/backups".to_string(),
                 retention: DEFAULT_BACKUP_RETENTION,
                 include_search: false,
+                cron: None,
             }
         );
     }
@@ -1037,6 +1080,7 @@ mod test_config {
                 backup_path: "/backups".to_string(),
                 retention: 14,
                 include_search: true,
+                cron: None,
             }
         );
     }
@@ -1053,12 +1097,14 @@ mod test_config {
             DB_BACKUP_INCLUDE_SEARCH_KEY,
             EnvironmentVariable::Set(String::new()),
         );
+        env.set_var(DB_BACKUP_CRON_KEY, EnvironmentVariable::Set(String::new()));
 
         let config = BackupConfig::from_env(&env).unwrap();
 
         assert_eq!(config.backup_path, "/data/backups");
         assert_eq!(config.retention, DEFAULT_BACKUP_RETENTION);
         assert!(!config.include_search);
+        assert!(config.cron.is_none());
     }
 
     #[test]
@@ -1102,12 +1148,65 @@ mod test_config {
     }
 
     #[test]
+    fn test_backup_config_from_env_accepts_five_field_cron() {
+        let mut env = backup_env("/data");
+        env.set_var(
+            DB_BACKUP_CRON_KEY,
+            EnvironmentVariable::Set("0 3 * * *".to_string()),
+        );
+
+        let config = BackupConfig::from_env(&env).unwrap();
+
+        assert_eq!(config.cron, Some("0 3 * * *".to_string()));
+        assert!(config.schedule().unwrap().is_some());
+    }
+
+    #[test]
+    fn test_backup_config_from_env_accepts_six_field_cron() {
+        let mut env = backup_env("/data");
+        env.set_var(
+            DB_BACKUP_CRON_KEY,
+            EnvironmentVariable::Set("0 0 3 * * *".to_string()),
+        );
+
+        assert!(
+            BackupConfig::from_env(&env)
+                .unwrap()
+                .schedule()
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn test_backup_config_from_env_invalid_cron_errors() {
+        let mut env = backup_env("/data");
+        env.set_var(
+            DB_BACKUP_CRON_KEY,
+            EnvironmentVariable::Set("not a cron".to_string()),
+        );
+
+        assert!(BackupConfig::from_env(&env).is_err());
+    }
+
+    #[test]
+    fn test_normalize_cron_expression() {
+        assert_eq!(normalize_cron_expression("0 3 * * *"), "0 0 3 * * *");
+        assert_eq!(normalize_cron_expression("0 0 3 * * *"), "0 0 3 * * *");
+        assert_eq!(
+            normalize_cron_expression("  0   0  3  *  *  *  "),
+            "0 0 3 * * *"
+        );
+    }
+
+    #[test]
     fn test_backup_config_databases_excludes_search_by_default() {
         let config = BackupConfig {
             data_path: "/data".to_string(),
             backup_path: "/data/backups".to_string(),
             retention: DEFAULT_BACKUP_RETENTION,
             include_search: false,
+            cron: None,
         };
 
         assert!(!config.databases().contains(&"search.db"));
@@ -1120,6 +1219,7 @@ mod test_config {
             backup_path: "/data/backups".to_string(),
             retention: DEFAULT_BACKUP_RETENTION,
             include_search: true,
+            cron: None,
         };
 
         assert!(config.databases().contains(&"search.db"));
