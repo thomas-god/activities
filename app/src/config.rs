@@ -9,6 +9,11 @@ const SERVER_PORT_KEY: &str = "SERVER_PORT";
 const ALLOW_ORIGIN_KEY: &str = "ALLOW_ORIGIN";
 const ACTIVITIES_DATA_PATH_KEY: &str = "ACTIVITIES_DATA_PATH";
 
+// Database backup related keys
+const DB_BACKUP_PATH_KEY: &str = "ACTIVITIES_DB_BACKUP_PATH";
+const DB_BACKUP_RETENTION_KEY: &str = "ACTIVITIES_DB_BACKUP_RETENTION";
+const DB_BACKUP_INCLUDE_SEARCH_KEY: &str = "ACTIVITIES_DB_BACKUP_INCLUDE_SEARCH";
+
 // Single user related keys
 const SINGLE_USER_PASSWORD_KEY: &str = "ACTIVITIES_SINGLE_USER_PASSWORD";
 
@@ -92,6 +97,55 @@ pub struct BackupConfig {
 }
 
 impl BackupConfig {
+    /// Builds the backup configuration from the environment.
+    ///
+    /// `ACTIVITIES_DB_BACKUP_PATH` defaults to `<ACTIVITIES_DATA_PATH>/backups`,
+    /// `ACTIVITIES_DB_BACKUP_RETENTION` defaults to [`DEFAULT_BACKUP_RETENTION`], and
+    /// `ACTIVITIES_DB_BACKUP_INCLUDE_SEARCH` defaults to `false`. An empty value is treated as
+    /// unset for all three.
+    pub fn from_env<T: Environment>(env: &T) -> Result<BackupConfig, String> {
+        let data_path = data_path_from_env(env)?;
+
+        let backup_path = match load_env(env, DB_BACKUP_PATH_KEY)
+            .as_string()
+            .filter(|value| !value.is_empty())
+        {
+            Some(value) => value,
+            None => PathBuf::from(&data_path)
+                .join(DEFAULT_BACKUP_DIR_NAME)
+                .to_string_lossy()
+                .to_string(),
+        };
+
+        let retention = match load_env(env, DB_BACKUP_RETENTION_KEY)
+            .as_string()
+            .filter(|value| !value.is_empty())
+        {
+            None => DEFAULT_BACKUP_RETENTION,
+            Some(value) => value.trim().parse::<usize>().map_err(|_| {
+                format!(
+                    "Invalid value for {DB_BACKUP_RETENTION_KEY}: expected a non-negative integer, got `{value}`"
+                )
+            })?,
+        };
+
+        let include_search = match load_env(env, DB_BACKUP_INCLUDE_SEARCH_KEY)
+            .as_string()
+            .filter(|value| !value.is_empty())
+        {
+            None => false,
+            Some(value) => parse_bool(DB_BACKUP_INCLUDE_SEARCH_KEY, &value)?,
+        };
+
+        Ok(BackupConfig {
+            data_path,
+            backup_path,
+            retention,
+            include_search,
+        })
+    }
+
+    /// Directory containing the live databases.
     pub fn databases_path(&self) -> PathBuf {
         PathBuf::from(&self.data_path).join(DATABASES_DIR_NAME)
     }
@@ -268,15 +322,7 @@ impl MultiUserConfig {
 
         let allow_registration = match allow_registration {
             None => true,
-            Some(value) => match value.to_ascii_lowercase().as_str() {
-                "true" | "1" => true,
-                "false" | "0" => false,
-                _ => {
-                    return Err(format!(
-                        "Invalid value for {MULTI_USER_ALLOW_REGISTRATION_KEY}: expected `true` or `false`, got `{value}`"
-                    ));
-                }
-            },
+            Some(value) => parse_bool(MULTI_USER_ALLOW_REGISTRATION_KEY, &value)?,
         };
 
         let email = EmailAuthConfig::try_from_env(env)?;
@@ -325,6 +371,16 @@ impl EnvironmentVariable {
 
 pub trait Environment {
     fn get_var(&self, key: &str) -> EnvironmentVariable;
+}
+
+fn parse_bool(key: &str, value: &str) -> Result<bool, String> {
+    match value.to_ascii_lowercase().as_str() {
+        "true" | "1" => Ok(true),
+        "false" | "0" => Ok(false),
+        _ => Err(format!(
+            "Invalid value for {key}: expected `true` or `false`, got `{value}`"
+        )),
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -932,5 +988,178 @@ mod test_config {
                 service_name: None,
             }
         );
+    }
+
+    fn backup_env(data_path: &str) -> MockEnvironment {
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            ACTIVITIES_DATA_PATH_KEY,
+            EnvironmentVariable::Set(data_path.to_string()),
+        );
+        env
+    }
+
+    #[test]
+    fn test_backup_config_from_env_defaults() {
+        let env = backup_env("/tmp/activities");
+
+        assert_eq!(
+            BackupConfig::from_env(&env).unwrap(),
+            BackupConfig {
+                data_path: "/tmp/activities".to_string(),
+                backup_path: "/tmp/activities/backups".to_string(),
+                retention: DEFAULT_BACKUP_RETENTION,
+                include_search: false,
+            }
+        );
+    }
+
+    #[test]
+    fn test_backup_config_from_env_with_values() {
+        let mut env = backup_env("/data");
+        env.set_var(
+            DB_BACKUP_PATH_KEY,
+            EnvironmentVariable::Set("/backups".to_string()),
+        );
+        env.set_var(
+            DB_BACKUP_RETENTION_KEY,
+            EnvironmentVariable::Set("14".to_string()),
+        );
+        env.set_var(
+            DB_BACKUP_INCLUDE_SEARCH_KEY,
+            EnvironmentVariable::Set("true".to_string()),
+        );
+
+        assert_eq!(
+            BackupConfig::from_env(&env).unwrap(),
+            BackupConfig {
+                data_path: "/data".to_string(),
+                backup_path: "/backups".to_string(),
+                retention: 14,
+                include_search: true,
+            }
+        );
+    }
+
+    #[test]
+    fn test_backup_config_from_env_empty_optional_values_use_defaults() {
+        let mut env = backup_env("/data");
+        env.set_var(DB_BACKUP_PATH_KEY, EnvironmentVariable::Set(String::new()));
+        env.set_var(
+            DB_BACKUP_RETENTION_KEY,
+            EnvironmentVariable::Set(String::new()),
+        );
+        env.set_var(
+            DB_BACKUP_INCLUDE_SEARCH_KEY,
+            EnvironmentVariable::Set(String::new()),
+        );
+
+        let config = BackupConfig::from_env(&env).unwrap();
+
+        assert_eq!(config.backup_path, "/data/backups");
+        assert_eq!(config.retention, DEFAULT_BACKUP_RETENTION);
+        assert!(!config.include_search);
+    }
+
+    #[test]
+    fn test_backup_config_from_env_invalid_retention_errors() {
+        let mut env = backup_env("/data");
+        env.set_var(
+            DB_BACKUP_RETENTION_KEY,
+            EnvironmentVariable::Set("many".to_string()),
+        );
+
+        assert!(BackupConfig::from_env(&env).is_err());
+    }
+
+    #[test]
+    fn test_backup_config_from_env_invalid_include_search_errors() {
+        let mut env = backup_env("/data");
+        env.set_var(
+            DB_BACKUP_INCLUDE_SEARCH_KEY,
+            EnvironmentVariable::Set("maybe".to_string()),
+        );
+
+        assert!(BackupConfig::from_env(&env).is_err());
+    }
+
+    #[test]
+    fn test_backup_config_from_env_missing_data_path_errors() {
+        assert!(BackupConfig::from_env(&MockEnvironment::default()).is_err());
+    }
+
+    #[test]
+    fn test_backup_config_from_env_reads_retention_from_file() {
+        let mut tmpfile = tempfile::NamedTempFile::new().unwrap();
+        writeln!(tmpfile, "3").unwrap();
+        let mut env = backup_env("/data");
+        env.set_var(
+            &format!("{DB_BACKUP_RETENTION_KEY}_FILE"),
+            EnvironmentVariable::Set(tmpfile.path().to_str().unwrap().to_string()),
+        );
+
+        assert_eq!(BackupConfig::from_env(&env).unwrap().retention, 3);
+    }
+
+    #[test]
+    fn test_backup_config_databases_excludes_search_by_default() {
+        let config = BackupConfig {
+            data_path: "/data".to_string(),
+            backup_path: "/data/backups".to_string(),
+            retention: DEFAULT_BACKUP_RETENTION,
+            include_search: false,
+        };
+
+        assert!(!config.databases().contains(&"search.db"));
+    }
+
+    #[test]
+    fn test_backup_config_databases_can_include_search() {
+        let config = BackupConfig {
+            data_path: "/data".to_string(),
+            backup_path: "/data/backups".to_string(),
+            retention: DEFAULT_BACKUP_RETENTION,
+            include_search: true,
+        };
+
+        assert!(config.databases().contains(&"search.db"));
+    }
+
+    #[test]
+    fn test_parse_bool_accepts_true_variants() {
+        for value in ["true", "TRUE", "True", "1"] {
+            assert!(
+                parse_bool("KEY", value).unwrap(),
+                "expected `{value}` to parse as true"
+            );
+        }
+    }
+
+    #[test]
+    fn test_parse_bool_accepts_false_variants() {
+        for value in ["false", "FALSE", "False", "0"] {
+            assert!(
+                !parse_bool("KEY", value).unwrap(),
+                "expected `{value}` to parse as false"
+            );
+        }
+    }
+
+    #[test]
+    fn test_parse_bool_rejects_other_values() {
+        for value in ["", "yes", "no", "2", "true ", " false"] {
+            assert!(
+                parse_bool("KEY", value).is_err(),
+                "expected `{value}` to be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_parse_bool_error_mentions_key_and_value() {
+        let err = parse_bool("ACTIVITIES_FOO", "maybe").unwrap_err();
+
+        assert!(err.contains("ACTIVITIES_FOO"));
+        assert!(err.contains("maybe"));
     }
 }
