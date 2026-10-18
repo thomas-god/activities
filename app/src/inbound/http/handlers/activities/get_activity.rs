@@ -1,12 +1,16 @@
 use axum::{
     Extension, Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
 };
+use serde::Deserialize;
 
 use crate::{
     domain::{
-        models::activity::{ActivityId, DEFAULT_METRICS},
+        models::{
+            activity::{ActivityId, DEFAULT_METRICS},
+            training::TrainingPeriodId,
+        },
         ports::{
             activity::{GetActivityError, IActivityService},
             preferences::IPreferencesService,
@@ -18,6 +22,12 @@ use crate::{
 
 use super::activity_schema::PublicActivityWithTimeseries;
 
+#[derive(Debug, Default, Deserialize)]
+pub struct GetActivityQuery {
+    // Enrich activity in the context of this training period
+    pub period_id: Option<String>,
+}
+
 #[tracing::instrument(skip_all, err)]
 pub async fn get_activity<
     AS: IActivityService,
@@ -28,13 +38,17 @@ pub async fn get_activity<
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, PS>>,
     Path(activity_id): Path<String>,
+    Query(query): Query<GetActivityQuery>,
 ) -> Result<Json<PublicActivityWithTimeseries>, StatusCode> {
+    let period_id = query.period_id.as_deref().map(TrainingPeriodId::from);
+
     match state
         .training_metrics_service
         .get_activity_with_training_context(
             user.user(),
             &ActivityId::from(&activity_id),
             &DEFAULT_METRICS,
+            period_id,
         )
         .await
     {
@@ -100,7 +114,7 @@ mod tests {
         let mut training_service = MockTrainingService::new();
         training_service
             .expect_get_activity_with_training_context()
-            .returning(|_, _, _| {
+            .returning(|_, _, _, _| {
                 Ok(ActivityWithTrainingContext::new(
                     ActivityWithParsedData::new(
                         Activity::new_empty(
@@ -157,6 +171,7 @@ mod tests {
             Extension(AuthenticatedUser::new(UserId::test_default())),
             state,
             path,
+            Query(GetActivityQuery::default()),
         )
         .await;
         assert!(response.is_ok());
@@ -199,7 +214,7 @@ mod tests {
                 },
                 training_context: PublicTrainingContext {
                     weight: Some(70.0),
-                    best_duration_12w_curves: vec![]
+                    best_duration_curves: vec![]
                 },
                 duration_curves: vec![],
             }
@@ -215,8 +230,9 @@ mod tests {
                 eq(UserId::test_default()),
                 eq(ActivityId::from("target_id")),
                 eq(DEFAULT_METRICS),
+                eq(None),
             )
-            .returning(|_, _, _| {
+            .returning(|_, _, _, _| {
                 Err(ActivityWithTrainingContextError::ActivityDoesNotExist(
                     ActivityId::from("target_id"),
                 ))
@@ -237,6 +253,7 @@ mod tests {
             Extension(AuthenticatedUser::new(UserId::test_default())),
             state,
             path,
+            Query(GetActivityQuery::default()),
         )
         .await;
         assert!(response.is_err());

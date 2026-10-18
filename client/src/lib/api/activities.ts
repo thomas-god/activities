@@ -65,14 +65,27 @@ const DurationCurveSchema = z.object({
 });
 
 /**
+ * Best duration curves over a reference window (e.g. the 12 weeks before the
+ * activity, or the enclosing training period). `end` is exclusive.
+ */
+const BestDurationCurveReferenceSchema = z.object({
+	kind: z.enum(['twelve_week', 'training_period']),
+	/** Optional pure-data label, e.g. the training period name. */
+	label: z.string().nullable(),
+	start: z.string(),
+	end: z.string(),
+	curves: z.array(DurationCurveSchema)
+});
+
+/**
  * Additional context used to interpret or derive statistics of an activity
  * (e.g. the athlete weight at the time of the activity, used for W/kg).
+ * `best_duration_curves` always contains the 12-week reference and, when the
+ * activity is opened from a training period, the period reference as well.
  */
 const TrainingContextSchema = z.object({
 	weight: z.number().nullable(),
-	/** Best duration curves over the 12 weeks before the activity, one per curve
-	 *  type (e.g. power and pace) found in the user's history. */
-	best_duration_12w_curves: z.array(DurationCurveSchema)
+	best_duration_curves: z.array(BestDurationCurveReferenceSchema)
 });
 
 /**
@@ -92,6 +105,7 @@ export const ActivityWithTimeseriesSchema = ActivitySchema.extend({
 export type Activity = z.infer<typeof ActivitySchema>;
 export type ActivityList = z.infer<typeof ActivityListSchema>;
 export type ActivityWithTimeseries = z.infer<typeof ActivityWithTimeseriesSchema>;
+export type BestDurationCurveReference = z.infer<typeof BestDurationCurveReferenceSchema>;
 export type Timeseries = z.infer<typeof TimeseriesSchema>;
 export type TrainingContext = z.infer<typeof TrainingContextSchema>;
 export type DurationCurve = z.infer<typeof DurationCurveSchema>;
@@ -153,13 +167,23 @@ export async function fetchActivities(
  */
 export async function fetchActivityDetails(
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
-	activityId: string
+	activityId: string,
+	options?: { periodId?: string }
 ): Promise<ActivityWithTimeseries | null> {
-	const res = await fetch(`${PUBLIC_APP_URL}/api/activity/${activityId}`, {
-		method: 'GET',
-		credentials: 'include',
-		mode: 'cors'
-	});
+	const params = new URLSearchParams();
+	if (options?.periodId) {
+		params.set('period_id', options.periodId);
+	}
+	const query = params.size > 0 ? `?${params.toString()}` : '';
+
+	const res = await fetch(
+		`${PUBLIC_APP_URL}/api/activity/${encodeURIComponent(activityId)}${query}`,
+		{
+			method: 'GET',
+			credentials: 'include',
+			mode: 'cors'
+		}
+	);
 
 	if (res.status === 401) {
 		goto(resolve('login'));

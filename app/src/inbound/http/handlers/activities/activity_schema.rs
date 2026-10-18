@@ -1,6 +1,6 @@
 use std::{collections::HashMap, ops::Mul};
 
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, FixedOffset, NaiveDate};
 use derive_more::Constructor;
 use serde::{Deserialize, Serialize};
 
@@ -13,7 +13,7 @@ use crate::domain::{
         },
         training::BestDurationCurve,
     },
-    ports::training::{ActivityWithTrainingContext, TrainingContext},
+    ports::training::{ActivityWithTrainingContext, ReferenceBestDurationCurve, TrainingContext},
 };
 
 // =============================================================================
@@ -308,23 +308,48 @@ fn public_curve_values(
 // Public representation of an Activity (without timeseries)
 // =============================================================================
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PublicBestDurationCurveReference {
+    pub kind: String,
+    pub label: Option<String>,
+    pub start: NaiveDate,
+    pub end: NaiveDate,
+    pub curves: Vec<PublicDurationCurve>,
+}
+
+impl From<&ReferenceBestDurationCurve> for PublicBestDurationCurveReference {
+    fn from(reference: &ReferenceBestDurationCurve) -> Self {
+        Self {
+            kind: reference.kind().as_str().to_string(),
+            label: reference.label().clone(),
+            start: *reference.start(),
+            end: *reference.end(),
+            curves: reference
+                .curves()
+                .iter()
+                .map(PublicDurationCurve::from)
+                .collect(),
+        }
+    }
+}
+
 /// Additional training context used to interpret or derive statistics of an
 /// activity (e.g. the athlete weight at the time of the activity, used for
-/// W/kg, or the best duration curves over the 12 weeks before the activity).
+/// W/kg, or the best duration curves for the available reference windows).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PublicTrainingContext {
     pub weight: Option<f32>,
-    pub best_duration_12w_curves: Vec<PublicDurationCurve>,
+    pub best_duration_curves: Vec<PublicBestDurationCurveReference>,
 }
 
 impl From<&TrainingContext> for PublicTrainingContext {
     fn from(context: &TrainingContext) -> Self {
         Self {
             weight: *context.weight(),
-            best_duration_12w_curves: context
-                .best_duration_12w_curves()
+            best_duration_curves: context
+                .reference_best_duration_curves()
                 .iter()
-                .map(PublicDurationCurve::from)
+                .map(PublicBestDurationCurveReference::from)
                 .collect(),
         }
     }
@@ -350,6 +375,7 @@ mod tests {
         TimeseriesMetric, TimeseriesTime, TimeseriesValue,
     };
     use crate::domain::models::training::BestDurationCurve;
+    use crate::domain::ports::training::{ReferenceBestDurationCurve, ReferenceDurationCurveKind};
 
     fn activity_id() -> ActivityId {
         ActivityId::from("activity_id")
@@ -403,6 +429,20 @@ mod tests {
         ActivityMetrics::new(HashMap::from([(ActivityMetric::Duration, Some(1200.0))]))
     }
 
+    fn reference(
+        kind: ReferenceDurationCurveKind,
+        label: Option<&str>,
+        curves: Vec<BestDurationCurve>,
+    ) -> ReferenceBestDurationCurve {
+        ReferenceBestDurationCurve::new(
+            kind,
+            label.map(str::to_string),
+            NaiveDate::from_ymd_opt(2025, 6, 1).unwrap(),
+            NaiveDate::from_ymd_opt(2025, 8, 24).unwrap(),
+            curves,
+        )
+    }
+
     #[test]
     fn test_public_activity_with_timeseries_json_roundtrip() {
         let activity = ActivityWithTrainingContext::new(
@@ -425,22 +465,26 @@ mod tests {
             activity_with_parsed_data(),
             TrainingContext::new(
                 Some(70.0),
-                vec![BestDurationCurve::new(
-                    DurationCurveType::Power,
-                    [
-                        Some(250.0),
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                    ],
+                vec![reference(
+                    ReferenceDurationCurveKind::TwelveWeek,
+                    None,
+                    vec![BestDurationCurve::new(
+                        DurationCurveType::Power,
+                        [
+                            Some(250.0),
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                        ],
+                    )],
                 )],
             ),
             metrics(),
@@ -452,20 +496,65 @@ mod tests {
 
         assert_eq!(json["training_context"]["weight"], serde_json::json!(70.0));
         assert_eq!(
-            json["training_context"]["best_duration_12w_curves"][0]["curve_type"],
+            json["training_context"]["best_duration_curves"][0]["kind"],
+            serde_json::json!("twelve_week")
+        );
+        assert_eq!(
+            json["training_context"]["best_duration_curves"][0]["label"],
+            serde_json::json!(null)
+        );
+        assert_eq!(
+            json["training_context"]["best_duration_curves"][0]["start"],
+            serde_json::json!("2025-06-01")
+        );
+        assert_eq!(
+            json["training_context"]["best_duration_curves"][0]["end"],
+            serde_json::json!("2025-08-24")
+        );
+        assert_eq!(
+            json["training_context"]["best_duration_curves"][0]["curves"][0]["curve_type"],
             serde_json::json!("Power")
         );
         assert_eq!(
-            json["training_context"]["best_duration_12w_curves"][0]["unit"],
+            json["training_context"]["best_duration_curves"][0]["curves"][0]["unit"],
             serde_json::json!("W")
         );
         assert_eq!(
-            json["training_context"]["best_duration_12w_curves"][0]["values"][0],
+            json["training_context"]["best_duration_curves"][0]["curves"][0]["values"][0],
             serde_json::json!(250.0)
         );
         assert_eq!(
-            json["training_context"]["best_duration_12w_curves"][0]["values"][1],
+            json["training_context"]["best_duration_curves"][0]["curves"][0]["values"][1],
             serde_json::json!(null)
+        );
+    }
+
+    #[test]
+    fn test_public_activity_with_timeseries_serialises_training_period_reference_label() {
+        let activity = ActivityWithTrainingContext::new(
+            activity_with_parsed_data(),
+            TrainingContext::new(
+                Some(70.0),
+                vec![reference(
+                    ReferenceDurationCurveKind::TrainingPeriod,
+                    Some("Base training"),
+                    vec![],
+                )],
+            ),
+            metrics(),
+        );
+
+        let public = PublicActivityWithTimeseries::from(&activity);
+        let json: serde_json::Value =
+            serde_json::from_str(&serde_json::to_string(&public).unwrap()).unwrap();
+
+        assert_eq!(
+            json["training_context"]["best_duration_curves"][0]["kind"],
+            serde_json::json!("training_period")
+        );
+        assert_eq!(
+            json["training_context"]["best_duration_curves"][0]["label"],
+            serde_json::json!("Base training")
         );
     }
 
@@ -482,7 +571,7 @@ mod tests {
             serde_json::from_str(&serde_json::to_string(&public).unwrap()).unwrap();
 
         assert_eq!(
-            json["training_context"]["best_duration_12w_curves"],
+            json["training_context"]["best_duration_curves"],
             serde_json::json!([])
         );
     }

@@ -247,14 +247,17 @@
 	};
 
 	const selectActivityCallback = (activityId: string) => {
+		const periodQuery = period_id ? `?period_id=${encodeURIComponent(period_id)}` : '';
+
 		if (screenWidth < 700) {
-			goto(resolve(`activity/${activityId}`));
+			/* eslint-disable-next-line svelte/no-navigation-without-resolve */
+			goto(resolve(`activity/${activityId}`) + periodQuery);
 			return;
 		}
 
 		// On desktop, load and show activity details in right column
 		selectedActivityId = activityId;
-		selectedActivityPromise = fetchActivityDetails(fetch, activityId);
+		selectedActivityPromise = fetchActivityDetails(fetch, activityId, { periodId: period_id });
 	};
 
 	const handleActivityDeleted = (activiyId: string) => {

@@ -11,9 +11,8 @@
 		 *  available); pace curves take km/h and can toggle km/h ↔ min/km. */
 		kind: Kind;
 		curveValues: (number | null)[];
-		/** Best values over the 12 weeks before the activity, for comparison
-		 *  (dashed line). Empty when there is no comparable curve. */
 		bestCurveValues?: (number | null)[];
+		bestCurveLabel?: string;
 		activityDuration?: number;
 		averageValue?: number | null;
 		width: number;
@@ -27,6 +26,7 @@
 		kind,
 		curveValues,
 		bestCurveValues = [],
+		bestCurveLabel = '12-week',
 		activityDuration = undefined,
 		averageValue = null,
 		width,
@@ -325,7 +325,7 @@
 			<span class="px-1.5">Interval: {formatTooltipDuration(tooltipData)}</span>
 			<span class="text-power-chart px-1.5 font-semibold">{formatValue(tooltipData.value)}</span>
 			{#if tooltipBestData}
-				(12-week best
+				({bestCurveLabel} best
 				<span class="text-best-power-chart px-1.5 font-semibold">
 					{formatValue(tooltipBestData.value)}
 				</span>
@@ -498,7 +498,7 @@
 						background-size: 6px 100%;
 					"
 				></span>
-				12-week best
+				{bestCurveLabel} best
 			</span>
 		</div>
 	{/if}

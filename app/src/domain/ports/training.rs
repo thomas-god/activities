@@ -373,7 +373,7 @@ pub enum WeightAndNutritionError {
 #[derive(Clone, Debug, Constructor, Default, PartialEq)]
 pub struct TrainingContext {
     weight: Option<f32>,
-    best_duration_12w_curves: Vec<BestDurationCurve>,
+    reference_best_duration_curves: Vec<ReferenceBestDurationCurve>,
 }
 
 impl TrainingContext {
@@ -381,8 +381,54 @@ impl TrainingContext {
         &self.weight
     }
 
-    pub fn best_duration_12w_curves(&self) -> &[BestDurationCurve] {
-        &self.best_duration_12w_curves
+    pub fn reference_best_duration_curves(&self) -> &[ReferenceBestDurationCurve] {
+        &self.reference_best_duration_curves
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReferenceDurationCurveKind {
+    TwelveWeek,
+    TrainingPeriod,
+}
+
+impl ReferenceDurationCurveKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::TwelveWeek => "twelve_week",
+            Self::TrainingPeriod => "training_period",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Constructor, PartialEq)]
+pub struct ReferenceBestDurationCurve {
+    kind: ReferenceDurationCurveKind,
+    label: Option<String>,
+    start: NaiveDate,
+    end: NaiveDate,
+    curves: Vec<BestDurationCurve>,
+}
+
+impl ReferenceBestDurationCurve {
+    pub fn kind(&self) -> &ReferenceDurationCurveKind {
+        &self.kind
+    }
+
+    pub fn label(&self) -> &Option<String> {
+        &self.label
+    }
+
+    pub fn start(&self) -> &NaiveDate {
+        &self.start
+    }
+
+    pub fn end(&self) -> &NaiveDate {
+        &self.end
+    }
+
+    pub fn curves(&self) -> &[BestDurationCurve] {
+        &self.curves
     }
 }
 
@@ -615,6 +661,7 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         user: &UserId,
         activity: &ActivityId,
         metrics: &[ActivityMetric],
+        period: Option<TrainingPeriodId>,
     ) -> impl Future<Output = Result<ActivityWithTrainingContext, ActivityWithTrainingContextError>> + Send;
 }
 

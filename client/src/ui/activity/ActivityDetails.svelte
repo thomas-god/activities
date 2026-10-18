@@ -19,7 +19,8 @@
 	import type { WorkoutType } from '#lib/workout-type.js';
 	import type { Nutrition } from '#lib/nutrition.js';
 	import { sportDisplay } from '#lib/sport.js';
-	import type { ActivityWithTimeseries } from '#lib/api/activities.js';
+	import type { ActivityWithTimeseries, BestDurationCurveReference } from '#lib/api/activities.js';
+	import type { DurationCurveReference } from '#lib/durationCurve.js';
 	import { asOption, isNone, isSome, none, some, type Option, type Some } from '#lib/Options.js';
 	import { resolve } from '$app/paths';
 
@@ -75,34 +76,64 @@
 		activity.duration_curves.find((curve) => curve.curve_type === 'Pace') ?? null
 	);
 	let hasPaceData = $derived(paceCurve !== null && paceCurve.values.some((v) => v !== null));
+
+	// The training context always carries the 12-week reference and, when the activity
+	// was opened from a training period, the period reference as well.
+	let bestCurveReferences = $derived(activity.training_context.best_duration_curves);
+
+	type ReferenceKind = BestDurationCurveReference['kind'];
+
+	/** Generic label used in the reference toggle and notification titles. */
+	const referenceKindLabel = (reference: BestDurationCurveReference): string =>
+		reference.kind === 'twelve_week' ? '12-week' : 'period';
+
+	/** Richer label used in the chart legend, e.g. the training period name. */
+	const referenceLegendLabel = (reference: BestDurationCurveReference): string =>
+		reference.kind === 'twelve_week' ? '12-week' : (reference.label ?? 'period');
+
+	// Default to the period reference when the activity was opened from a period.
+	// svelte-ignore state_referenced_locally
+	let selectedReferenceKind = $state<ReferenceKind>(
+		bestCurveReferences.some((reference) => reference.kind === 'training_period')
+			? 'training_period'
+			: 'twelve_week'
+	);
+
+	let selectedReference = $derived(
+		bestCurveReferences.find((reference) => reference.kind === selectedReferenceKind) ??
+			bestCurveReferences[0] ??
+			null
+	);
+
+	let hasMultipleReferences = $derived(bestCurveReferences.length > 1);
+
 	// The training context carries one best curve per curve type (e.g. power and pace):
 	// reconcile by keeping the one matching the type of the displayed curve.
 	let bestPowerCurve = $derived(
-		activity.training_context.best_duration_12w_curves.find(
-			(curve) => curve.curve_type === 'Power'
-		) ?? null
+		selectedReference?.curves.find((curve) => curve.curve_type === 'Power') ?? null
 	);
 	let hasBestPowerCurve = $derived(
 		bestPowerCurve !== null && bestPowerCurve.values.some((v) => v !== null)
 	);
 	let bestPaceCurve = $derived(
-		activity.training_context.best_duration_12w_curves.find(
-			(curve) => curve.curve_type === 'Pace'
-		) ?? null
+		selectedReference?.curves.find((curve) => curve.curve_type === 'Pace') ?? null
 	);
 	let hasBestPaceCurve = $derived(
 		bestPaceCurve !== null && bestPaceCurve.values.some((v) => v !== null)
 	);
 
-	// Reference curves the activity's own curve is compared against to detect new
-	// records. Additional groups (e.g. all-time bests) can be added here once the
-	// backend returns them.
-	let powerCurveReferences = $derived(
-		hasBestPowerCurve ? [{ label: '12-week', values: bestPowerCurve!.values }] : []
-	);
-	let paceCurveReferences = $derived(
-		hasBestPaceCurve ? [{ label: '12-week', values: bestPaceCurve!.values }] : []
-	);
+	// Notification groups, one per reference that has a non-empty curve for the
+	// displayed type. All groups are shown regardless of the selected reference.
+	const referenceGroups = (kind: 'Power' | 'Pace'): DurationCurveReference[] =>
+		bestCurveReferences.flatMap((reference) => {
+			const curve = reference.curves.find((curve) => curve.curve_type === kind);
+			return curve && curve.values.some((value) => value !== null)
+				? [{ label: referenceKindLabel(reference), values: curve.values }]
+				: [];
+		});
+
+	let powerCurveReferences = $derived(referenceGroups('Power'));
+	let paceCurveReferences = $derived(referenceGroups('Pace'));
 	let activityDuration = $derived(activity.metrics['Duration']?.value ?? null);
 	let averagePower = $derived(activity.metrics['AvgPower']?.value ?? null);
 	let averagePace = $derived(activity.metrics['AvgSpeed']?.value ?? null);
@@ -308,6 +339,26 @@
 	);
 </script>
 
+{#snippet referenceToggle()}
+	{#if hasMultipleReferences}
+		<div class="flex items-center gap-2 px-2 pb-1 text-xs">
+			<span class="opacity-70">Reference</span>
+			<div class="join">
+				{#each bestCurveReferences as reference (reference.kind)}
+					<button
+						class="btn join-item btn-xs"
+						class:btn-primary={selectedReferenceKind === reference.kind}
+						class:btn-outline={selectedReferenceKind !== reference.kind}
+						onclick={() => (selectedReferenceKind = reference.kind)}
+					>
+						{referenceKindLabel(reference)}
+					</button>
+				{/each}
+			</div>
+		</div>
+	{/if}
+{/snippet}
+
 <div class="flex flex-col gap-4">
 	<ActivityHeader
 		{activity}
@@ -401,12 +452,16 @@
 		<details class={`collapse-arrow collapse ${sectionClass}`} open>
 			<summary class="collapse-title text-lg font-semibold">Pace curve</summary>
 			<div class="collapse-content px-0">
+				{@render referenceToggle()}
 				<div class="px-2 pb-2">
 					<div class="w-full overflow-hidden" bind:clientWidth={chartWidth}>
 						<DurationCurve
 							kind="pace"
 							curveValues={paceCurve!.values}
 							bestCurveValues={hasBestPaceCurve ? bestPaceCurve!.values : undefined}
+							bestCurveLabel={selectedReference
+								? referenceLegendLabel(selectedReference)
+								: undefined}
 							activityDuration={activityDuration ?? undefined}
 							averageValue={averagePace * 3.6}
 							width={chartWidth}
@@ -428,12 +483,16 @@
 		<details class={`collapse-arrow collapse ${sectionClass}`} open>
 			<summary class="collapse-title text-lg font-semibold">Power curve</summary>
 			<div class="collapse-content px-0">
+				{@render referenceToggle()}
 				<div class="px-2 pb-2">
 					<div class="w-full overflow-hidden" bind:clientWidth={chartWidth}>
 						<DurationCurve
 							kind="power"
 							curveValues={powerCurve!.values}
 							bestCurveValues={hasBestPowerCurve ? bestPowerCurve!.values : undefined}
+							bestCurveLabel={selectedReference
+								? referenceLegendLabel(selectedReference)
+								: undefined}
 							activityDuration={activityDuration ?? undefined}
 							averageValue={averagePower}
 							width={chartWidth}
