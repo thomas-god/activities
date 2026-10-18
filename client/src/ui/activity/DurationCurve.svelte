@@ -1,5 +1,6 @@
 <script lang="ts">
 	import * as d3 from 'd3';
+	import { DURATION_CURVE_DURATIONS } from '#lib/durationCurve.js';
 	import { isNone, isSome, none, some, unwrapOr, type Option, type Some } from '#lib/Options.js';
 	import type { ChartHandle, HoveredBin } from '#ui/training_metrics/TrainingMetricChart.svelte';
 
@@ -47,7 +48,7 @@
 	const marginLeft = 48;
 
 	// Fixed duration set in seconds — ensures curves are comparable across activities
-	const FIXED_DURATIONS = [5, 10, 30, 60, 120, 300, 600, 1200, 1800, 3600, 7200, 3600 * 5];
+	const FIXED_DURATIONS = DURATION_CURVE_DURATIONS;
 
 	type Mode = 'absolute' | 'relative';
 

@@ -13,6 +13,7 @@
 	import ActivityLaps from '#ui/activity/internal/ActivityLaps.svelte';
 	import ActivityHeader from '#ui/activity/internal/ActivityHeader.svelte';
 	import DurationCurve from '#ui/activity/DurationCurve.svelte';
+	import DurationCurveNotifications from '#ui/activity/DurationCurveNotifications.svelte';
 	import ActivityMap from '#ui/activity/internal/ActivityMap.svelte';
 	import { convertTimeseriesToActiveTime } from '#lib/timeseries.js';
 	import type { WorkoutType } from '#lib/workout-type.js';
@@ -91,6 +92,16 @@
 	);
 	let hasBestPaceCurve = $derived(
 		bestPaceCurve !== null && bestPaceCurve.values.some((v) => v !== null)
+	);
+
+	// Reference curves the activity's own curve is compared against to detect new
+	// records. Additional groups (e.g. all-time bests) can be added here once the
+	// backend returns them.
+	let powerCurveReferences = $derived(
+		hasBestPowerCurve ? [{ label: '12-week', values: bestPowerCurve!.values }] : []
+	);
+	let paceCurveReferences = $derived(
+		hasBestPaceCurve ? [{ label: '12-week', values: bestPaceCurve!.values }] : []
 	);
 	let activityDuration = $derived(activity.metrics['Duration']?.value ?? null);
 	let averagePower = $derived(activity.metrics['AvgPower']?.value ?? null);
@@ -404,6 +415,11 @@
 						/>
 					</div>
 				</div>
+				<DurationCurveNotifications
+					curveValues={paceCurve!.values}
+					references={paceCurveReferences}
+					unit={paceCurve!.unit}
+				/>
 			</div>
 		</details>
 	{/if}
@@ -426,6 +442,11 @@
 						/>
 					</div>
 				</div>
+				<DurationCurveNotifications
+					curveValues={powerCurve!.values}
+					references={powerCurveReferences}
+					unit={powerCurve!.unit}
+				/>
 			</div>
 		</details>
 	{/if}
