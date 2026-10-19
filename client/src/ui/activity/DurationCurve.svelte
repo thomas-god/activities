@@ -325,7 +325,7 @@
 			<span class="px-1.5">Interval: {formatTooltipDuration(tooltipData)}</span>
 			<span class="text-power-chart px-1.5 font-semibold">{formatValue(tooltipData.value)}</span>
 			{#if tooltipBestData}
-				({bestCurveLabel} best
+				(period best
 				<span class="text-best-power-chart px-1.5 font-semibold">
 					{formatValue(tooltipBestData.value)}
 				</span>

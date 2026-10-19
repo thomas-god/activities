@@ -85,7 +85,7 @@
 
 	/** Generic label used in the reference toggle and notification titles. */
 	const referenceKindLabel = (reference: BestDurationCurveReference): string =>
-		reference.kind === 'twelve_week' ? '12-week' : 'period';
+		reference.kind === 'twelve_week' ? '12-week' : 'Period';
 
 	/** Richer label used in the chart legend, e.g. the training period name. */
 	const referenceLegendLabel = (reference: BestDurationCurveReference): string =>
