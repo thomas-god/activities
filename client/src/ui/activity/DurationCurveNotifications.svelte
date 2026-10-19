@@ -18,7 +18,7 @@
 
 	let { curveValues, references, unit }: Props = $props();
 
-	let groups = $derived(computeDurationCurveRecords(curveValues, references));
+	let groups = $derived(computeDurationCurveRecords(curveValues, references, unit));
 </script>
 
 {#if groups.length > 0}

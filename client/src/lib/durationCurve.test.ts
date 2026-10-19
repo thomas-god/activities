@@ -16,7 +16,7 @@ describe('computeDurationCurveRecords', () => {
 			}
 		];
 
-		const groups = computeDurationCurveRecords(activity, references);
+		const groups = computeDurationCurveRecords(activity, references, 'W');
 
 		expect(groups).toHaveLength(1);
 		expect(groups[0].label).toBe('12-week');
@@ -32,7 +32,30 @@ describe('computeDurationCurveRecords', () => {
 		const activity = [250];
 		const references: DurationCurveReference[] = [{ label: '12-week', values: [250] }];
 
-		expect(computeDurationCurveRecords(activity, references)).toEqual([]);
+		expect(computeDurationCurveRecords(activity, references, 'W')).toEqual([]);
+	});
+
+	it('does not report a record when values round to the same displayed value', () => {
+		const activity = [161.2];
+		const references: DurationCurveReference[] = [{ label: '12-week', values: [160.6] }];
+
+		expect(computeDurationCurveRecords(activity, references, 'W')).toEqual([]);
+	});
+
+	it('reports a record when rounded values differ', () => {
+		const activity = [160.6];
+		const references: DurationCurveReference[] = [{ label: '12-week', values: [159.6] }];
+
+		const groups = computeDurationCurveRecords(activity, references, 'W');
+
+		expect(groups[0].records).toEqual([{ duration: 5, previousValue: 159.6, newValue: 160.6 }]);
+	});
+
+	it('compares other units at a single decimal', () => {
+		const activity = [15.34];
+		const references: DurationCurveReference[] = [{ label: '12-week', values: [15.31] }];
+
+		expect(computeDurationCurveRecords(activity, references, 'km/h')).toEqual([]);
 	});
 
 	it('reports a record when the reference has no value for a duration', () => {
@@ -41,7 +64,7 @@ describe('computeDurationCurveRecords', () => {
 			{ label: 'all-time', values: [200, null, null, null, null, null] }
 		];
 
-		const groups = computeDurationCurveRecords(activity, references);
+		const groups = computeDurationCurveRecords(activity, references, 'W');
 
 		expect(groups[0].records).toEqual([{ duration: 300, previousValue: null, newValue: 210 }]);
 	});
@@ -52,7 +75,7 @@ describe('computeDurationCurveRecords', () => {
 			{ label: '12-week', values: new Array(12).fill(100) }
 		];
 
-		expect(computeDurationCurveRecords(activity, references)).toEqual([]);
+		expect(computeDurationCurveRecords(activity, references, 'W')).toEqual([]);
 	});
 
 	it('drops reference groups without any record', () => {
@@ -62,7 +85,7 @@ describe('computeDurationCurveRecords', () => {
 			{ label: 'all-time', values: [50, 50] }
 		];
 
-		const groups = computeDurationCurveRecords(activity, references);
+		const groups = computeDurationCurveRecords(activity, references, 'W');
 
 		expect(groups).toHaveLength(1);
 		expect(groups[0].label).toBe('all-time');
@@ -75,7 +98,7 @@ describe('computeDurationCurveRecords', () => {
 			{ label: 'all-time', values: [290, 290] }
 		];
 
-		const groups = computeDurationCurveRecords(activity, references);
+		const groups = computeDurationCurveRecords(activity, references, 'W');
 
 		expect(groups.map((group) => group.label)).toEqual(['12-week', 'all-time']);
 		expect(groups[0].records).toHaveLength(2);

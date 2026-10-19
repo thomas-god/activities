@@ -40,10 +40,15 @@ export interface DurationCurveRecordGroup {
  * value. Durations missing from the activity (or for which the activity does
  * not beat the reference) are ignored. A reference value of `null` is treated
  * as an unset benchmark, so the activity value always yields a record.
+ *
+ * Values are compared at the precision they are displayed with (see
+ * `roundCurveValue`), so a barely higher raw value that rounds to the same
+ * number as the reference does not produce a spurious record.
  */
 export function computeDurationCurveRecords(
 	activityValues: (number | null)[],
-	references: DurationCurveReference[]
+	references: DurationCurveReference[],
+	unit: string
 ): DurationCurveRecordGroup[] {
 	const groups: DurationCurveRecordGroup[] = [];
 
@@ -57,7 +62,10 @@ export function computeDurationCurveRecords(
 			}
 
 			const previousValue = reference.values[i] ?? null;
-			if (previousValue !== null && newValue <= previousValue) {
+			if (
+				previousValue !== null &&
+				roundCurveValue(newValue, unit) <= roundCurveValue(previousValue, unit)
+			) {
 				continue;
 			}
 
@@ -88,10 +96,17 @@ export function formatCurveDuration(duration: number): string {
 }
 
 /**
- * Formats a duration curve value with its unit. Watt values are whole numbers,
- * other units (e.g. km/h) keep a single decimal.
+ * Rounds a duration curve value to the precision it is displayed with. Watt
+ * values are whole numbers, other units (e.g. km/h) keep a single decimal.
+ */
+export function roundCurveValue(value: number, unit: string): number {
+	return unit === 'W' ? Math.round(value) : Math.round(value * 10) / 10;
+}
+
+/**
+ * Formats a duration curve value with its unit, rounded as done by
+ * `roundCurveValue`.
  */
 export function formatCurveValue(value: number, unit: string): string {
-	const rounded = unit === 'W' ? Math.round(value) : Math.round(value * 10) / 10;
-	return `${rounded} ${unit}`;
+	return `${roundCurveValue(value, unit)} ${unit}`;
 }
