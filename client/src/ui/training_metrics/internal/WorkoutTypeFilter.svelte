@@ -20,13 +20,18 @@
 			workoutTypes = some(workoutTypes.value.filter((r) => r !== wType));
 		}
 	};
+	let display = $derived(
+		isSome(workoutTypes) && workoutTypes.value.length > 0
+			? workoutTypes.value.toSorted().join(', ')
+			: 'all workouts'
+	);
 </script>
 
 {#if isSome(workoutTypes)}
 	<div class="flex flex-col gap-1 rounded border border-black/30 p-1.5 shadow">
 		<div class="flex flex-row items-center justify-between">
 			<div class="flex-1 text-wrap wrap-break-word">
-				Workout types: {workoutTypes.value.toSorted().map(workoutTypeDisplay).join(', ')}
+				Workout types: {display}
 			</div>
 			<div class="join shrink-0">
 				<button

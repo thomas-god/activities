@@ -131,7 +131,7 @@
 		if (isSome(categories))
 			values = values.concat(categories.value.map((c) => sportCategoryDisplay(c)).toSorted());
 
-		return values.length > 0 ? values.join(', ') : 'All sports';
+		return values.length > 0 ? values.join(', ') : 'all sports';
 	});
 </script>
 

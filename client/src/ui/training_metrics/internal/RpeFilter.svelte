@@ -20,13 +20,17 @@
 			rpes = some(rpes.value.filter((r) => r !== rpe));
 		}
 	};
+
+	let display = $derived(
+		isSome(rpes) && rpes.value.length > 0 ? rpes.value.toSorted().join(', ') : 'all values'
+	);
 </script>
 
 {#if isSome(rpes)}
 	<div class="flex flex-col gap-1 rounded border border-black/30 p-1.5 shadow">
 		<div class="flex flex-row items-center justify-between">
 			<div class="flex-1 text-wrap wrap-break-word">
-				RPEs: {rpes.value.toSorted().join(', ')}
+				RPEs: {display}
 			</div>
 			<div class="join shrink-0">
 				<button
