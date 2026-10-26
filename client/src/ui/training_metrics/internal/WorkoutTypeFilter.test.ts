@@ -27,7 +27,7 @@ describe('WorkoutTypeFilterV2', () => {
 			props: { workoutTypes: some<WorkoutType[]>(['tempo', 'easy']) }
 		});
 
-		expect(screen.getByText('Workout types: Easy, Tempo')).toBeTruthy();
+		expect(screen.getByText('Workout types: easy, tempo')).toBeTruthy();
 		expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
 
 		await user.click(screen.getByTestId('edit'));
@@ -38,7 +38,7 @@ describe('WorkoutTypeFilterV2', () => {
 
 		await user.click(tempoCheckbox);
 
-		expect(screen.getByText('Workout types: Easy')).toBeTruthy();
+		expect(screen.getByText('Workout types: easy')).toBeTruthy();
 		expect(screen.getByLabelText('Tempo')).not.toBeChecked();
 	});
 

@@ -46,7 +46,7 @@ describe('SportFilterV2', () => {
 
 		await user.click(runningCheckbox);
 
-		expect(getSummaryText(container)).toBe('Sports: All sports');
+		expect(getSummaryText(container)).toBe('Sports: all sports');
 		expect(screen.getByLabelText('Running')).not.toBeChecked();
 	});
 
