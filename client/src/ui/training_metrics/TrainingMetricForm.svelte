@@ -89,7 +89,6 @@
 		<optgroup label={category}>
 			{#each templates as template (template.category + template.display_name)}
 				<option value={template}>{template.display_name}</option>
-				{template}
 			{/each}
 		</optgroup>
 	{/each}
