@@ -25,7 +25,6 @@
 		filters: TrainingMetricFiltersType;
 		existingSportsConstraints?: Option<{ sports: Sport[]; categories: SportCategory[] }>;
 	} = $props();
-	const uid = $props.id();
 
 	let allFiltersSet = $derived(
 		isSome(filters.sports) &&
@@ -34,56 +33,96 @@
 			isSome(filters.workoutTypes) &&
 			isSome(filters.bonked)
 	);
+
+	let menuOpen = $state(false);
+	let menuContainer: HTMLDivElement | undefined = $state();
+
+	const handleWindowClick = (event: MouseEvent) => {
+		if (menuOpen && menuContainer && !menuContainer.contains(event.target as Node)) {
+			menuOpen = false;
+		}
+	};
+
+	const handleWindowKeydown = (event: KeyboardEvent) => {
+		if (event.key === 'Escape') {
+			menuOpen = false;
+		}
+	};
 </script>
 
-<label class="label" for="metric-name"
-	>Filter activities by
+<svelte:window onclick={handleWindowClick} onkeydown={handleWindowKeydown} />
+
+<div class="label">
+	Filter activities by
 
 	{#if !allFiltersSet}
-		<button
-			class="btn btn-circle btn-xs"
-			popovertarget={`${uid}-filters-popover`}
-			style="anchor-name:--anchor-1"
-		>
-			<Plus class="size-5" />
-		</button>
-		<ul
-			class="menu dropdown z-1 w-52 rounded-box bg-base-100 p-2 shadow-sm"
-			popover
-			id={`${uid}-filters-popover`}
-			style="position-anchor:--anchor-1"
-		>
-			{#if isNone(filters.sports) && isNone(filters.sportCategories)}
-				<li>
-					<button
-						onclick={() => {
-							filters.sports = some([]);
-							filters.sportCategories = some([]);
-						}}>Sports</button
-					>
-				</li>
-			{/if}
+		<div class="relative inline-flex" bind:this={menuContainer}>
+			<button
+				type="button"
+				class="btn btn-circle btn-xs"
+				aria-haspopup="true"
+				aria-expanded={menuOpen}
+				onclick={() => (menuOpen = !menuOpen)}
+			>
+				<Plus class="size-5" />
+			</button>
+			{#if menuOpen}
+				<ul
+					class="menu absolute top-full left-0 z-50 mt-1 w-52 rounded-box bg-base-100 p-2 shadow-md"
+				>
+					{#if isNone(filters.sports) && isNone(filters.sportCategories)}
+						<li>
+							<button
+								type="button"
+								onclick={() => {
+									filters.sports = some([]);
+									filters.sportCategories = some([]);
+									menuOpen = false;
+								}}>Sports</button
+							>
+						</li>
+					{/if}
 
-			{#if isNone(filters.rpes)}
-				<li>
-					<button onclick={() => (filters.rpes = some([]))}>RPE values</button>
-				</li>
-			{/if}
+					{#if isNone(filters.rpes)}
+						<li>
+							<button
+								type="button"
+								onclick={() => {
+									filters.rpes = some([]);
+									menuOpen = false;
+								}}>RPE values</button
+							>
+						</li>
+					{/if}
 
-			{#if isNone(filters.workoutTypes)}
-				<li>
-					<button onclick={() => (filters.workoutTypes = some([]))}>Workout types</button>
-				</li>
-			{/if}
+					{#if isNone(filters.workoutTypes)}
+						<li>
+							<button
+								type="button"
+								onclick={() => {
+									filters.workoutTypes = some([]);
+									menuOpen = false;
+								}}>Workout types</button
+							>
+						</li>
+					{/if}
 
-			{#if isNone(filters.bonked)}
-				<li>
-					<button onclick={() => (filters.bonked = some('none'))}>Bonk status</button>
-				</li>
+					{#if isNone(filters.bonked)}
+						<li>
+							<button
+								type="button"
+								onclick={() => {
+									filters.bonked = some('none');
+									menuOpen = false;
+								}}>Bonk status</button
+							>
+						</li>
+					{/if}
+				</ul>
 			{/if}
-		</ul>
+		</div>
 	{/if}
-</label>
+</div>
 <div class="flex flex-col gap-2 pl-2">
 	<SportFilter
 		bind:sports={() => filters.sports, (v) => (filters.sports = v)}
