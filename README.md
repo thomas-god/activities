@@ -161,7 +161,7 @@ from an existing host scheduler:
 
 ```bash
 # Backup all the databases once (the archive path and duration are printed).
-docker exec -it <container> /app_bin backup run
+docker exec -it <container> /activities/app backup run
 ```
 
 #### Admin role
@@ -180,18 +180,18 @@ An **admin** is a regular account flagged as administrator that has extra rights
 
   ```bash
   # Create an user as admin. Prefer --password-file to keep the secret out of the process list.
-  docker exec -it <container> /app_bin admin bootstrap \
+  docker exec -it <container> /activities/app admin bootstrap \
     --email admin@your.domain --password-file /run/secrets/admin
 
   # Promote an existing user to admin. No-op if the user is already an admin.
-  docker exec -it <container> /app_bin admin promote --email admin@your.domain
+  docker exec -it <container> /activities/app admin promote --email admin@your.domain
 
   # Bootstrapping can be used to reset the password of an existing admin user.
-   docker exec -it <container> /app_bin admin bootstrap \
+   docker exec -it <container> /activities/app admin bootstrap \
      --email existing_admin@your.domain --password-file /run/secrets/new_admin_pwd
 
   # Clear the admin flag (fails if it would leave the instance with no admin).
-  docker exec -it <container> /app_bin admin revoke --email admin@your.domain
+  docker exec -it <container> /activities/app admin revoke --email admin@your.domain
   ```
 
 #### Observability

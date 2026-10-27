@@ -43,20 +43,25 @@ COPY fit-parser/ fit-parser/
 COPY fit-codegen/ fit-codegen/
 RUN cargo build --release -p app
 
-# Runtime stage
-FROM nginx:alpine
-RUN apk add --no-cache nginx
+FROM alpine:3
 
-COPY --from=backend-builder /app/backend/target/release/app ./app_bin
-COPY infra/docker/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=frontend-builder --chown=nginx:nginx /app/frontend/build /usr/share/nginx/html
-COPY --chmod=0755 infra/docker/start.sh ./
+# Required for outbound TLS: the mailer and the OTLP exporter both rely on the system trust store,
+# which the Alpine base image does not ship by default.
+RUN apk add --no-cache ca-certificates
+
+WORKDIR /activities
+
+COPY --from=backend-builder /app/backend/target/release/app ./app
+COPY --from=frontend-builder /app/frontend/build ./static
+
+ENV SERVER_PORT=80
+ENV ALLOW_ORIGIN=
+ENV ACTIVITIES_STATIC_ASSETS_PATH=/activities/static
 
 EXPOSE 80
 
-# Probe the /health endpoint through nginx; it is proxied to the Rust API,
-# so this only passes when nginx AND the backend are healthy.
+# Probe the /health endpoint directly on the API.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
-    CMD wget -q -O /dev/null http://127.0.0.1/health || exit 1
+    CMD wget -q -O /dev/null http://127.0.0.1:80/health || exit 1
 
-CMD ["./start.sh"]
+CMD ["/activities/app"]
