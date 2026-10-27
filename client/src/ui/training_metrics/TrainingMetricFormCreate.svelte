@@ -39,8 +39,8 @@
 	};
 	let metricTemplatesPromise = $state(buildPromise());
 
+	let metricName = $state('');
 	let fields: TrainingMetricFields = $state({
-		name: '',
 		selectedTemplate: none(),
 		granularity: none(),
 		groupBy: none(),
@@ -88,13 +88,13 @@
 		if (isNone(metricDefinitionPayload)) {
 			return none();
 		}
-		if (fields.name.trim() === '') {
+		if (metricName.trim() === '') {
 			return none();
 		}
 
 		return some({
 			...metricDefinitionPayload.value,
-			name: fields.name.trim(),
+			name: metricName.trim(),
 			scope:
 				scope.kind === 'global'
 					? { type: 'global' }
@@ -109,6 +109,7 @@
 			return;
 		}
 		await createTrainingMetric(payload.value);
+		metricName = '';
 		callback();
 	};
 
@@ -130,7 +131,12 @@
 <div class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2" id="test-debug">
 	<fieldset class="fieldset rounded-box bg-base-100 p-2">
 		{#await metricTemplatesPromise then metricTemplates}
-			<TrainingMetricForm templates={metricTemplates} bind:fields {existingSportsConstraints} />
+			<TrainingMetricForm
+				templates={metricTemplates}
+				bind:fields
+				{existingSportsConstraints}
+				bind:metricName
+			/>
 
 			<div class="mt-4">
 				<button

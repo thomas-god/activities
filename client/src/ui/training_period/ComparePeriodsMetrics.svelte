@@ -138,12 +138,16 @@
 		return templates;
 	};
 	let metricTemplatesPromise = $state(buildPromise());
+	let temporaryMetricName = $state('');
 	let temporaryMetricFields: TrainingMetricFields = $state(emptyTrainingMetricFields());
-	const fieldsToDefinition = (fields: TrainingMetricFields): Option<CompareMetricDefinition> => {
+	const fieldsToDefinition = (
+		fields: TrainingMetricFields,
+		name: string
+	): Option<CompareMetricDefinition> => {
 		const base = fieldsAsPayload(fields);
 		return map(base, (b) => ({
-			key: `custom:${fields.name}`,
-			label: fields.name,
+			key: `custom:${name}`,
+			label: name,
 			source: 'default',
 			base: b
 		}));
@@ -270,12 +274,16 @@
 		</p>
 		<fieldset class="fieldset rounded-box bg-base-100 p-2">
 			{#await metricTemplatesPromise then metricTemplates}
-				<TrainingMetricForm templates={metricTemplates} bind:fields={temporaryMetricFields} />
+				<TrainingMetricForm
+					templates={metricTemplates}
+					bind:fields={temporaryMetricFields}
+					bind:metricName={temporaryMetricName}
+				/>
 				<div class="mt-4">
 					<button
 						class="btn w-full btn-neutral"
 						onclick={() => {
-							const definition = fieldsToDefinition(temporaryMetricFields);
+							const definition = fieldsToDefinition(temporaryMetricFields, temporaryMetricName);
 							if (isSome(definition)) {
 								addDefinition(definition.value);
 								temporaryMetricFields = emptyTrainingMetricFields();

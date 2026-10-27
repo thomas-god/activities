@@ -9,10 +9,12 @@
 	let {
 		templates,
 		fields = $bindable(),
+		metricName = $bindable(),
 		existingSportsConstraints = none()
 	}: {
 		templates: TrainingMetricTemplate[];
 		fields: TrainingMetricFields;
+		metricName: string;
 		existingSportsConstraints?: Option<{ sports: Sport[]; categories: SportCategory[] }>;
 	} = $props();
 
@@ -187,7 +189,7 @@
 	type="text"
 	class="input"
 	id="metric-name"
-	bind:value={() => fields.name, (n) => (fields = { ...fields, name: n })}
+	bind:value={metricName}
 	placeholder="e.g., Weekly running volume"
 	required
 />

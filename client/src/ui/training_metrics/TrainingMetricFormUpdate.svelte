@@ -31,12 +31,13 @@
 	const buildPromise = async () => {
 		const templates = await fetchTrainingMetricTemplates();
 		fields = matchMetricToFormFields(initialMetric, templates);
+		metricName = initialMetric.name || '';
 		return templates;
 	};
 	let metricTemplatesPromise = $state(buildPromise());
 
+	let metricName = $state('');
 	let fields: TrainingMetricFields = $state({
-		name: '',
 		selectedTemplate: none(),
 		granularity: none(),
 		groupBy: none(),
@@ -83,11 +84,11 @@
 		if (isNone(metricDefinitionPayload)) {
 			return none();
 		}
-		if (fields.name.trim() === '') {
+		if (metricName.trim() === '') {
 			return none();
 		}
 
-		return some({ name: fields.name.trim(), ...metricDefinitionPayload.value });
+		return some({ name: metricName.trim(), ...metricDefinitionPayload.value });
 	});
 
 	const updateMetricCallback = async (
@@ -115,7 +116,12 @@
 		<legend class="fieldset-legend text-base">Update training metric</legend>
 
 		{#await metricTemplatesPromise then metricTemplates}
-			<TrainingMetricForm templates={metricTemplates} bind:fields {existingSportsConstraints} />
+			<TrainingMetricForm
+				templates={metricTemplates}
+				bind:fields
+				{existingSportsConstraints}
+				bind:metricName
+			/>
 
 			<div class="mt-4">
 				<button

@@ -18,7 +18,6 @@ import type {
 import type { TrainingMetricFiltersType } from './internal/TrainingMetricFilters.svelte';
 
 export interface TrainingMetricFields {
-	name: string;
 	selectedTemplate: Option<TrainingMetricTemplate>;
 	granularity: Option<TrainingMetricGranularity>;
 	groupBy: Option<TrainingMetricGroupByClause>;
@@ -29,7 +28,6 @@ export interface TrainingMetricFields {
 
 export const emptyTrainingMetricFields = (): TrainingMetricFields => {
 	return {
-		name: '',
 		selectedTemplate: none(),
 		granularity: none(),
 		groupBy: none(),
@@ -46,7 +44,7 @@ export const emptyTrainingMetricFields = (): TrainingMetricFields => {
 };
 
 export const fieldsAreEmpty = (fields: TrainingMetricFields): boolean => {
-	return fields.name === '' || isNone(fields.selectedTemplate);
+	return isNone(fields.selectedTemplate);
 };
 
 export type Scope = { kind: 'global' } | { kind: 'period'; periodId: string };
@@ -218,7 +216,6 @@ export const matchMetricToFormFields = (
 	const groupBy = getMetricGroupBy(metric);
 
 	return {
-		name: metric.name || '',
 		selectedTemplate: selectedTemplate === undefined ? none() : some(selectedTemplate),
 		granularity: asOption(metric.granularity),
 		groupBy,

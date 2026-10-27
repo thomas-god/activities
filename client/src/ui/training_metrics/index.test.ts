@@ -72,7 +72,6 @@ describe('matchMetricToFormFields', () => {
 
 		const result = matchMetricToFormFields(metric, [template]);
 
-		expect(result.name).toBe('My Metric');
 		expect(result.showAverage).toBe(true);
 		expect(result.granularity).toEqual(some('Weekly'));
 		expect(result.groupBy).toEqual(some('Sport'));
@@ -114,7 +113,6 @@ describe('matchMetricToFormFields', () => {
 
 		const result = matchMetricToFormFields(metric, []);
 
-		expect(result.name).toBe('');
 		expect(result.showAverage).toBe(false);
 		expect(isNone(result.granularity)).toBe(true);
 		expect(isNone(result.groupBy)).toBe(true);
@@ -342,7 +340,6 @@ describe('matchTemplate', () => {
 
 describe('fieldsAsPayload', () => {
 	const makeFields = (target: number | null): TrainingMetricFields => ({
-		name: 'Metric',
 		selectedTemplate: some(
 			makeTemplate({
 				source: { type: 'activity', metric: 'ActiveDuration' },
