@@ -107,11 +107,9 @@
 		}[] = [];
 
 		for (const metric of firstPeriodMetrics) {
-			if (metric.granularity === null) continue;
 			picked.push({ key: metricDefinitionKey(metric), source: firstPeriodName, metric });
 		}
 		for (const metric of secondPeriodMetrics) {
-			if (metric.granularity === null) continue;
 			const key = metricDefinitionKey(metric);
 			const existing = picked.find((entry) => entry.key === key);
 			if (existing !== undefined) {
@@ -234,8 +232,10 @@
 								</span>
 								<span class="text-xs opacity-60">
 									{formatMetricSource(entry.definition.base)}
-									· {entry.definition.base.window?.granularity}
-									{entry.definition.base.window?.aggregate}
+									{#if entry.definition.base.window !== undefined}
+										· {entry.definition.base.window.granularity}
+										{entry.definition.base.window.aggregate}
+									{/if}
 									{#if isSome(groupBy)}
 										· by {groupBy.value}
 									{/if}
