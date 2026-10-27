@@ -1,18 +1,30 @@
+use std::convert::Infallible;
+use std::future::Future;
 use std::marker::PhantomData;
 use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context as TaskContext, Poll};
 
 use anyhow::Context;
 use axum::extract::DefaultBodyLimit;
-use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE, COOKIE, SET_COOKIE};
+use axum::extract::Request;
+use axum::http::header::{CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_TYPE, COOKIE, SET_COOKIE};
 use axum::http::{HeaderMap, HeaderValue, Method, StatusCode};
+use axum::middleware::{self, Next};
+use axum::response::Response;
 
 use axum::routing::{delete, get, patch};
 use axum::{Json, Router, response::IntoResponse, routing::post};
 use cookie::{Cookie, SameSite, time::OffsetDateTime};
 use serde_json::json;
 use tokio::net;
+use tower::Service;
+use tower_http::compression::CompressionLayer;
+use tower_http::compression::predicate::{NotForContentType, Predicate, SizeAbove};
 use tower_http::cors::CorsLayer;
+use tower_http::services::{ServeDir, ServeFile};
 
 use crate::config::{AppMode, BaseConfig};
 use crate::domain::ports::{
@@ -205,14 +217,22 @@ impl<
             router = router.nest("/api", admin_router);
         }
 
-        router = router.layer(trace_layer).layer(
-            CorsLayer::new()
-                .allow_headers([CONTENT_TYPE, COOKIE, SET_COOKIE, CONTENT_DISPOSITION])
-                .expose_headers([CONTENT_DISPOSITION])
-                .allow_origin([origin])
-                .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PATCH])
-                .allow_credentials(true),
-        );
+        if let Some(static_path) = &config.static_assets_path {
+            router = router.fallback_service(StaticFiles::try_new(static_path)?);
+        }
+
+        router = router
+            .layer(middleware::from_fn(static_cache_control))
+            .layer(trace_layer)
+            .layer(
+                CorsLayer::new()
+                    .allow_headers([CONTENT_TYPE, COOKIE, SET_COOKIE, CONTENT_DISPOSITION])
+                    .expose_headers([CONTENT_DISPOSITION])
+                    .allow_origin([origin])
+                    .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PATCH])
+                    .allow_credentials(true),
+            )
+            .layer(compression_layer());
 
         let listener = net::TcpListener::bind(format!("0.0.0.0:{}", config.server_port))
             .await
@@ -245,12 +265,110 @@ impl<
 
 /// Dedicated health-check endpoint, used by the Docker `HEALTHCHECK`.
 ///
-/// Mounted at the router root (not under `/api`) *after* the auth router is
+/// Mounted at the router root (not under `/api`) and *after* the auth router is
 /// applied, so it stays unauthenticated and reachable by infrastructure
-/// probes. nginx proxies `/health` to this route, so a successful probe also
-/// validates the reverse-proxy wiring.
+/// probes.
 async fn health() -> impl IntoResponse {
     (StatusCode::OK, Json(json!({ "status": "ok" })))
+}
+
+/// Serves the built client as the router's fallback.
+///
+/// Because this is mounted as the fallback, it is also reached by `/api/...`
+/// requests for which no API route matched. Those must keep returning an
+/// (empty) `404` rather than being answered with the SPA shell, so API paths
+/// short-circuit before delegating to `ServeDir`.
+#[derive(Clone)]
+struct StaticFiles {
+    serve_dir: ServeDir<ServeFile>,
+}
+
+impl StaticFiles {
+    fn try_new(static_path: &str) -> anyhow::Result<Self> {
+        let root = PathBuf::from(static_path);
+        anyhow::ensure!(
+            root.is_dir(),
+            "ACTIVITIES_STATIC_ASSETS_PATH points to `{}`, which is not a directory",
+            root.display()
+        );
+        let index = root.join("index.html");
+        anyhow::ensure!(
+            index.is_file(),
+            "ACTIVITIES_STATIC_ASSETS_PATH `{}` does not contain an `index.html`",
+            root.display()
+        );
+
+        Ok(Self {
+            serve_dir: ServeDir::new(&root)
+                .append_index_html_on_directories(true)
+                .html_as_default_extension(true)
+                .fallback(ServeFile::new(index)),
+        })
+    }
+}
+
+impl Service<Request> for StaticFiles {
+    type Response = Response;
+    type Error = Infallible;
+    // The two branches (API's 404 and static files) produce different future types (`ServeDir`'s
+    // is opaque), so the future is boxed rather than boxing the whole service.
+    type Future = Pin<Box<dyn Future<Output = Result<Response, Infallible>> + Send>>;
+
+    fn poll_ready(&mut self, _cx: &mut TaskContext<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, request: Request) -> Self::Future {
+        if is_api_path(request.uri().path()) {
+            return Box::pin(async { Ok(StatusCode::NOT_FOUND.into_response()) });
+        }
+
+        let mut serve_dir = self.serve_dir.clone();
+        Box::pin(async move {
+            let response = serve_dir
+                .call(request)
+                .await
+                .expect("serving a file from disk is infallible");
+            Ok(response.map(axum::body::Body::new))
+        })
+    }
+}
+
+fn is_api_path(path: &str) -> bool {
+    path == "/api" || path.starts_with("/api/") || path == "/health"
+}
+
+async fn static_cache_control(request: Request, next: Next) -> Response {
+    let path = request.uri().path().to_owned();
+    let mut response = next.run(request).await;
+
+    let cache_control = if is_api_path(&path) {
+        None
+    } else if path.starts_with("/_app/immutable/") {
+        // Client's immutable build artifacts
+        Some("public, max-age=31536000, immutable")
+    } else {
+        Some("no-cache")
+    };
+
+    if let Some(value) = cache_control {
+        response
+            .headers_mut()
+            .insert(CACHE_CONTROL, HeaderValue::from_static(value));
+    }
+
+    response
+}
+
+fn compression_layer() -> CompressionLayer<impl Predicate + Clone + Send + Sync + 'static> {
+    CompressionLayer::new().compress_when(
+        SizeAbove::new(1024)
+            .and(NotForContentType::GRPC)
+            .and(NotForContentType::IMAGES)
+            .and(NotForContentType::SSE)
+            .and(NotForContentType::new("application/zip"))
+            .and(NotForContentType::new("application/octet-stream")),
+    )
 }
 
 fn search_routes<SS: ISearchService>(search_service: SS) -> Router<()> {
@@ -930,5 +1048,186 @@ mod tests {
             .await;
 
         response.assert_status(StatusCode::BAD_REQUEST);
+    }
+
+    /// Tests for serving the built client from the API process, replacing the
+    /// `try_files` behavior once delegated to nginx.
+    mod static_files {
+        use super::*;
+        use axum::http::header::{CONTENT_ENCODING, ETAG};
+        use std::path::Path;
+
+        fn write_file(root: &Path, relative: &str, content: &[u8]) {
+            let path = root.join(relative);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, content).unwrap();
+        }
+
+        fn build_dir() -> tempfile::TempDir {
+            let dir = tempfile::tempdir().unwrap();
+            write_file(dir.path(), "index.html", b"<html>shell</html>");
+            write_file(dir.path(), "training/periods.html", b"<html>periods</html>");
+            write_file(dir.path(), "service-worker.js", b"self.skipWaiting();");
+            write_file(dir.path(), "_app/immutable/app.js", &vec![b'x'; 2048]);
+            dir
+        }
+
+        fn app(root: &Path) -> Router {
+            Router::new()
+                .route("/health", get(health))
+                .fallback_service(StaticFiles::try_new(root.to_str().unwrap()).unwrap())
+                .layer(axum::middleware::from_fn(static_cache_control))
+                .layer(compression_layer())
+        }
+
+        fn app_with_api(root: &Path) -> Router {
+            Router::new()
+                .nest(
+                    "/api",
+                    Router::new().route("/ping", get(|| async { "pong" })),
+                )
+                .fallback_service(StaticFiles::try_new(root.to_str().unwrap()).unwrap())
+                .layer(axum::middleware::from_fn(static_cache_control))
+                .layer(compression_layer())
+        }
+
+        fn cache_control(response: &axum_test::TestResponse) -> Option<&str> {
+            response
+                .headers()
+                .get(CACHE_CONTROL)
+                .map(|v| v.to_str().unwrap())
+        }
+
+        #[tokio::test]
+        async fn serves_the_index_at_root() {
+            let dir = build_dir();
+            let server = TestServer::new(app(dir.path()));
+
+            let response = server.get("/").await;
+
+            response.assert_status_ok();
+            assert_eq!(response.text(), "<html>shell</html>");
+            assert_eq!(cache_control(&response), Some("no-cache"));
+            assert_eq!(
+                response.headers()[CONTENT_TYPE].to_str().unwrap(),
+                "text/html"
+            );
+        }
+
+        #[tokio::test]
+        async fn serves_prerendered_pages_for_extensionless_paths() {
+            let dir = build_dir();
+            let server = TestServer::new(app(dir.path()));
+
+            let response = server.get("/training/periods").await;
+
+            response.assert_status_ok();
+            assert_eq!(response.text(), "<html>periods</html>");
+        }
+
+        #[tokio::test]
+        async fn serves_the_spa_shell_for_client_side_routes() {
+            let dir = build_dir();
+            let server = TestServer::new(app(dir.path()));
+
+            let response = server.get("/activity/123").await;
+
+            response.assert_status_ok();
+            assert_eq!(response.text(), "<html>shell</html>");
+            assert_eq!(cache_control(&response), Some("no-cache"));
+        }
+
+        #[tokio::test]
+        async fn content_hashed_assets_are_immutable() {
+            let dir = build_dir();
+            let server = TestServer::new(app(dir.path()));
+
+            let response = server.get("/_app/immutable/app.js").await;
+
+            response.assert_status_ok();
+            assert_eq!(
+                cache_control(&response),
+                Some("public, max-age=31536000, immutable")
+            );
+        }
+
+        #[tokio::test]
+        async fn the_service_worker_is_not_immutable() {
+            let dir = build_dir();
+            let server = TestServer::new(app(dir.path()));
+
+            let response = server.get("/service-worker.js").await;
+
+            response.assert_status_ok();
+            assert_eq!(cache_control(&response), Some("no-cache"));
+        }
+
+        #[tokio::test]
+        async fn api_routes_take_precedence_over_the_fallback() {
+            let dir = build_dir();
+            let server = TestServer::new(app_with_api(dir.path()));
+
+            server.get("/api/ping").await.assert_text("pong");
+            server
+                .get("/api/does-not-exist")
+                .await
+                .assert_status_not_found();
+        }
+
+        #[tokio::test]
+        async fn health_is_not_given_a_cache_control_header() {
+            let dir = build_dir();
+            let server = TestServer::new(app(dir.path()));
+
+            let response = server.get("/health").await;
+
+            response.assert_status_ok();
+            assert_eq!(cache_control(&response), None);
+        }
+
+        #[tokio::test]
+        async fn conditional_requests_are_answered_with_not_modified() {
+            let dir = build_dir();
+            let server = TestServer::new(app(dir.path()));
+
+            let first = server.get("/").await;
+            let etag = first.headers()[ETAG].clone();
+
+            let second = server.get("/").add_header("if-none-match", etag).await;
+
+            second.assert_status(StatusCode::NOT_MODIFIED);
+        }
+
+        #[tokio::test]
+        async fn large_text_assets_are_compressed() {
+            let dir = build_dir();
+            let server = TestServer::new(app(dir.path()));
+
+            let response = server
+                .get("/_app/immutable/app.js")
+                .add_header("accept-encoding", "gzip")
+                .await;
+
+            response.assert_status_ok();
+            assert_eq!(
+                response.headers()[CONTENT_ENCODING].to_str().unwrap(),
+                "gzip"
+            );
+        }
+
+        #[test]
+        fn missing_static_root_fails_to_build_the_service() {
+            let dir = tempfile::tempdir().unwrap();
+            let missing = dir.path().join("nope");
+
+            assert!(StaticFiles::try_new(missing.to_str().unwrap()).is_err());
+        }
+
+        #[test]
+        fn static_root_without_index_html_fails_to_build_the_service() {
+            let dir = tempfile::tempdir().unwrap();
+
+            assert!(StaticFiles::try_new(dir.path().to_str().unwrap()).is_err());
+        }
     }
 }

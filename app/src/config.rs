@@ -11,6 +11,7 @@ use cron::Schedule;
 const SERVER_PORT_KEY: &str = "SERVER_PORT";
 const ALLOW_ORIGIN_KEY: &str = "ALLOW_ORIGIN";
 const ACTIVITIES_DATA_PATH_KEY: &str = "ACTIVITIES_DATA_PATH";
+const ACTIVITIES_STATIC_ASSETS_PATH_KEY: &str = "ACTIVITIES_STATIC_ASSETS_PATH";
 
 // Database backup related keys
 const DB_BACKUP_PATH_KEY: &str = "ACTIVITIES_DB_BACKUP_PATH";
@@ -42,6 +43,7 @@ pub struct BaseConfig {
     pub server_port: String,
     pub allow_origin: String,
     pub activities_data_path: String,
+    pub static_assets_path: Option<String>,
 }
 
 /// Reads only the data path from the environment.
@@ -64,10 +66,15 @@ impl BaseConfig {
             .ok_or_else(|| format!("Invalid or missing {ALLOW_ORIGIN_KEY}"))?;
         let activities_data_path = data_path_from_env(env)?;
 
+        let static_path = load_env(env, ACTIVITIES_STATIC_ASSETS_PATH_KEY)
+            .as_string()
+            .filter(|value| !value.is_empty());
+
         Ok(BaseConfig {
             server_port,
             allow_origin,
             activities_data_path,
+            static_assets_path: static_path,
         })
     }
 }
@@ -570,8 +577,35 @@ mod test_config {
                 server_port: "3000".to_string(),
                 allow_origin: "http://localhost:5173".to_string(),
                 activities_data_path: "/tmp/activities".to_string(),
+                static_assets_path: None,
             }
         );
+    }
+
+    #[test]
+    fn test_base_config_from_env_reads_static_path() {
+        let mut env = MockEnvironment::default();
+        env.set_var(SERVER_PORT_KEY, EnvironmentVariable::Set("80".to_string()));
+        env.set_var(ALLOW_ORIGIN_KEY, EnvironmentVariable::Set(String::new()));
+        env.set_var(
+            ACTIVITIES_DATA_PATH_KEY,
+            EnvironmentVariable::Set("/tmp/activities".to_string()),
+        );
+        env.set_var(
+            ACTIVITIES_STATIC_ASSETS_PATH_KEY,
+            EnvironmentVariable::Set("/app/static".to_string()),
+        );
+
+        assert_eq!(
+            BaseConfig::from_env(&env).unwrap().static_assets_path,
+            Some("/app/static".to_string())
+        );
+
+        env.set_var(
+            ACTIVITIES_STATIC_ASSETS_PATH_KEY,
+            EnvironmentVariable::Set(String::new()),
+        );
+        assert_eq!(BaseConfig::from_env(&env).unwrap().static_assets_path, None);
     }
 
     #[test]

@@ -49,7 +49,13 @@ thiserror = "2.0.16"
 tokio = { version = "1.47.1", features = ["full"] }
 tokio-util = "0.7.18"
 tower = "0.5.2"
-tower-http = { version = "0.7.0", features = ["cors", "trace"] }
+tower-http = { version = "0.7.0", features = [
+    "compression-br",
+    "compression-gzip",
+    "cors",
+    "fs",
+    "trace",
+] }
 tracing = { version = "0.1.41", features = ["log"] }
 tracing-opentelemetry = "0.34.0"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter", "registry"] }

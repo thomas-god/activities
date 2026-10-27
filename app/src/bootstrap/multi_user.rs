@@ -361,6 +361,7 @@ mod tests {
             server_port: "0".to_string(),
             allow_origin: "http://localhost".to_string(),
             activities_data_path: path.to_string_lossy().to_string(),
+            static_assets_path: None,
         }
     }
 
