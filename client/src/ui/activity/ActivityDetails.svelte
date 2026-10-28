@@ -15,6 +15,8 @@
 	import DurationCurve from '#ui/activity/DurationCurve.svelte';
 	import DurationCurveNotifications from '#ui/activity/DurationCurveNotifications.svelte';
 	import ActivityMap from '#ui/activity/internal/ActivityMap.svelte';
+	import { feedbackWarnings } from '#ui/activity/internal/feedbackWarnings.js';
+	import { TriangleAlert } from '@lucide/svelte';
 	import { convertTimeseriesToActiveTime } from '#lib/timeseries.js';
 	import type { WorkoutType } from '#lib/workout-type.js';
 	import type { Nutrition } from '#lib/nutrition.js';
@@ -138,6 +140,8 @@
 	let averagePower = $derived(activity.metrics['AvgPower']?.value ?? null);
 	let averagePace = $derived(activity.metrics['AvgSpeed']?.value ?? null);
 	let activityWeight = $derived(asOption(activity.training_context.weight));
+
+	let feedbackWarningLabels = $derived(feedbackWarnings(activity.training_context.hooper_index));
 
 	interface MetricOption {
 		option: Metric;
@@ -371,6 +375,21 @@
 	<details class={`collapse-arrow collapse ${sectionClass}`} open>
 		<summary class="collapse-title text-lg font-semibold">Session feedbacks</summary>
 		<div class="collapse-content flex flex-col gap-3">
+			{#if feedbackWarningLabels.length > 0}
+				<div class="flex flex-wrap gap-2">
+					{#each feedbackWarningLabels as warning (warning.kind)}
+						<span
+							class="badge gap-1 badge-sm"
+							class:badge-warning={warning.severity === 'warning'}
+							class:badge-error={warning.severity === 'alert'}
+							data-testid={`feedback-warning-${warning.kind}`}
+						>
+							<TriangleAlert class="h-3.5 w-3.5" />
+							{warning.label}
+						</span>
+					{/each}
+				</div>
+			{/if}
 			<EditableRpe rpe={activity.rpe} editCallback={updateActivityRpeCallback} />
 			<div class="my-0 border-b border-base-300"></div>
 			<EditableWorkoutType
