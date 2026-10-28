@@ -375,7 +375,7 @@ mod tests {
         TimeseriesMetric, TimeseriesTime, TimeseriesValue,
     };
     use crate::domain::models::training::{
-        BestDurationCurve, ReferenceBestDurationCurve, ReferenceDurationCurveKind,
+        BestDurationCurve, HooperIndex, ReferenceBestDurationCurve, ReferenceDurationCurveKind,
     };
 
     fn activity_id() -> ActivityId {
@@ -448,7 +448,7 @@ mod tests {
     fn test_public_activity_with_timeseries_json_roundtrip() {
         let activity = ActivityWithTrainingContext::new(
             activity_with_parsed_data(),
-            TrainingContext::new(Some(70.0), vec![]),
+            TrainingContext::new(Some(70.0), vec![], HooperIndex::default()),
             metrics(),
         );
 
@@ -487,6 +487,7 @@ mod tests {
                         ],
                     )],
                 )],
+                HooperIndex::default(),
             ),
             metrics(),
         );
@@ -541,6 +542,7 @@ mod tests {
                     Some("Base training"),
                     vec![],
                 )],
+                HooperIndex::default(),
             ),
             metrics(),
         );
@@ -563,7 +565,7 @@ mod tests {
     fn test_public_activity_with_timeseries_serialises_empty_training_context_curves() {
         let activity = ActivityWithTrainingContext::new(
             activity_with_parsed_data(),
-            TrainingContext::new(Some(70.0), vec![]),
+            TrainingContext::new(Some(70.0), vec![], HooperIndex::default()),
             metrics(),
         );
 
@@ -581,7 +583,7 @@ mod tests {
     fn test_public_activity_with_timeseries_serialises_null_weight() {
         let activity = ActivityWithTrainingContext::new(
             activity_with_parsed_data(),
-            TrainingContext::new(None, vec![]),
+            TrainingContext::new(None, vec![], HooperIndex::default()),
             metrics(),
         );
 
@@ -613,7 +615,7 @@ mod tests {
         );
         let activity = ActivityWithTrainingContext::new(
             activity_with_parsed_data_with_curves(ActivityDurationCurves::new(vec![curve])),
-            TrainingContext::new(Some(70.0), vec![]),
+            TrainingContext::new(Some(70.0), vec![], HooperIndex::default()),
             metrics(),
         );
 

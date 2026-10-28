@@ -8,7 +8,9 @@ use tokio_util::sync::CancellationToken;
 use crate::domain::{
     models::{
         UserId,
-        activity::{ActivityId, ActivityMetric, DURATION_CURVE_DURATIONS_SECOND},
+        activity::{
+            ActivityId, ActivityMetric, ActivityStartTime, DURATION_CURVE_DURATIONS_SECOND,
+        },
         search::{SearchDocument, SearchDocumentType},
         training::{
             ActivitySource, ActivityWithTrainingContext, DurationCurveSource, HooperIndex,
@@ -305,6 +307,58 @@ where
             TrainingMetricSummaryValues::default(),
             source.unit(),
         ))
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_activity_best_duration_curves(
+        &self,
+        user: &UserId,
+        activity_start: &ActivityStartTime,
+        period: Option<TrainingPeriodId>,
+    ) -> Result<Vec<ReferenceBestDurationCurve>, ActivityWithTrainingContextError> {
+        let before = activity_start.naive_date();
+        let mut best_duration_curves = Vec::with_capacity(2);
+
+        // Always compare against the 12-week best
+        let twelve_week_since = before
+            .checked_sub_days(Days::new(12 * 7))
+            .ok_or_else(|| anyhow!("invalid activity date {before}"))?;
+        best_duration_curves.push(ReferenceBestDurationCurve::new(
+            ReferenceDurationCurveKind::TwelveWeek,
+            None,
+            twelve_week_since,
+            before,
+            self.training_repository
+                .get_best_duration_curves(user, twelve_week_since, before)
+                .await?,
+        ));
+
+        // Optionally compare against the period best
+        if let Some(period_id) = period
+            && let Some(period) = self
+                .training_repository
+                .get_training_period(user, &period_id)
+                .await
+        {
+            let period_start = *period.start();
+            let period_before = match period.end() {
+                Some(end) => before.min(end.checked_add_days(Days::new(1)).unwrap_or(*end)),
+                None => before,
+            };
+            if period_start < period_before {
+                best_duration_curves.push(ReferenceBestDurationCurve::new(
+                    ReferenceDurationCurveKind::TrainingPeriod,
+                    Some(period.name().to_string()),
+                    period_start,
+                    period_before,
+                    self.training_repository
+                        .get_best_duration_curves(user, period_start, period_before)
+                        .await?,
+                ));
+            }
+        }
+
+        Ok(best_duration_curves)
     }
 }
 
@@ -980,51 +1034,19 @@ where
             .get_last_weight(user, activity.start_time().naive_date())
             .await?;
 
-        let before = activity.start_time().naive_date();
-        let mut best_duration_curves = Vec::with_capacity(2);
+        let best_duration_curves = self
+            .get_activity_best_duration_curves(user, activity.start_time(), period)
+            .await?;
 
-        // Always compare against the 12-week best
-        let twelve_week_since = before
-            .checked_sub_days(Days::new(12 * 7))
-            .ok_or_else(|| anyhow!("invalid activity date {before}"))?;
-        best_duration_curves.push(ReferenceBestDurationCurve::new(
-            ReferenceDurationCurveKind::TwelveWeek,
-            None,
-            twelve_week_since,
-            before,
-            self.training_repository
-                .get_best_duration_curves(user, twelve_week_since, before)
-                .await?,
-        ));
-
-        // Optionally compare against the period best
-        if let Some(period_id) = period
-            && let Some(period) = self
-                .training_repository
-                .get_training_period(user, &period_id)
-                .await
-        {
-            let period_start = *period.start();
-            let period_before = match period.end() {
-                Some(end) => before.min(end.checked_add_days(Days::new(1)).unwrap_or(*end)),
-                None => before,
-            };
-            if period_start < period_before {
-                best_duration_curves.push(ReferenceBestDurationCurve::new(
-                    ReferenceDurationCurveKind::TrainingPeriod,
-                    Some(period.name().to_string()),
-                    period_start,
-                    period_before,
-                    self.training_repository
-                        .get_best_duration_curves(user, period_start, period_before)
-                        .await?,
-                ));
-            }
-        }
+        let hooper_index = self
+            .get_hooper_index(user, &activity.start_time().naive_date())
+            .await
+            .map_err(|err| ActivityWithTrainingContextError::Unknown(anyhow!(err)))?
+            .unwrap_or_default();
 
         Ok(ActivityWithTrainingContext::new(
             activity,
-            TrainingContext::new(weight, best_duration_curves),
+            TrainingContext::new(weight, best_duration_curves, hooper_index),
             metrics,
         ))
     }
@@ -6959,10 +6981,14 @@ mod test_training_service_activity_with_training_context {
         ActivityWithParsedData, DurationCurveType, Sport,
     };
     use crate::domain::models::training::{
-        BestDurationCurve, TrainingPeriod, TrainingPeriodSports,
+        BestDurationCurve, HooperIndex, SubjectiveScale, TrainingPeriod, TrainingPeriodSports,
     };
     use crate::domain::services::activity::test_utils::MockActivityService;
     use crate::domain::services::training::test_utils::MockTrainingRepository;
+
+    fn scale(value: u8) -> SubjectiveScale {
+        SubjectiveScale::try_from(value).unwrap()
+    }
 
     fn build_activity_with_parsed_data(start_time: &str) -> ActivityWithParsedData {
         ActivityWithParsedData::new(
@@ -7021,6 +7047,10 @@ mod test_training_service_activity_with_training_context {
             .expect_get_best_duration_curves()
             .times(1)
             .returning(|_, _, _| Ok(vec![]));
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
 
         let service = TrainingService::new(
             repository,
@@ -7044,6 +7074,131 @@ mod test_training_service_activity_with_training_context {
         assert_eq!(result.activity().id(), &activity_id);
         assert_eq!(result.metrics(), &metrics);
         assert_eq!(result.training_context().weight(), &Some(85.0));
+        assert_eq!(
+            result.training_context().hooper_index(),
+            &HooperIndex::default()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_returns_hooper_index() {
+        let user = UserId::from("user1");
+        let activity = build_activity_with_parsed_data("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .returning(|_, _, _| Ok(vec![]));
+        let expected_user = user.clone();
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .withf(move |u, d| {
+                u == &expected_user && *d == "2025-09-03".parse::<NaiveDate>().unwrap()
+            })
+            .returning(|_, _| {
+                Ok(Some(HooperIndex::new(
+                    Some(scale(6)),
+                    Some(scale(2)),
+                    Some(scale(3)),
+                    Some(scale(4)),
+                    Some(scale(5)),
+                )))
+            });
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+                None,
+            )
+            .await
+            .expect("Should have succeeded");
+
+        let hooper_index = result.training_context().hooper_index();
+        assert_eq!(hooper_index.fatigue(), &Some(scale(6)));
+        assert_eq!(hooper_index.sleep(), &Some(scale(2)));
+        assert_eq!(hooper_index.pain(), &Some(scale(3)));
+        assert_eq!(hooper_index.stress(), &Some(scale(4)));
+        assert_eq!(hooper_index.mood(), &Some(scale(5)));
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_propagates_hooper_index_error() {
+        let user = UserId::from("user1");
+        let activity = build_activity_with_parsed_data("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .returning(|_, _, _| Ok(vec![]));
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Err(HooperIndexError::Unknown(anyhow!("db error"))));
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+                None,
+            )
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(ActivityWithTrainingContextError::Unknown(_))
+        ));
     }
 
     #[tokio::test]
@@ -7070,6 +7225,10 @@ mod test_training_service_activity_with_training_context {
             .expect_get_best_duration_curves()
             .times(1)
             .returning(|_, _, _| Ok(vec![]));
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
 
         let service = TrainingService::new(
             repository,
@@ -7114,6 +7273,7 @@ mod test_training_service_activity_with_training_context {
         let mut repository = MockTrainingRepository::new();
         repository.expect_get_last_weight().times(0);
         repository.expect_get_best_duration_curves().times(0);
+        repository.expect_get_hooper_index().times(0);
 
         let service = TrainingService::new(
             repository,
@@ -7163,6 +7323,7 @@ mod test_training_service_activity_with_training_context {
             .times(1)
             .returning(|_, _| Err(anyhow!("db error")));
         repository.expect_get_best_duration_curves().times(0);
+        repository.expect_get_hooper_index().times(0);
 
         let service = TrainingService::new(
             repository,
@@ -7255,6 +7416,10 @@ mod test_training_service_activity_with_training_context {
                     ),
                 ])
             });
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
 
         let service = TrainingService::new(
             repository,
@@ -7323,6 +7488,10 @@ mod test_training_service_activity_with_training_context {
             .expect_get_best_duration_curves()
             .times(1)
             .returning(|_, _, _| Ok(vec![]));
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
 
         let service = TrainingService::new(
             repository,
@@ -7397,6 +7566,10 @@ mod test_training_service_activity_with_training_context {
                     "Base training",
                 ))
             });
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
 
         let service = TrainingService::new(
             repository,
@@ -7466,6 +7639,10 @@ mod test_training_service_activity_with_training_context {
             .expect_get_training_period()
             .times(1)
             .returning(|_, _| None);
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
 
         let service = TrainingService::new(
             repository,
@@ -7523,6 +7700,10 @@ mod test_training_service_activity_with_training_context {
             .expect_get_training_period()
             .times(1)
             .returning(|_, _| Some(training_period("2025-07-07", Some("2025-08-31"), "Base")));
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
 
         let service = TrainingService::new(
             repository,
@@ -7579,6 +7760,10 @@ mod test_training_service_activity_with_training_context {
             .expect_get_training_period()
             .times(1)
             .returning(|_, _| Some(training_period("2025-09-03", None, "Base")));
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
 
         let service = TrainingService::new(
             repository,

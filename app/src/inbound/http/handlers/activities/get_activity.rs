@@ -86,7 +86,7 @@ mod tests {
                     Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
                     TimeseriesValue,
                 },
-                training::{ActivityWithTrainingContext, TrainingContext},
+                training::{ActivityWithTrainingContext, HooperIndex, TrainingContext},
             },
             ports::activity::GetActivityError,
             services::{
@@ -150,7 +150,7 @@ mod tests {
                         )])),
                         ActivityDurationCurves::default(),
                     ),
-                    TrainingContext::new(Some(70.0), vec![]),
+                    TrainingContext::new(Some(70.0), vec![], HooperIndex::default()),
                     ActivityMetrics::new(HashMap::from([(ActivityMetric::Duration, Some(1200.))])),
                 ))
             });

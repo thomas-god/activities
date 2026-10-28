@@ -1236,7 +1236,7 @@ impl SubjectiveScale {
 
 /// Hooper's index is a collection of self-reported subjective measures about one's state and
 /// well-being.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct HooperIndex {
     fatigue: Option<SubjectiveScale>,
     sleep: Option<SubjectiveScale>,
@@ -1971,6 +1971,7 @@ impl DurationCurveSource {
 pub struct TrainingContext {
     weight: Option<f32>,
     reference_best_duration_curves: Vec<ReferenceBestDurationCurve>,
+    hooper_index: HooperIndex,
 }
 
 impl TrainingContext {
@@ -1980,6 +1981,10 @@ impl TrainingContext {
 
     pub fn reference_best_duration_curves(&self) -> &[ReferenceBestDurationCurve] {
         &self.reference_best_duration_curves
+    }
+
+    pub fn hooper_index(&self) -> &HooperIndex {
+        &self.hooper_index
     }
 }
 
