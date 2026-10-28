@@ -8,7 +8,7 @@ import type {
 	PreviewTrainingMetricPayload,
 	TrainingPeriodDetails
 } from '#lib/api/index.js';
-import { asOption, isNone, none, type Option } from './Options';
+import { isNone, type Option } from './Options';
 
 export const trainingMetricGranularities = ['Daily', 'Weekly', 'Monthly'] as const;
 export type TrainingMetricGranularity = (typeof trainingMetricGranularities)[number];
@@ -134,9 +134,6 @@ export const metricValuesDisplayFormat = (metric: {
 /** How the compared periods' time axes are aligned on the comparison charts. */
 export type CompareAlignment = 'start' | 'end';
 
-/** Where a compared metric definition comes from. */
-export type CompareMetricSource = 'default' | 'first' | 'second' | 'both';
-
 /**
  * One entry of the metric comparison: a single metric definition which is
  * computed over each compared period's own date range. `label` is null when
@@ -160,18 +157,16 @@ export const metricDefinitionKey = (metric: TrainingMetric): string =>
 		aggregate: metric.aggregate
 	});
 
-export const definitionGroupBy = (
-	definition: CompareMetricDefinition
-): Option<TrainingMetricGroupByClause> => {
-	if (
-		definition.base.source.type === 'activity' &&
-		definition.base.source.metric.group_by !== undefined
-	) {
-		return asOption(definition.base.source.metric.group_by);
-	} else {
-		return none();
-	}
-};
+/**
+ * Identity of a comparison definition's base. Matches `metricDefinitionKey` of
+ * the saved metrics, so a period metric equal to a built-in can be deduplicated.
+ */
+export const definitionBaseKey = (definition: CompareMetricDefinition): string =>
+	JSON.stringify({
+		source: definition.base.source,
+		granularity: definition.base.window?.granularity ?? null,
+		aggregate: definition.base.window?.aggregate ?? null
+	});
 
 /**
  * Builds the comparable definition of a saved metric. Filters keep only the

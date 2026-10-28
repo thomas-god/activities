@@ -1,12 +1,10 @@
 <script lang="ts">
-	import { Import, Plus } from '@lucide/svelte';
-	import { untrack } from 'svelte';
+	import { Plus } from '@lucide/svelte';
 	import {
 		fetchTrainingMetricTemplates,
 		fetchTrainingPeriodMetrics,
 		getTrainingMetricPreview,
 		type TrainingMetric,
-		type TrainingMetricBasePayload,
 		type TrainingMetricList,
 		type TrainingPeriodDetails
 	} from '#lib/api/index.js';
@@ -14,12 +12,12 @@
 	import {
 		definitionLabel,
 		metricPreviewPayload,
-		defaultCompareDefinitions,
 		metricDefinitionKey,
 		extractBaseDefinitionFromMetric,
+		definitionBaseKey,
+		defaultCompareDefinitions,
 		type CompareAlignment,
-		type CompareMetricDefinition,
-		definitionGroupBy
+		type CompareMetricDefinition
 	} from '#lib/trainingMetric.js';
 	import CompareMetricEntry from './internal/CompareMetricEntry.svelte';
 	import TrainingMetricForm from '#ui/training_metrics/TrainingMetricForm.svelte';
@@ -50,89 +48,97 @@
 		secondPeriodValues: getTrainingMetricPreview(metricPreviewPayload(definition, secondPeriod))
 	});
 
-	// The computation promises are created here, when a definition is added, and
-	// in the effect below when the compared periods change — never during
-	// rendering, which Svelte forbids (state_unsafe_mutation).
-	let comparisons: MetricComparison[] = $state(
-		defaultCompareDefinitions().map(buildMetricComparison)
-	);
-
-	// The ids are snapshotted on purpose: they record which periods the current
-	// promises were built for, and the effect below rebuilds when they change.
-	// svelte-ignore state_referenced_locally
-	let builtForFirstId: string | null = firstPeriod.id;
-	// svelte-ignore state_referenced_locally
-	let builtForSecondId: string | null = secondPeriod.id;
-
-	$effect(() => {
-		if (firstPeriod.id === builtForFirstId && secondPeriod.id === builtForSecondId) {
-			return;
-		}
-		builtForFirstId = firstPeriod.id;
-		builtForSecondId = secondPeriod.id;
-		untrack(() => {
-			comparisons = comparisons.map((comparison) => buildMetricComparison(comparison.definition));
-		});
-	});
-
-	let importMetricDialog: HTMLDialogElement;
-	let addMetricDialog: HTMLDialogElement;
-
-	let firstPeriodMetricsPromise = $derived(fetchTrainingPeriodMetrics(fetch, firstPeriod.id));
-	let secondPeriodMetricsPromise = $derived(fetchTrainingPeriodMetrics(fetch, secondPeriod.id));
-
-	const addDefinition = (definition: CompareMetricDefinition) => {
-		if (comparisons.some((comparison) => comparison.definition.key === definition.key)) {
-			return;
-		}
-		comparisons = [...comparisons, buildMetricComparison(definition)];
-	};
-
-	const removeDefinition = (key: string) => {
-		comparisons = comparisons.filter((comparison) => comparison.definition.key !== key);
-	};
-
-	type PickerEntry = { definition: CompareMetricDefinition; added: boolean };
-
-	const pickerEntries = (
+	/**
+	 * Merges the saved metrics of both periods. Metrics sharing the same
+	 * definition are compared once and marked as coming from both periods.
+	 */
+	const mergedCompareDefinitions = (
 		firstPeriodMetrics: TrainingMetricList,
-		firstPeriodName: string,
 		secondPeriodMetrics: TrainingMetricList,
+		firstPeriodName: string,
 		secondPeriodName: string
-	): PickerEntry[] => {
-		const picked: {
-			key: string;
-			source: string;
-			metric: TrainingMetric;
-		}[] = [];
+	): CompareMetricDefinition[] => {
+		const merged: Record<string, CompareMetricDefinition> = {};
 
 		for (const metric of firstPeriodMetrics) {
-			picked.push({ key: metricDefinitionKey(metric), source: firstPeriodName, metric });
+			const key = metricDefinitionKey(metric);
+			merged[key] = {
+				key,
+				label: metric.name,
+				source: firstPeriodName,
+				base: extractBaseDefinitionFromMetric(metric)
+			};
 		}
+
 		for (const metric of secondPeriodMetrics) {
 			const key = metricDefinitionKey(metric);
-			const existing = picked.find((entry) => entry.key === key);
+			const existing = merged[key];
 			if (existing !== undefined) {
 				existing.source = 'both';
 			} else {
-				picked.push({ key, source: secondPeriodName, metric });
+				merged[key] = {
+					key,
+					label: metric.name,
+					source: secondPeriodName,
+					base: extractBaseDefinitionFromMetric(metric)
+				};
 			}
 		}
 
-		return picked
-			.map(({ key, source, metric }) => ({
-				definition: {
-					key,
-					label: metric.name,
-					source,
-					base: extractBaseDefinitionFromMetric(metric)
-				},
-				added: comparisons.some((comparison) => comparison.definition.key === key)
-			}))
-			.toSorted((a, b) =>
-				definitionLabel(a.definition).localeCompare(definitionLabel(b.definition))
-			);
+		return Object.values(merged).toSorted((a, b) =>
+			definitionLabel(a).localeCompare(definitionLabel(b))
+		);
 	};
+
+	// Custom metrics added by the user, appended after the automatic ones, and
+	// keys the user removed (built-in and period metrics are recomputed each
+	// time, so they must be filtered out on display).
+	let customDefinitions: CompareMetricDefinition[] = $state([]);
+	let removedKeys: string[] = $state([]);
+
+	/**
+	 * The built-in definitions first, then the metrics of both periods merged
+	 * (common definitions deduplicated). Recomputed whenever the periods change.
+	 */
+	const automaticComparisonsPromise = $derived.by(async () => {
+		// Read the reactive props synchronously so the derived tracks them.
+		const firstPeriodName = firstPeriod.name;
+		const secondPeriodName = secondPeriod.name;
+
+		const [firstPeriodMetrics, secondPeriodMetrics] = await Promise.all([
+			fetchTrainingPeriodMetrics(fetch, firstPeriod.id),
+			fetchTrainingPeriodMetrics(fetch, secondPeriod.id)
+		]);
+
+		const defaultDefinitions = defaultCompareDefinitions();
+		const defaultKeys = new Set(defaultDefinitions.map(definitionBaseKey));
+		const periodDefinitions = mergedCompareDefinitions(
+			firstPeriodMetrics,
+			secondPeriodMetrics,
+			firstPeriodName,
+			secondPeriodName
+		).filter((definition) => !defaultKeys.has(definitionBaseKey(definition)));
+
+		return [...defaultDefinitions, ...periodDefinitions].map(buildMetricComparison);
+	});
+
+	const customComparisons = $derived(customDefinitions.map(buildMetricComparison));
+
+	const addDefinition = (definition: CompareMetricDefinition) => {
+		removedKeys = removedKeys.filter((key) => key !== definition.key);
+		if (customDefinitions.some((candidate) => candidate.key === definition.key)) {
+			return;
+		}
+		customDefinitions = [...customDefinitions, definition];
+	};
+
+	const removeDefinition = (key: string) => {
+		customDefinitions = customDefinitions.filter((definition) => definition.key !== key);
+		if (!removedKeys.includes(key)) {
+			removedKeys = [...removedKeys, key];
+		}
+	};
+
 	const buildPromise = async () => {
 		const templates = await fetchTrainingMetricTemplates();
 		return templates;
@@ -153,13 +159,7 @@
 		}));
 	};
 
-	const formatMetricSource = (metric: TrainingMetricBasePayload): string => {
-		if (metric.source.type === 'activity') {
-			return metric.source.metric.metric;
-		} else {
-			return metric.source.metric;
-		}
-	};
+	let addMetricDialog: HTMLDialogElement;
 </script>
 
 <div class="rounded-box bg-base-100 p-4 shadow-md">
@@ -180,10 +180,6 @@
 					onclick={() => (alignBy = 'end')}>End</button
 				>
 			</div>
-			<button class="btn btn-sm" onclick={() => importMetricDialog.show()}>
-				<Import class="size-4" />
-				Import metric
-			</button>
 			<button class="btn btn-sm" onclick={() => addMetricDialog.show()}>
 				<Plus class="size-4" />
 				Add metric
@@ -192,76 +188,35 @@
 	</div>
 </div>
 
-{#each comparisons as comparison (comparison.definition.key)}
-	<div class="mt-5">
-		<CompareMetricEntry
-			definition={comparison.definition}
-			firstPeriod={{ period: firstPeriod, metric: comparison.firstPeriodValues }}
-			secondPeriod={{ period: secondPeriod, metric: comparison.secondPeriodValues }}
-			{alignBy}
-			onRemove={() => removeDefinition(comparison.definition.key)}
-		/>
+{#await automaticComparisonsPromise}
+	<div class="mt-5 flex w-full flex-col items-center p-4">
+		<div class="loading loading-bars"></div>
 	</div>
-{:else}
-	<div class="mt-5 rounded-box bg-base-100 p-4 shadow-md">
-		<p class="text-sm tracking-wide italic opacity-70">
-			No metric compared. Add one from the training metrics of the periods.
-		</p>
-	</div>
-{/each}
-
-<dialog class="modal" bind:this={importMetricDialog}>
-	<div class="modal-box max-w-2xl">
-		<form method="dialog">
-			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
-		</form>
-		<h3 class="mb-3 text-lg font-semibold">Import a metric from a period</h3>
-		<p class="mb-3 text-sm opacity-70">
-			Each metric is computed over each period's own date range.
-		</p>
-		{#await Promise.all([firstPeriodMetricsPromise, secondPeriodMetricsPromise])}
-			<div class="flex justify-center p-4">
-				<div class="loading loading-bars"></div>
-			</div>
-		{:then [firstPeriodMetrics, secondPeriodMetrics]}
-			<ul class="menu w-full rounded-box bg-base-200 p-2">
-				{#each pickerEntries(firstPeriodMetrics, firstPeriod.name, secondPeriodMetrics, secondPeriod.name) as entry (entry.definition.key)}
-					{@const groupBy = definitionGroupBy(entry.definition)}
-					<li class="w-full" class:disabled={entry.added}>
-						<button disabled={entry.added} onclick={() => addDefinition(entry.definition)}>
-							<div class="flex w-full flex-col items-start gap-0.5">
-								<span>
-									{definitionLabel(entry.definition)}
-									<span class="badge badge-ghost badge-xs">{entry.definition.source}</span>
-								</span>
-								<span class="text-xs opacity-60">
-									{formatMetricSource(entry.definition.base)}
-									{#if entry.definition.base.window !== undefined}
-										· {entry.definition.base.window.granularity}
-										{entry.definition.base.window.aggregate}
-									{/if}
-									{#if isSome(groupBy)}
-										· by {groupBy.value}
-									{/if}
-								</span>
-							</div>
-							{#if entry.added}
-								<span class="badge badge-ghost badge-sm">Added</span>
-							{/if}
-						</button>
-					</li>
-				{:else}
-					<li class="disabled">
-						<span>No comparable training metrics in these periods</span>
-					</li>
-				{/each}
-			</ul>
-		{/await}
-	</div>
-	<form method="dialog" class="modal-backdrop">
-		<button>close</button>
-	</form>
-</dialog>
+{:then automaticComparisons}
+	{@const comparisons = [
+		...automaticComparisons.filter(
+			(comparison) => !removedKeys.includes(comparison.definition.key)
+		),
+		...customComparisons
+	]}
+	{#each comparisons as comparison (comparison.definition.key)}
+		<div class="mt-5">
+			<CompareMetricEntry
+				definition={comparison.definition}
+				firstPeriod={{ period: firstPeriod, metric: comparison.firstPeriodValues }}
+				secondPeriod={{ period: secondPeriod, metric: comparison.secondPeriodValues }}
+				{alignBy}
+				onRemove={() => removeDefinition(comparison.definition.key)}
+			/>
+		</div>
+	{:else}
+		<div class="mt-5 rounded-box bg-base-100 p-4 shadow-md">
+			<p class="text-sm tracking-wide italic opacity-70">
+				No metric compared. Add a custom metric to compare these periods.
+			</p>
+		</div>
+	{/each}
+{/await}
 
 <dialog class="modal" bind:this={addMetricDialog}>
 	<div class="modal-box max-w-2xl">
