@@ -86,11 +86,9 @@ mod tests {
                     Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
                     TimeseriesValue,
                 },
-            },
-            ports::{
-                activity::GetActivityError,
                 training::{ActivityWithTrainingContext, TrainingContext},
             },
+            ports::activity::GetActivityError,
             services::{
                 activity::test_utils::MockActivityService,
                 preferences::tests_utils::MockPreferencesService,

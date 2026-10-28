@@ -6,13 +6,12 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityDurationCurve, ActivityId, ActivityMetric, ActivityMetrics,
-            ActivityWithParsedData,
+            Activity, ActivityDurationCurve, ActivityId, ActivityMetric, ActivityWithParsedData,
         },
         search::SearchDocument,
         training::{
-            BestDurationCurve, HooperIndex, HooperIndexPatch, TrainingMetric,
-            TrainingMetricDefinitionPatch, TrainingMetricId, TrainingMetricName,
+            ActivityWithTrainingContext, BestDurationCurve, HooperIndex, HooperIndexPatch,
+            TrainingMetric, TrainingMetricDefinitionPatch, TrainingMetricId, TrainingMetricName,
             TrainingMetricPatch, TrainingMetricScope, TrainingMetricSource, TrainingMetricSummary,
             TrainingMetricTarget, TrainingMetricValues, TrainingMetricWindow,
             TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
@@ -367,89 +366,6 @@ impl DeleteWeightAndNutritionRequest {
 pub enum WeightAndNutritionError {
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
-}
-
-/// Additional training context to help interpret or derive statistics (like W/kg) from an activity.
-#[derive(Clone, Debug, Constructor, Default, PartialEq)]
-pub struct TrainingContext {
-    weight: Option<f32>,
-    reference_best_duration_curves: Vec<ReferenceBestDurationCurve>,
-}
-
-impl TrainingContext {
-    pub fn weight(&self) -> &Option<f32> {
-        &self.weight
-    }
-
-    pub fn reference_best_duration_curves(&self) -> &[ReferenceBestDurationCurve] {
-        &self.reference_best_duration_curves
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ReferenceDurationCurveKind {
-    TwelveWeek,
-    TrainingPeriod,
-}
-
-impl ReferenceDurationCurveKind {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::TwelveWeek => "twelve_week",
-            Self::TrainingPeriod => "training_period",
-        }
-    }
-}
-
-#[derive(Clone, Debug, Constructor, PartialEq)]
-pub struct ReferenceBestDurationCurve {
-    kind: ReferenceDurationCurveKind,
-    label: Option<String>,
-    start: NaiveDate,
-    end: NaiveDate,
-    curves: Vec<BestDurationCurve>,
-}
-
-impl ReferenceBestDurationCurve {
-    pub fn kind(&self) -> &ReferenceDurationCurveKind {
-        &self.kind
-    }
-
-    pub fn label(&self) -> &Option<String> {
-        &self.label
-    }
-
-    pub fn start(&self) -> &NaiveDate {
-        &self.start
-    }
-
-    pub fn end(&self) -> &NaiveDate {
-        &self.end
-    }
-
-    pub fn curves(&self) -> &[BestDurationCurve] {
-        &self.curves
-    }
-}
-
-/// Activity extended with extra training context.
-#[derive(Clone, Debug, Constructor)]
-pub struct ActivityWithTrainingContext {
-    activity: ActivityWithParsedData,
-    training_context: TrainingContext,
-    metrics: ActivityMetrics,
-}
-
-impl ActivityWithTrainingContext {
-    pub fn activity(&self) -> &ActivityWithParsedData {
-        &self.activity
-    }
-    pub fn training_context(&self) -> &TrainingContext {
-        &self.training_context
-    }
-    pub fn metrics(&self) -> &ActivityMetrics {
-        &self.metrics
-    }
 }
 
 #[derive(Debug, Error)]

@@ -5,6 +5,7 @@ use derive_more::Constructor;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::{
+    models::training::{ActivityWithTrainingContext, ReferenceBestDurationCurve, TrainingContext},
     models::{
         activity::{
             Activity, ActivityDurationCurve, ActivityMetric, ActivityMetrics, ActivityNutrition,
@@ -13,7 +14,6 @@ use crate::domain::{
         },
         training::BestDurationCurve,
     },
-    ports::training::{ActivityWithTrainingContext, ReferenceBestDurationCurve, TrainingContext},
 };
 
 // =============================================================================
@@ -374,8 +374,9 @@ mod tests {
         ActivityWithParsedData, DurationCurveType, Sport, Timeseries, TimeseriesActiveTime,
         TimeseriesMetric, TimeseriesTime, TimeseriesValue,
     };
-    use crate::domain::models::training::BestDurationCurve;
-    use crate::domain::ports::training::{ReferenceBestDurationCurve, ReferenceDurationCurveKind};
+    use crate::domain::models::training::{
+        BestDurationCurve, ReferenceBestDurationCurve, ReferenceDurationCurveKind,
+    };
 
     fn activity_id() -> ActivityId {
         ActivityId::from("activity_id")
