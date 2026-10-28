@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { fetchHooperIndex, saveHooperIndex, type HooperIndex } from '#lib/api/index.js';
 import HooperIndexForm from './FeedbackForm.svelte';
-import { emptyHooperIndex, hooperMeasures } from './feedback';
+import { emptyHooperIndex, hooperMeasureExtremes, hooperMeasures } from './feedback';
 import { dayjs } from '#lib/duration.js';
 
 vi.mock('#lib/api/index.js', () => ({
@@ -88,6 +88,21 @@ describe('HooperIndexForm', () => {
 		expect(slider('fatigue').value).toBe('8');
 		expect(slider('fatigue')).not.toHaveClass('range-empty');
 		expect(displayedValue('fatigue')).toBe('8');
+	});
+
+	it('labels both ends of every measure', async () => {
+		await renderForm();
+
+		for (const measure of hooperMeasures) {
+			const extremes = hooperMeasureExtremes[measure];
+			const low = screen.getByTestId(`hooper-${measure}-low`);
+			const high = screen.getByTestId(`hooper-${measure}-high`);
+
+			expect(low).toHaveTextContent('0');
+			expect(low).toHaveTextContent(extremes.low);
+			expect(high).toHaveTextContent('10');
+			expect(high).toHaveTextContent(extremes.high);
+		}
 	});
 
 	it('clears a single measure without touching the others', async () => {

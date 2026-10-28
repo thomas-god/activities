@@ -7,6 +7,7 @@
 		emptyHooperIndex,
 		HOOPER_MEASURE_MAX,
 		HOOPER_MEASURE_MIN,
+		hooperMeasureExtremes,
 		hooperMeasures,
 		type HooperMeasure
 	} from './feedback';
@@ -87,9 +88,10 @@
 	{:else}
 		{#each hooperMeasures as measure (measure)}
 			{@const value = values[measure]}
+			{@const extremes = hooperMeasureExtremes[measure]}
 			<div class="flex flex-col gap-1">
 				<div class="flex items-center justify-between">
-					<label class="label capitalize" for="hooper-{measure}">
+					<label class="label font-semibold capitalize" for="hooper-{measure}">
 						{measure}
 						<span class="text-xs font-normal normal-case opacity-50">
 							({previousLabel}: {previousValues[measure] ?? '–'} )
@@ -112,21 +114,29 @@
 					</div>
 				</div>
 
-				<div class="flex items-center gap-2">
-					<span class="w-3 text-end text-xs tabular-nums opacity-40">{HOOPER_MEASURE_MIN}</span>
+				<div class="flex flex-col gap-0.5">
+					<div class="flex items-center justify-between text-xs leading-tight opacity-50">
+						<span data-testid="hooper-{measure}-low">
+							<span class="tabular-nums">{HOOPER_MEASURE_MIN}</span>
+							· {extremes.low}
+						</span>
+						<span data-testid="hooper-{measure}-high">
+							{extremes.high} ·
+							<span class="tabular-nums">{HOOPER_MEASURE_MAX}</span>
+						</span>
+					</div>
 					<input
 						id="hooper-{measure}"
 						type="range"
 						min={HOOPER_MEASURE_MIN}
 						max={HOOPER_MEASURE_MAX}
 						step="1"
-						class="range flex-1 range-neutral range-sm"
+						class="range w-full range-neutral range-sm"
 						class:range-empty={value === null}
 						value={value ?? HOOPER_MEASURE_MIN}
 						oninput={(event) =>
 							setMeasure(measure, Number((event.currentTarget as HTMLInputElement).value))}
 					/>
-					<span class="w-3 text-xs tabular-nums opacity-40">{HOOPER_MEASURE_MAX}</span>
 				</div>
 			</div>
 		{/each}

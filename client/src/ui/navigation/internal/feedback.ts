@@ -9,6 +9,19 @@ export type HooperMeasure = (typeof hooperMeasures)[number];
 export const HOOPER_MEASURE_MIN = 0;
 export const HOOPER_MEASURE_MAX = 10;
 
+export interface HooperMeasureExtremes {
+	low: string;
+	high: string;
+}
+
+export const hooperMeasureExtremes: Record<HooperMeasure, HooperMeasureExtremes> = {
+	fatigue: { low: 'Fresh', high: 'Exhausted' },
+	sleep: { low: 'Terrible', high: 'Excellent' },
+	pain: { low: 'None', high: 'Extreme' },
+	stress: { low: 'Relaxed', high: 'Stressed' },
+	mood: { low: 'Low', high: 'Great' }
+};
+
 /** A Hooper index with every measure unset. */
 export const emptyHooperIndex = (): HooperIndex => ({
 	fatigue: null,
