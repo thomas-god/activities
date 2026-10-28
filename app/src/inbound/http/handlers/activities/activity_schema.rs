@@ -5,7 +5,9 @@ use derive_more::Constructor;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::{
-    models::training::{ActivityWithTrainingContext, ReferenceBestDurationCurve, TrainingContext},
+    models::training::{
+        ActivityWithTrainingContext, HooperIndex, ReferenceBestDurationCurve, TrainingContext,
+    },
     models::{
         activity::{
             Activity, ActivityDurationCurve, ActivityMetric, ActivityMetrics, ActivityNutrition,
@@ -333,6 +335,27 @@ impl From<&ReferenceBestDurationCurve> for PublicBestDurationCurveReference {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct PublicHooperIndex {
+    pub fatigue: Option<u8>,
+    pub sleep: Option<u8>,
+    pub pain: Option<u8>,
+    pub stress: Option<u8>,
+    pub mood: Option<u8>,
+}
+
+impl From<&HooperIndex> for PublicHooperIndex {
+    fn from(index: &HooperIndex) -> Self {
+        Self {
+            fatigue: index.fatigue().map(|scale| scale.value()),
+            sleep: index.sleep().map(|scale| scale.value()),
+            pain: index.pain().map(|scale| scale.value()),
+            stress: index.stress().map(|scale| scale.value()),
+            mood: index.mood().map(|scale| scale.value()),
+        }
+    }
+}
+
 /// Additional training context used to interpret or derive statistics of an
 /// activity (e.g. the athlete weight at the time of the activity, used for
 /// W/kg, or the best duration curves for the available reference windows).
@@ -340,6 +363,7 @@ impl From<&ReferenceBestDurationCurve> for PublicBestDurationCurveReference {
 pub struct PublicTrainingContext {
     pub weight: Option<f32>,
     pub best_duration_curves: Vec<PublicBestDurationCurveReference>,
+    pub hooper_index: PublicHooperIndex,
 }
 
 impl From<&TrainingContext> for PublicTrainingContext {
@@ -351,6 +375,7 @@ impl From<&TrainingContext> for PublicTrainingContext {
                 .iter()
                 .map(PublicBestDurationCurveReference::from)
                 .collect(),
+            hooper_index: PublicHooperIndex::from(context.hooper_index()),
         }
     }
 }
@@ -376,6 +401,7 @@ mod tests {
     };
     use crate::domain::models::training::{
         BestDurationCurve, HooperIndex, ReferenceBestDurationCurve, ReferenceDurationCurveKind,
+        SubjectiveScale,
     };
 
     fn activity_id() -> ActivityId {
@@ -558,6 +584,50 @@ mod tests {
         assert_eq!(
             json["training_context"]["best_duration_curves"][0]["label"],
             serde_json::json!("Base training")
+        );
+    }
+
+    #[test]
+    fn test_public_activity_with_timeseries_serialises_hooper_index() {
+        let activity = ActivityWithTrainingContext::new(
+            activity_with_parsed_data(),
+            TrainingContext::new(
+                Some(70.0),
+                vec![],
+                HooperIndex::new(
+                    Some(SubjectiveScale::try_from(6).unwrap()),
+                    None,
+                    Some(SubjectiveScale::try_from(3).unwrap()),
+                    None,
+                    Some(SubjectiveScale::try_from(8).unwrap()),
+                ),
+            ),
+            metrics(),
+        );
+
+        let public = PublicActivityWithTimeseries::from(&activity);
+        let json: serde_json::Value =
+            serde_json::from_str(&serde_json::to_string(&public).unwrap()).unwrap();
+
+        assert_eq!(
+            json["training_context"]["hooper_index"]["fatigue"],
+            serde_json::json!(6)
+        );
+        assert_eq!(
+            json["training_context"]["hooper_index"]["sleep"],
+            serde_json::json!(null)
+        );
+        assert_eq!(
+            json["training_context"]["hooper_index"]["pain"],
+            serde_json::json!(3)
+        );
+        assert_eq!(
+            json["training_context"]["hooper_index"]["stress"],
+            serde_json::json!(null)
+        );
+        assert_eq!(
+            json["training_context"]["hooper_index"]["mood"],
+            serde_json::json!(8)
         );
     }
 

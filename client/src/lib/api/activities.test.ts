@@ -22,6 +22,8 @@ describe('ActivitySchema', () => {
 });
 
 describe('ActivityWithTimeseriesSchema', () => {
+	const emptyHooperIndex = { fatigue: null, sleep: null, pain: null, stress: null, mood: null };
+
 	const payload = {
 		id: 'activity_id',
 		sport: 'IndoorCycling',
@@ -35,6 +37,13 @@ describe('ActivityWithTimeseriesSchema', () => {
 		metrics: { Duration: { value: 1200, unit: 's' } },
 		training_context: {
 			weight: 70.0,
+			hooper_index: {
+				fatigue: 6,
+				sleep: null,
+				pain: 3,
+				stress: null,
+				mood: 8
+			},
 			best_duration_curves: [
 				{
 					kind: 'twelve_week',
@@ -85,6 +94,13 @@ describe('ActivityWithTimeseriesSchema', () => {
 		const result = ActivityWithTimeseriesSchema.parse(payload);
 
 		expect(result.training_context.weight).toBe(70.0);
+		expect(result.training_context.hooper_index).toEqual({
+			fatigue: 6,
+			sleep: null,
+			pain: 3,
+			stress: null,
+			mood: 8
+		});
 		expect(result.training_context.best_duration_curves).toHaveLength(2);
 
 		const [twelveWeek, period] = result.training_context.best_duration_curves;
@@ -103,7 +119,11 @@ describe('ActivityWithTimeseriesSchema', () => {
 	it('parses an empty training context best duration curve list', () => {
 		const result = ActivityWithTimeseriesSchema.parse({
 			...payload,
-			training_context: { weight: 70.0, best_duration_curves: [] }
+			training_context: {
+				weight: 70.0,
+				best_duration_curves: [],
+				hooper_index: emptyHooperIndex
+			}
 		});
 
 		expect(result.training_context.best_duration_curves).toHaveLength(0);
@@ -112,7 +132,7 @@ describe('ActivityWithTimeseriesSchema', () => {
 	it('parses a null training context weight', () => {
 		const result = ActivityWithTimeseriesSchema.parse({
 			...payload,
-			training_context: { weight: null, best_duration_curves: [] }
+			training_context: { weight: null, best_duration_curves: [], hooper_index: emptyHooperIndex }
 		});
 
 		expect(result.training_context.weight).toBeNull();
@@ -125,11 +145,37 @@ describe('ActivityWithTimeseriesSchema', () => {
 		expect(() => ActivityWithTimeseriesSchema.parse(without_training_context)).toThrow();
 	});
 
+	it('rejects a training context without hooper index', () => {
+		expect(() =>
+			ActivityWithTimeseriesSchema.parse({
+				...payload,
+				training_context: { weight: 70.0, best_duration_curves: [] }
+			})
+		).toThrow();
+	});
+
+	it('rejects an out of range hooper measure', () => {
+		expect(() =>
+			ActivityWithTimeseriesSchema.parse({
+				...payload,
+				training_context: {
+					weight: 70.0,
+					best_duration_curves: [],
+					hooper_index: { ...emptyHooperIndex, fatigue: 11 }
+				}
+			})
+		).toThrow();
+	});
+
 	it('rejects a non numeric weight', () => {
 		expect(() =>
 			ActivityWithTimeseriesSchema.parse({
 				...payload,
-				training_context: { weight: '70', best_duration_curves: [] }
+				training_context: {
+					weight: '70',
+					best_duration_curves: [],
+					hooper_index: emptyHooperIndex
+				}
 			})
 		).toThrow();
 	});
@@ -140,6 +186,7 @@ describe('ActivityWithTimeseriesSchema', () => {
 				...payload,
 				training_context: {
 					weight: 70.0,
+					hooper_index: emptyHooperIndex,
 					best_duration_curves: [
 						{
 							kind: 'all_time',
@@ -160,6 +207,7 @@ describe('ActivityWithTimeseriesSchema', () => {
 				...payload,
 				training_context: {
 					weight: 70.0,
+					hooper_index: emptyHooperIndex,
 					best_duration_curves: [
 						{
 							kind: 'twelve_week',

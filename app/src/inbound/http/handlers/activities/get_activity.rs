@@ -86,7 +86,9 @@ mod tests {
                     Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
                     TimeseriesValue,
                 },
-                training::{ActivityWithTrainingContext, HooperIndex, TrainingContext},
+                training::{
+                    ActivityWithTrainingContext, HooperIndex, SubjectiveScale, TrainingContext,
+                },
             },
             ports::activity::GetActivityError,
             services::{
@@ -97,8 +99,8 @@ mod tests {
         },
         inbound::{
             http::handlers::activities::activity_schema::{
-                PublicActivity, PublicActivityTimeseries, PublicMetricValue, PublicTimeseries,
-                PublicTimeseriesValue, PublicTrainingContext,
+                PublicActivity, PublicActivityTimeseries, PublicHooperIndex, PublicMetricValue,
+                PublicTimeseries, PublicTimeseriesValue, PublicTrainingContext,
             },
             parser::test_utils::MockFileParser,
         },
@@ -150,7 +152,17 @@ mod tests {
                         )])),
                         ActivityDurationCurves::default(),
                     ),
-                    TrainingContext::new(Some(70.0), vec![], HooperIndex::default()),
+                    TrainingContext::new(
+                        Some(70.0),
+                        vec![],
+                        HooperIndex::new(
+                            Some(SubjectiveScale::try_from(6).unwrap()),
+                            None,
+                            Some(SubjectiveScale::try_from(3).unwrap()),
+                            None,
+                            Some(SubjectiveScale::try_from(8).unwrap()),
+                        ),
+                    ),
                     ActivityMetrics::new(HashMap::from([(ActivityMetric::Duration, Some(1200.))])),
                 ))
             });
@@ -212,7 +224,14 @@ mod tests {
                 },
                 training_context: PublicTrainingContext {
                     weight: Some(70.0),
-                    best_duration_curves: vec![]
+                    best_duration_curves: vec![],
+                    hooper_index: PublicHooperIndex {
+                        fatigue: Some(6),
+                        sleep: None,
+                        pain: Some(3),
+                        stress: None,
+                        mood: Some(8),
+                    }
                 },
                 duration_curves: vec![],
             }

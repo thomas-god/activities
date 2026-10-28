@@ -6,6 +6,7 @@ import { WORKOUT_TYPE_VALUES } from '#lib/workout-type.js';
 import { BONK_STATUS_VALUES } from '#lib/nutrition.js';
 import { dayjs } from '#lib/duration.js';
 import { resolve } from '$app/paths';
+import { HooperIndexSchema } from './hooperIndex';
 
 // =============================================================================
 // Schemas
@@ -82,10 +83,13 @@ const BestDurationCurveReferenceSchema = z.object({
  * (e.g. the athlete weight at the time of the activity, used for W/kg).
  * `best_duration_curves` always contains the 12-week reference and, when the
  * activity is opened from a training period, the period reference as well.
+ * `hooper_index` holds the subjective feedback (Hooper's index) recorded on the
+ * day of the activity, with every measure unset when it was not recorded.
  */
 const TrainingContextSchema = z.object({
 	weight: z.number().nullable(),
-	best_duration_curves: z.array(BestDurationCurveReferenceSchema)
+	best_duration_curves: z.array(BestDurationCurveReferenceSchema),
+	hooper_index: HooperIndexSchema
 });
 
 /**

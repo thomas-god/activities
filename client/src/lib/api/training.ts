@@ -13,6 +13,7 @@ import {
 } from '#lib/trainingMetric.js';
 import { dayjs } from '#lib/duration.js';
 import { ActivitySchema } from './activities';
+import { HooperIndexSchema, SubjectiveScaleSchema, type HooperIndex } from './hooperIndex';
 import { none, type Option, some } from '#lib/Options.js';
 import { WORKOUT_TYPE_VALUES, type WorkoutType } from '#lib/workout-type.js';
 import { BONK_STATUS_VALUES, type BonkStatus } from '#lib/nutrition.js';
@@ -128,16 +129,7 @@ const TrainingMetricTemplatesSchema = z.array(
 	})
 );
 
-/** A subjective Hooper index measure, constrained to the 0..=10 range. */
-const SubjectiveScaleSchema = z.number().int().min(0).max(10);
-
-export const HooperIndexSchema = z.object({
-	fatigue: SubjectiveScaleSchema.nullable(),
-	sleep: SubjectiveScaleSchema.nullable(),
-	pain: SubjectiveScaleSchema.nullable(),
-	stress: SubjectiveScaleSchema.nullable(),
-	mood: SubjectiveScaleSchema.nullable()
-});
+export { HooperIndexSchema, type HooperIndex } from './hooperIndex';
 
 export const CreateHooperIndexSchema = HooperIndexSchema.extend({
 	date: z.string()
@@ -205,7 +197,6 @@ export type TrainingMetricList = z.infer<typeof TrainingMetricListSchema>;
 export type TrainingNote = z.infer<typeof TrainingNoteSchema>;
 export type TrainingNotesList = z.infer<typeof TrainingNotesListSchema>;
 export type TrainingMetricTemplate = z.infer<typeof TrainingMetricTemplatesSchema>[number];
-export type HooperIndex = z.infer<typeof HooperIndexSchema>;
 export type CreateHooperIndexBody = z.infer<typeof CreateHooperIndexSchema>;
 export type UpdateHooperIndexPatch = z.infer<typeof UpdateHooperIndexSchema>;
 export type WeightAndNutrition = z.infer<typeof WeightAndNutritionSchema>;
