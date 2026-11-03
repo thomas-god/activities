@@ -79,7 +79,7 @@ export const fetchActivityListSummary = async (
 	const preference = preferences.find((pref) => pref.key === 'activity_list_summary');
 	if (preference === undefined) {
 		// Default activity list summary
-		return [{ type: 'workoutType' }, { type: 'rpe' }, { type: 'metric', value: 'Duration' }];
+		return [{ type: 'workoutType' }, { type: 'rpe' }, { type: 'metric', value: 'ActiveDuration' }];
 	}
 	return preference.value.items;
 };
