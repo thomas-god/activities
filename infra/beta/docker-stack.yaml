@@ -27,6 +27,7 @@ services:
       ACTIVITIES_MAILER_DOMAIN_FILE: /run/secrets/activities_mailer_domain
       ACTIVITIES_PASSWORD_AUTH_ENABLED: "true"
       ACTIVITIES_DATA_PATH: /app/data
+      ACTIVITIES_DB_BACKUP_CRON: "0 3 * * *"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     networks:
       - traefik-public
