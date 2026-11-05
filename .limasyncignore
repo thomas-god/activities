@@ -1,0 +1,153 @@
+# .limasyncignore
+#
+# Syntax is rsync's, not gitignore's:
+#   - comments start with '#' or ';'
+#   - a trailing '/' matches directories only
+#   - no '/' matches the basename anywhere
+#   - a pattern containing '/' is matched from the transfer root
+#
+# Copy or adapt this file in a project root. Remove entries that your
+# project needs the agent to see.
+
+# OS / editor metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+.fleet/
+*.iml
+*.swp
+*.swo
+*~
+.#*
+[#]*#
+.history/
+
+# Local caches / temporary files
+.cache/
+.tmp/
+.sass-cache/
+.eslintcache
+.stylelintcache
+*.log
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+
+# JavaScript / TypeScript
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/install-state.gz
+.yarn/build-state.yml
+.next/
+.nuxt/
+.svelte-kit/
+.turbo/
+.parcel-cache/
+.vercel/
+.netlify/
+.serverless/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# Rust
+target/
+*.rs.bk
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.hypothesis/
+.ipynb_checkpoints/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+lcov.info
+
+# JVM / Gradle / Maven
+.gradle/
+build/
+out/
+*.class
+*.jar
+*.war
+*.ear
+*.apk
+*.aab
+
+# Native build outputs
+CMakeFiles/
+CMakeCache.txt
+cmake-build-*/
+compile_commands.json
+*.ninja
+.ninja_*
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.out
+*.test
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.dSYM/
+
+# Coverage / profiling
+*.gcda
+*.gcno
+*.lcov
+*.profraw
+*.profdata
+
+# Terraform / cloud state
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+
+# Secrets and credentials that should stay on the host
+.env
+.env.local
+.env.*.local
+.envrc
+.direnv/
+.netrc
+.npmrc
+.pypirc
+.ssh/
+.aws/
+.gnupg/
+.kube/
+.docker/config.json
+.cargo/credentials*
+.secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.kdbx
