@@ -220,7 +220,7 @@ mod tests {
 
             TestApp {
                 base_url: Url::parse(&format!("http://{addr}")).unwrap(),
-                client: reqwest::Client::new(),
+                client: reqwest::Client::builder().no_proxy().build().unwrap(),
                 server,
             }
         }
