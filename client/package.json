@@ -24,7 +24,7 @@
 		"@sveltejs/load-config": "^0.2.2",
 		"@sveltejs/vite-plugin-svelte": "^7.3.1",
 		"@tailwindcss/vite": "^4.3.5",
-		"@testing-library/jest-dom": "^7.0.1",
+		"@testing-library/jest-dom": "^8.0.0",
 		"@testing-library/svelte": "^5.4.2",
 		"@testing-library/user-event": "^14.6.13",
 		"@types/d3": "^7.4.3",
