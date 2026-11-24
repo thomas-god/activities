@@ -1,12 +1,13 @@
+use activities_app::config::{AppMode, StdEnvironment, TelemetryConfig};
 use anyhow::anyhow;
-use app::config::{AppMode, StdEnvironment, TelemetryConfig};
 
 async fn run() -> anyhow::Result<()> {
     let mode = AppMode::try_from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
     match &mode {
         AppMode::MultiUser(config) => {
             let (server, search_service, training_service, activity_service, backup_service) =
-                app::bootstrap::multi_user::bootstrap_multi_user(config.clone(), mode).await?;
+                activities_app::bootstrap::multi_user::bootstrap_multi_user(config.clone(), mode)
+                    .await?;
             let _ = tokio::join!(
                 server.run(),
                 search_service.run(),
@@ -17,7 +18,8 @@ async fn run() -> anyhow::Result<()> {
         }
         AppMode::SingleUser(config) => {
             let (server, search_service, training_service, activity_service, backup_service) =
-                app::bootstrap::single_user::bootstrap_single_user(config.clone(), mode).await?;
+                activities_app::bootstrap::single_user::bootstrap_single_user(config.clone(), mode)
+                    .await?;
             let _ = tokio::join!(
                 server.run(),
                 search_service.run(),
@@ -32,8 +34,8 @@ async fn run() -> anyhow::Result<()> {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    match app::cli::parse_env() {
-        Some(Ok(command)) => return app::cli::run(command).await,
+    match activities_app::cli::parse_env() {
+        Some(Ok(command)) => return activities_app::cli::run(command).await,
         Some(Err(err)) => {
             let _ = err.print();
             std::process::exit(2);
@@ -42,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let telemetry_config = TelemetryConfig::from_env(&StdEnvironment {});
-    let telemetry = app::telemetry::init(&telemetry_config)?;
+    let telemetry = activities_app::telemetry::init(&telemetry_config)?;
     let result = run().await;
     telemetry.shutdown();
     result

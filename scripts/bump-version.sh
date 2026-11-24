@@ -75,9 +75,9 @@ if ! command -v npm &> /dev/null; then
     exit 1
 fi
 
-echo "Updating app/Cargo.toml..."
-# cd "$PROJECT_ROOT/app"
-cargo set-version -p app "$VERSION"
+echo "Updating crates/activities-app/Cargo.toml..."
+# cd "$PROJECT_ROOT/crates/activities-app"
+cargo set-version -p activities-app "$VERSION"
 
 echo "Updating client/package.json..."
 cd "$PROJECT_ROOT/client"
@@ -93,7 +93,7 @@ git diff --name-only
 
 echo ""
 echo "Committing changes..."
-git add app/Cargo.toml Cargo.lock client/package.json client/package-lock.json
+git add crates/activities-app/Cargo.toml Cargo.lock client/package.json client/package-lock.json
 git commit -m "chore: bump version to $VERSION"
 
 echo -e "${GREEN}✓ Version bump committed${NC}"

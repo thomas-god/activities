@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
-members = [ "app", "fit-codegen", "fit-parser"]
-default-members = ["app"]
+members = [ "crates/activities-app", "crates/fit-codegen", "crates/fit-parser"]
+default-members = ["crates/activities-app"]
 
 [profile.dev]
 debug = "line-tables-only"

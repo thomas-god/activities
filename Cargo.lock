@@ -3,6 +3,61 @@
 version = 4
 
 [[package]]
+name = "activities-app"
+version = "0.11.6"
+dependencies = [
+ "anyhow",
+ "argon2",
+ "assert_approx_eq",
+ "axum",
+ "axum-extra",
+ "axum-test",
+ "base64 0.23.1",
+ "chrono",
+ "clap",
+ "const-hex",
+ "cookie",
+ "cron",
+ "derive_more",
+ "email_address",
+ "fit-parser",
+ "flate2",
+ "getrandom 0.4.3",
+ "handlebars",
+ "hmac 0.13.0",
+ "itertools 0.15.0",
+ "lettre",
+ "log",
+ "mockall",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry-semantic-conventions",
+ "opentelemetry_sdk",
+ "rand 0.10.4",
+ "reqwest",
+ "roxmltree",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "sqlx",
+ "subtle",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tower",
+ "tower-http 0.7.1",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+ "unicode-normalization",
+ "unicode_categories",
+ "url",
+ "uuid",
+ "zip",
+]
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -113,61 +168,6 @@ name = "anyhow"
 version = "1.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
-
-[[package]]
-name = "app"
-version = "0.11.6"
-dependencies = [
- "anyhow",
- "argon2",
- "assert_approx_eq",
- "axum",
- "axum-extra",
- "axum-test",
- "base64 0.23.1",
- "chrono",
- "clap",
- "const-hex",
- "cookie",
- "cron",
- "derive_more",
- "email_address",
- "fit-parser",
- "flate2",
- "getrandom 0.4.3",
- "handlebars",
- "hmac 0.13.0",
- "itertools 0.15.0",
- "lettre",
- "log",
- "mockall",
- "opentelemetry",
- "opentelemetry-otlp",
- "opentelemetry-semantic-conventions",
- "opentelemetry_sdk",
- "rand 0.10.4",
- "reqwest",
- "roxmltree",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "sqlx",
- "subtle",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-util",
- "tower",
- "tower-http 0.7.1",
- "tracing",
- "tracing-opentelemetry",
- "tracing-subscriber",
- "unicode-normalization",
- "unicode_categories",
- "url",
- "uuid",
- "zip",
-]
 
 [[package]]
 name = "argon2"

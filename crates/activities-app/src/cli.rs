@@ -1,6 +1,6 @@
 //! Command line interface.
 //!
-//! Invoked as `app admin <command>` or `app backup run`. These commands operate directly on the
+//! Invoked as `activities-app admin <command>` or `activities-app backup run`. These commands operate directly on the
 //! application's data, so they work even when the server is not running and do not require a
 //! session or the full server configuration.
 
@@ -26,7 +26,7 @@ use crate::{
 };
 
 #[derive(Debug, Parser)]
-#[command(name = "app", about = "Self-hosted sport training journal")]
+#[command(name = "activities-app", about = "Self-hosted sport training journal")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -107,7 +107,7 @@ pub fn parse_env() -> Option<Result<CliCommand, clap::Error>> {
     }
 }
 
-/// Parses any `app <command> ...` invocation from the given arguments.
+/// Parses any `activities-app <command> ...` invocation from the given arguments.
 pub fn parse_from<I, T>(args: I) -> Result<CliCommand, clap::Error>
 where
     I: IntoIterator<Item = T>,
@@ -119,7 +119,7 @@ where
     })
 }
 
-/// Parses `app admin <command> ...` from the given arguments.
+/// Parses `activities-app admin <command> ...` from the given arguments.
 pub fn parse_admin_from<I, T>(args: I) -> Result<AdminCommand, clap::Error>
 where
     I: IntoIterator<Item = T>,

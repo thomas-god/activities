@@ -26,9 +26,7 @@ WORKDIR /app/backend
 # Analyse the workspace and emit a recipe describing its dependencies.
 FROM chef AS planner
 COPY Cargo.toml Cargo.lock ./
-COPY app/ app/
-COPY fit-parser/ fit-parser/
-COPY fit-codegen/ fit-codegen/
+COPY crates/ crates/
 RUN cargo chef prepare --recipe-path recipe.json
 
 # Build stage for Rust backend
@@ -38,10 +36,8 @@ COPY --from=planner /app/backend/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 # Compile the workspace crates themselves.
 COPY Cargo.toml Cargo.lock ./
-COPY app/ app/
-COPY fit-parser/ fit-parser/
-COPY fit-codegen/ fit-codegen/
-RUN cargo build --release -p app
+COPY crates/ crates/
+RUN cargo build --release -p activities-app
 
 FROM alpine:3
 
@@ -51,7 +47,7 @@ RUN apk add --no-cache ca-certificates
 
 WORKDIR /activities
 
-COPY --from=backend-builder /app/backend/target/release/app ./app
+COPY --from=backend-builder /app/backend/target/release/activities-app ./activities-app
 COPY --from=frontend-builder /app/frontend/build ./static
 
 ENV SERVER_PORT=80
@@ -64,4 +60,4 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
     CMD wget -q -O /dev/null http://127.0.0.1:80/health || exit 1
 
-CMD ["/activities/app"]
+CMD ["/activities/activities-app"]
