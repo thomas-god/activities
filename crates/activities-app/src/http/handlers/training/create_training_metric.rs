@@ -1,0 +1,251 @@
+use crate::http::error_status::ApiErrorStatus;
+use axum::{Extension, Json, extract::State, http::StatusCode};
+use serde::Deserialize;
+
+use crate::domain::activity::models::ActivityMetric;
+use crate::domain::activity::ports::IActivityService;
+use crate::domain::preferences::ports::IPreferencesService;
+use crate::domain::shared::UserId;
+use crate::domain::training::models::TrainingMetricActivityFilters;
+use crate::domain::training::models::TrainingMetricActivityGroupBy;
+use crate::domain::training::models::TrainingMetricName;
+use crate::domain::training::models::TrainingMetricSource;
+use crate::domain::training::models::TrainingMetricTarget;
+use crate::domain::training::models::TrainingMetricWindow;
+use crate::domain::training::ports::CreateTrainingMetricError;
+use crate::domain::training::ports::CreateTrainingMetricRequest;
+use crate::domain::training::ports::ITrainingService;
+use crate::http::AppState;
+use crate::http::handlers::training::types::APIActivityMetricSource;
+use crate::http::handlers::training::types::APITimeseriesWindow;
+use crate::http::handlers::training::types::APITrainingMetricAggregate;
+use crate::http::handlers::training::types::APITrainingMetricFilters;
+use crate::http::handlers::training::types::APITrainingMetricGranularity;
+use crate::http::handlers::training::types::APITrainingMetricScope;
+use crate::http::handlers::training::types::APITrainingMetricSource;
+use crate::http::handlers::training::types::APITrainingMetricSummary;
+use crate::http::handlers::training::types::APITrainingMetricTarget;
+use crate::parser::ParseFile;
+use activities_auth::infra::http::AuthenticatedUser;
+
+#[derive(Debug, Deserialize)]
+pub struct CreateTrainingMetricBody {
+    name: String,
+    source: APITrainingMetricSource,
+    window: Option<APITimeseriesWindow>,
+    #[serde(default)]
+    summary: APITrainingMetricSummary,
+    #[serde(default)]
+    target: Option<APITrainingMetricTarget>,
+    scope: APITrainingMetricScope,
+}
+
+fn build_request(
+    body: CreateTrainingMetricBody,
+    user: &UserId,
+) -> Result<CreateTrainingMetricRequest, String> {
+    if body.name.trim().is_empty() {
+        return Err("Metric name cannot be empty".to_string());
+    }
+
+    let target = body
+        .target
+        .map(TrainingMetricTarget::try_from)
+        .transpose()
+        .map_err(|_| "Invalid target unit".to_string())?;
+
+    Ok(CreateTrainingMetricRequest::new(
+        user.clone(),
+        TrainingMetricName::from(body.name),
+        TrainingMetricSource::try_from(&body.source)?,
+        body.window.map(TrainingMetricWindow::from),
+        body.summary.into(),
+        body.scope.into(),
+        target,
+    ))
+}
+
+impl ApiErrorStatus for CreateTrainingMetricError {
+    fn status_code(self) -> StatusCode {
+        StatusCode::UNPROCESSABLE_ENTITY
+    }
+}
+
+#[tracing::instrument(skip_all, err(Debug))]
+pub async fn create_training_metric<
+    AS: IActivityService,
+    PF: ParseFile,
+    TMS: ITrainingService,
+    PS: IPreferencesService,
+>(
+    Extension(user): Extension<AuthenticatedUser>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
+    Json(payload): Json<CreateTrainingMetricBody>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    let req = build_request(payload, user.user()).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": e })),
+        )
+    })?;
+
+    match state.training_metrics_service.create_metric(req).await {
+        Ok(_) => Ok(StatusCode::CREATED),
+        Err(err) => {
+            if matches!(&err, CreateTrainingMetricError::Unknown(_)) {
+                tracing::error!("Error creating training metric: {}", err.to_string());
+            }
+            Err((
+                err.status_code(),
+                Json(serde_json::json!({ "error": "Failed to create training metric" })),
+            ))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests_create_training_metric {
+
+    use super::*;
+
+    use activities_domain::activity::models::Unit;
+
+    #[test]
+    fn test_payload_format() {
+        assert!(
+            serde_json::from_str::<CreateTrainingMetricBody>(
+                r#"{
+            "name": "Test Metric",
+            "source": {"type": "activity", "metric": {"metric": "Calories"}},
+            "granularity": "Weekly",
+            "aggregate": "Min",
+            "scope": {"type": "global"}
+        }"#,
+            )
+            .is_ok()
+        );
+
+        assert!(
+            serde_json::from_str::<CreateTrainingMetricBody>(
+                r#"{
+            "name": "Test Metric",
+            "source": {"type": "activity", "metric": {"metric": "MinSpeed"}},
+            "granularity": "Weekly",
+            "aggregate": "Min",
+            "scope": {"type": "trainingPeriod", "trainingPeriodId": "123e4567-e89b-12d3-a456-426614174000"}
+        }"#,
+            )
+            .is_ok()
+        );
+
+        assert!(
+            serde_json::from_str::<CreateTrainingMetricBody>(
+                r#"{
+            "name": "Test Metric",
+            "source": {"type": "activity", "metric": {"metric": "MinSpeed", "filters": { "sports": [{"Sport": "Running"}, {"SportCategory": "Cycling"}] }}},
+            "granularity": "Weekly",
+            "aggregate": "Min",
+            "scope": {"type": "global"}
+        }"#,
+            )
+            .is_ok()
+        );
+
+        assert!(
+            serde_json::from_str::<CreateTrainingMetricBody>(
+                r#"{
+            "name": "Test Metric",
+            "source": {"type": "activity", "metric": {"metric": "Calories"}},
+            "granularity": "Weekly",
+            "aggregate": "Min",
+            "group_by": "Sport",
+            "scope": {"type": "global"}
+        }"#,
+            )
+            .is_ok()
+        );
+
+        assert!(
+            serde_json::from_str::<CreateTrainingMetricBody>(
+                r#"{
+            "name": "Test Metric",
+            "source": {"type": "activity", "metric": {"metric": "Calories"}},
+            "granularity": "Weekly",
+            "aggregate": "Min",
+            "group_by": "RpeRange",
+            "scope": {"type": "global"}
+        }"#,
+            )
+            .is_ok()
+        );
+
+        assert!(
+            serde_json::from_str::<CreateTrainingMetricBody>(
+                r#"{
+            "name": "My Custom Metric",
+            "source": {"type": "activity", "metric": {"metric": "Calories"}},
+            "granularity": "Weekly",
+            "aggregate": "Min",
+            "scope": {"type": "global"}
+        }"#,
+            )
+            .is_ok()
+        );
+
+        assert!(
+            serde_json::from_str::<CreateTrainingMetricBody>(
+                r#"{
+            "name": "My Custom Metric",
+            "source": {"type": "activity", "metric": {"metric": "Calories", "filters": {
+                "rpes":[1, 5],
+                "bonked": "Bonked",
+                "workout_types": ["Tempo", "Easy"]
+            }}},
+            "granularity": "Weekly",
+            "aggregate": "Min",
+            "scope": {"type": "global"}
+        }"#,
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn test_payload_with_target() {
+        let body: CreateTrainingMetricBody = serde_json::from_str(
+            r#"{
+            "name": "Test Metric",
+            "source": {"type": "activity", "metric": {"metric": "Calories"}},
+            "granularity": "Weekly",
+            "aggregate": "Min",
+            "filters": {},
+            "scope": {"type": "global"},
+            "target": {"value": 100.0, "unit": "km"}
+        }"#,
+        )
+        .unwrap();
+
+        let req = build_request(body, &UserId::test_default()).unwrap();
+        let target = req.target().as_ref().expect("target should be set");
+        assert_eq!(target.value(), 100.0);
+        assert_eq!(target.unit(), Unit::Kilometer);
+    }
+
+    #[test]
+    fn test_payload_with_invalid_target_unit_rejected() {
+        let body: CreateTrainingMetricBody = serde_json::from_str(
+            r#"{
+            "name": "Test Metric",
+            "source": {"type": "activity", "metric": {"metric": "Calories"}},
+            "granularity": "Weekly",
+            "aggregate": "Min",
+            "filters": {},
+            "scope": {"type": "global"},
+            "target": {"value": 100.0, "unit": "parsec"}
+        }"#,
+        )
+        .unwrap();
+
+        assert!(build_request(body, &UserId::test_default()).is_err());
+    }
+}

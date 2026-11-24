@@ -1,0 +1,159 @@
+use crate::http::error_status::ApiErrorStatus;
+use axum::{Extension, Json, extract::State, http::StatusCode};
+
+use crate::http::AppState;
+use crate::parser::ParseFile;
+use activities_auth::infra::http::AuthenticatedUser;
+use activities_domain::activity::ports::IActivityService;
+use activities_domain::preferences::ports::GetPreferenceError;
+use activities_domain::preferences::ports::IPreferencesService;
+use activities_domain::training::ports::ITrainingService;
+
+use super::types::PreferencePayload;
+
+#[tracing::instrument(skip_all, err)]
+pub async fn get_all_preferences<
+    AS: IActivityService,
+    PF: ParseFile,
+    TMS: ITrainingService,
+    PS: IPreferencesService,
+>(
+    Extension(user): Extension<AuthenticatedUser>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
+) -> Result<Json<Vec<PreferencePayload>>, StatusCode> {
+    let preferences = match state
+        .preferences_service
+        .get_all_preferences(user.user())
+        .await
+    {
+        Ok(preferences) => preferences,
+        Err(err) => {
+            if matches!(&err, GetPreferenceError::Unknown(_)) {
+                tracing::error!("Error getting all preferences: {}", err.to_string());
+            }
+            return Err(err.status_code());
+        }
+    };
+
+    let mut items = Vec::new();
+    for preference in preferences {
+        match PreferencePayload::try_from(preference) {
+            Ok(item) => items.push(item),
+            Err(err) => tracing::error!("Error while serializing preference: {}", err),
+        }
+    }
+
+    Ok(Json(items))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+
+    use crate::domain::activity::models::ActivityMetric;
+    use crate::domain::activity::services::test_utils::MockActivityService;
+    use crate::domain::preferences::models::ActivityListSummary;
+    use crate::domain::preferences::models::ActivityListSummaryItem;
+    use crate::domain::preferences::models::Preference;
+    use crate::domain::preferences::services::tests_utils::MockPreferencesService;
+    use crate::domain::shared::UserId;
+    use crate::domain::training::models::TrainingMetricId;
+    use crate::domain::training::models::TrainingMetricScope;
+    use crate::domain::training::services::test_utils::MockTrainingService;
+    use crate::parser::test_utils::MockFileParser;
+    use mockall::predicate::*;
+
+    fn create_test_state(
+        preferences_service: MockPreferencesService,
+    ) -> AppState<MockActivityService, MockFileParser, MockTrainingService, MockPreferencesService>
+    {
+        AppState {
+            activity_service: Arc::new(MockActivityService::test_default()),
+            file_parser: Arc::new(MockFileParser::test_default()),
+            training_metrics_service: Arc::new(MockTrainingService::test_default()),
+            preferences_service: Arc::new(preferences_service),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_all_preferences_success() {
+        let user_id = UserId::from("test_user");
+        let user_id_clone = user_id.clone();
+
+        let preferences = vec![Preference::ActivityListSummary(ActivityListSummary::new(
+            TrainingMetricScope::Global,
+            vec![
+                ActivityListSummaryItem::Metric(ActivityMetric::Distance),
+                ActivityListSummaryItem::RPE,
+            ],
+        ))];
+        let preferences_clone = preferences.clone();
+
+        let mut preferences_service = MockPreferencesService::new();
+        preferences_service
+            .expect_get_all_preferences()
+            .with(function(move |user: &UserId| user == &user_id_clone))
+            .times(1)
+            .returning(move |_| Ok(preferences_clone.clone()));
+
+        let state = create_test_state(preferences_service);
+
+        let user = AuthenticatedUser::new(user_id);
+
+        let result = get_all_preferences(Extension(user), State(state)).await;
+
+        assert!(result.is_ok());
+        let response = result.unwrap().0;
+        assert_eq!(response.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_all_preferences_empty() {
+        let user_id = UserId::from("test_user");
+        let user_id_clone = user_id.clone();
+
+        let mut preferences_service = MockPreferencesService::new();
+        preferences_service
+            .expect_get_all_preferences()
+            .with(function(move |user: &UserId| user == &user_id_clone))
+            .times(1)
+            .returning(|_| Ok(vec![]));
+
+        let state = create_test_state(preferences_service);
+
+        let user = AuthenticatedUser::new(user_id);
+
+        let result = get_all_preferences(Extension(user), State(state)).await;
+
+        assert!(result.is_ok());
+        let response = result.unwrap().0;
+        assert_eq!(response.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_all_preferences_service_error() {
+        let user_id = UserId::from("test_user");
+        let user_id_clone = user_id.clone();
+
+        let mut preferences_service = MockPreferencesService::new();
+        preferences_service
+            .expect_get_all_preferences()
+            .with(function(move |user: &UserId| user == &user_id_clone))
+            .times(1)
+            .returning(|_| {
+                Err(GetPreferenceError::Unknown(anyhow::anyhow!(
+                    "Database connection failed"
+                )))
+            });
+
+        let state = create_test_state(preferences_service);
+
+        let user = AuthenticatedUser::new(user_id);
+
+        let result = get_all_preferences(Extension(user), State(state)).await;
+
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+}

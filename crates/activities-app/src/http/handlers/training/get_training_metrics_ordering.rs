@@ -1,0 +1,70 @@
+use axum::{
+    Extension, Json,
+    extract::{Query, State},
+    http::StatusCode,
+};
+use serde::{Deserialize, Serialize};
+
+use crate::domain::activity::ports::IActivityService;
+use crate::domain::preferences::ports::IPreferencesService;
+use crate::domain::training::models::TrainingMetricId;
+use crate::domain::training::ports::GetTrainingMetricsOrderingError;
+use crate::domain::training::ports::ITrainingService;
+use crate::http::AppState;
+use crate::http::handlers::training::types::APITrainingMetricScope;
+use crate::parser::ParseFile;
+use activities_auth::infra::http::AuthenticatedUser;
+
+#[derive(Debug, Deserialize)]
+pub struct GetTrainingMetricsOrderingQuery {
+    #[serde(flatten)]
+    scope: APITrainingMetricScope,
+}
+
+#[derive(Debug, Serialize)]
+pub struct GetTrainingMetricsOrderingResponse {
+    metric_ids: Vec<String>,
+}
+
+/// # Example
+/// GET /api/training/metrics/ordering?type=global
+/// GET /api/training/metrics/ordering?type=trainingPeriod&trainingPeriodId=5e410a51-9274-4a1d-bdaa-db69a1c4874b
+#[tracing::instrument(skip_all, err(Debug))]
+pub async fn get_training_metrics_ordering<
+    AS: IActivityService,
+    PF: ParseFile,
+    TMS: ITrainingService,
+    PS: IPreferencesService,
+>(
+    Extension(user): Extension<AuthenticatedUser>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
+    Query(query): Query<GetTrainingMetricsOrderingQuery>,
+) -> Result<Json<GetTrainingMetricsOrderingResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let scope = query.scope.into();
+
+    let ordering = match state
+        .training_metrics_service
+        .get_training_metrics_ordering(user.user(), &scope)
+        .await
+    {
+        Ok(ordering) => ordering,
+        Err(err) => {
+            if matches!(&err, GetTrainingMetricsOrderingError::Unknown(_)) {
+                tracing::error!(
+                    "Error getting training metrics ordering: {}",
+                    err.to_string()
+                );
+            }
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(
+                    serde_json::json!({ "error": format!("Failed to get metrics ordering: {}", err) }),
+                ),
+            ));
+        }
+    };
+
+    Ok(Json(GetTrainingMetricsOrderingResponse {
+        metric_ids: ordering.ids().iter().map(|id| id.to_string()).collect(),
+    }))
+}

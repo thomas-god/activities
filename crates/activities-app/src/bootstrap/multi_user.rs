@@ -33,7 +33,7 @@ use activities_infra::{
     },
 };
 
-use crate::inbound::http::HttpServer;
+use crate::http::HttpServer;
 
 type ActualActivityService = ActivityService<
     SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,

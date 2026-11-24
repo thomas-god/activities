@@ -1,0 +1,125 @@
+use crate::http::error_status::ApiErrorStatus;
+use axum::{
+    Extension, Json,
+    extract::{Path, State},
+    http::StatusCode,
+};
+use serde::Deserialize;
+
+use crate::domain::training::models::TrainingNoteContent;
+use crate::domain::training::models::TrainingNoteDate;
+use crate::domain::training::models::TrainingNoteId;
+use crate::domain::training::models::TrainingNoteTitle;
+use crate::domain::training::ports::ITrainingService;
+use crate::domain::training::ports::UpdateTrainingNoteError;
+use crate::http::AppState;
+use activities_auth::infra::http::AuthenticatedUser;
+use activities_domain::activity::ports::IActivityService;
+use activities_domain::preferences::ports::IPreferencesService;
+use activities_infra::parser::ParseFile;
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateTrainingNoteBody {
+    title: Option<String>,
+    content: String,
+    date: String,
+}
+
+impl ApiErrorStatus for UpdateTrainingNoteError {
+    fn status_code(self) -> StatusCode {
+        StatusCode::UNPROCESSABLE_ENTITY
+    }
+}
+
+#[tracing::instrument(skip_all, err)]
+pub async fn update_training_note<
+    AS: IActivityService,
+    PF: ParseFile,
+    TMS: ITrainingService,
+    PS: IPreferencesService,
+>(
+    Extension(user): Extension<AuthenticatedUser>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
+    Path(note_id): Path<String>,
+    Json(payload): Json<UpdateTrainingNoteBody>,
+) -> Result<StatusCode, StatusCode> {
+    let note_id = TrainingNoteId::from(note_id.as_str());
+    let title = payload.title.map(TrainingNoteTitle::from);
+    let content = TrainingNoteContent::from(payload.content);
+    let date = TrainingNoteDate::try_from(payload.date).map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    match state
+        .training_metrics_service
+        .update_training_note(user.user(), &note_id, title, content, date)
+        .await
+    {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(err) => {
+            if matches!(&err, UpdateTrainingNoteError::Unknown(_)) {
+                tracing::error!("Error updating training note: {}", err.to_string());
+            }
+            Err(err.status_code())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_payload_format() {
+        assert!(
+            serde_json::from_str::<UpdateTrainingNoteBody>(
+                r#"{
+            "title": "Updated title",
+            "content": "Updated training note content",
+            "date": "2025-10-27"
+        }"#,
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn test_payload_format_without_title() {
+        assert!(
+            serde_json::from_str::<UpdateTrainingNoteBody>(
+                r#"{
+            "content": "Updated training note content",
+            "date": "2025-10-27"
+        }"#,
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn test_payload_format_missing_content() {
+        assert!(serde_json::from_str::<UpdateTrainingNoteBody>(r#"{}"#,).is_err());
+    }
+
+    #[test]
+    fn test_payload_format_missing_date() {
+        assert!(
+            serde_json::from_str::<UpdateTrainingNoteBody>(
+                r#"{
+            "content": "Updated training note content"
+        }"#,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn test_payload_with_invalid_date() {
+        let payload = UpdateTrainingNoteBody {
+            title: None,
+            content: "Test content".to_string(),
+            date: "not-a-valid-date".to_string(),
+        };
+        // The date parsing happens in the handler, so we just verify the struct accepts any string
+        assert_eq!(payload.date, "not-a-valid-date");
+    }
+}
