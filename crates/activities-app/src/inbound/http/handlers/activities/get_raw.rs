@@ -10,10 +10,6 @@ use axum::{
 use std::io::Write;
 use zip::result::ZipError;
 
-use crate::domain::models::activity::ActivityId;
-use crate::domain::ports::activity::{
-    GetAllActivitiesError, GetRawActivityError, GetRawActivityRequest, RawActivity,
-};
 use crate::{
     domain::ports::{
         activity::{GetAllActivitiesRequest, IActivityService},
@@ -21,6 +17,10 @@ use crate::{
         training::ITrainingService,
     },
     inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile},
+};
+use activities_domain::models::activity::ActivityId;
+use activities_domain::ports::activity::{
+    GetAllActivitiesError, GetRawActivityError, GetRawActivityRequest, RawActivity,
 };
 
 #[tracing::instrument(skip_all, err)]
@@ -152,13 +152,13 @@ pub async fn get_raw_activity<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{
+    use activities_domain::{
         models::UserId, ports::activity::RawActivity,
         services::activity::test_utils::MockActivityService,
         services::preferences::tests_utils::MockPreferencesService,
         services::training::test_utils::MockTrainingService,
     };
-    use crate::inbound::parser::test_utils::MockFileParser;
+    use activities_infra::parser::test_utils::MockFileParser;
     use std::sync::Arc;
 
     #[tokio::test]
@@ -207,7 +207,7 @@ mod tests {
             .expect_get_all_raw_activities()
             .returning(|_| {
                 Err(
-                    crate::domain::ports::activity::GetAllActivitiesError::Unknown(
+                    activities_domain::ports::activity::GetAllActivitiesError::Unknown(
                         anyhow::anyhow!("error"),
                     ),
                 )

@@ -1,3 +1,4 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use std::str::FromStr;
 
 use axum::{
@@ -40,7 +41,7 @@ pub async fn delete_weight_and_nutrition<
             if matches!(&err, WeightAndNutritionError::Unknown(_)) {
                 tracing::error!("Error deleting weight and nutrition: {}", err);
             }
-            Err(StatusCode::from(err))
+            Err(err.status_code())
         }
     }
 }

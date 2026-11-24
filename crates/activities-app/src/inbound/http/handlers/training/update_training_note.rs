@@ -1,3 +1,4 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::{
     Extension, Json,
     extract::{Path, State},
@@ -5,8 +6,6 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::domain::ports::{activity::IActivityService, preferences::IPreferencesService};
-use crate::inbound::parser::ParseFile;
 use crate::{
     domain::{
         models::training::{
@@ -16,6 +15,8 @@ use crate::{
     },
     inbound::{auth::AuthenticatedUser, http::AppState},
 };
+use activities_domain::ports::{activity::IActivityService, preferences::IPreferencesService};
+use activities_infra::parser::ParseFile;
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateTrainingNoteBody {
@@ -24,9 +25,9 @@ pub struct UpdateTrainingNoteBody {
     date: String,
 }
 
-impl From<UpdateTrainingNoteError> for StatusCode {
-    fn from(_value: UpdateTrainingNoteError) -> Self {
-        Self::UNPROCESSABLE_ENTITY
+impl ApiErrorStatus for UpdateTrainingNoteError {
+    fn status_code(self) -> StatusCode {
+        StatusCode::UNPROCESSABLE_ENTITY
     }
 }
 
@@ -57,7 +58,7 @@ pub async fn update_training_note<
             if matches!(&err, UpdateTrainingNoteError::Unknown(_)) {
                 tracing::error!("Error updating training note: {}", err.to_string());
             }
-            Err(StatusCode::from(err))
+            Err(err.status_code())
         }
     }
 }

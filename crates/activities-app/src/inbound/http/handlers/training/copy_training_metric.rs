@@ -4,15 +4,15 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 
-use crate::domain::models::training::{TrainingMetricId, TrainingMetricName, TrainingPeriodId};
-use crate::domain::ports::{
+use crate::inbound::auth::AuthenticatedUser;
+use crate::inbound::http::AppState;
+use activities_domain::models::training::{TrainingMetricId, TrainingMetricName, TrainingPeriodId};
+use activities_domain::ports::{
     activity::IActivityService,
     preferences::IPreferencesService,
     training::{CopyTrainingMetricError, CopyTrainingMetricRequest, ITrainingService},
 };
-use crate::inbound::auth::AuthenticatedUser;
-use crate::inbound::http::AppState;
-use crate::inbound::parser::ParseFile;
+use activities_infra::parser::ParseFile;
 
 #[derive(Serialize)]
 struct ErrorResponse {

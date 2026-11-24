@@ -1,3 +1,4 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use std::collections::HashMap;
 
 use axum::{
@@ -88,12 +89,12 @@ impl MetricsQuery {
     }
 }
 
-impl From<GetTrainingMetricValuesError> for StatusCode {
-    fn from(value: GetTrainingMetricValuesError) -> Self {
-        match value {
-            GetTrainingMetricValuesError::TrainingMetricDoesNotExist(_) => Self::NOT_FOUND,
-            GetTrainingMetricValuesError::TrainingPeriodDoesNotExist(_) => Self::NOT_FOUND,
-            GetTrainingMetricValuesError::Unknown(_) => Self::INTERNAL_SERVER_ERROR,
+impl ApiErrorStatus for GetTrainingMetricValuesError {
+    fn status_code(self) -> StatusCode {
+        match self {
+            GetTrainingMetricValuesError::TrainingMetricDoesNotExist(_) => StatusCode::NOT_FOUND,
+            GetTrainingMetricValuesError::TrainingPeriodDoesNotExist(_) => StatusCode::NOT_FOUND,
+            GetTrainingMetricValuesError::Unknown(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
@@ -164,7 +165,7 @@ pub async fn get_training_metrics<
             if matches!(&err, GetTrainingMetricValuesError::Unknown(_)) {
                 tracing::error!("Error getting training metric values: {}", err.to_string());
             }
-            return Err(StatusCode::from(err));
+            return Err(err.status_code());
         }
     };
 
@@ -209,7 +210,8 @@ pub async fn get_training_period_metrics<
     let res = state
         .training_metrics_service
         .get_training_period_metrics_values(user.user(), &period_id)
-        .await?;
+        .await
+        .map_err(|err| err.status_code())?;
 
     let body = ResponseBody(
         res.into_iter()
@@ -224,14 +226,14 @@ pub async fn get_training_period_metrics<
 mod tests {
     use serde_json::json;
 
-    use crate::domain::models::activity::{
-        ActivityMetric, ActivityRpe, ActivityStatistic, BonkStatus, Sport, SportCategory,
-        TimeseriesAggregate, TimeseriesMetric, Unit, WorkoutType,
-    };
-    use crate::domain::models::training::TrainingMetricTarget;
     use crate::inbound::http::handlers::training::types::{
         APIActivitySource, APITrainingMetricActivityGroupBy, APITrainingMetricFilters,
     };
+    use activities_domain::models::activity::{
+        ActivityMetric, ActivityRpe, ActivityStatistic, BonkStatus, Sport, SportCategory,
+        TimeseriesAggregate, TimeseriesMetric, Unit, WorkoutType,
+    };
+    use activities_domain::models::training::TrainingMetricTarget;
 
     use super::*;
 

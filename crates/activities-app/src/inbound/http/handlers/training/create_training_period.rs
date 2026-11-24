@@ -1,3 +1,4 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::{Extension, Json, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
@@ -49,9 +50,9 @@ fn build_request(body: CreateTrainingPeriodBody, user: &UserId) -> CreateTrainin
     )
 }
 
-impl From<CreateTrainingPeriodError> for StatusCode {
-    fn from(_value: CreateTrainingPeriodError) -> Self {
-        Self::UNPROCESSABLE_ENTITY
+impl ApiErrorStatus for CreateTrainingPeriodError {
+    fn status_code(self) -> StatusCode {
+        StatusCode::UNPROCESSABLE_ENTITY
     }
 }
 
@@ -81,7 +82,7 @@ pub async fn create_training_period<
             if matches!(&err, CreateTrainingPeriodError::Unknown(_)) {
                 tracing::error!("Error creating training period: {}", err.to_string());
             }
-            Err(StatusCode::from(err))
+            Err(err.status_code())
         }
     }
 }

@@ -1,3 +1,4 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::{
     Extension,
     extract::{Path, State},
@@ -16,11 +17,11 @@ use crate::{
     inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile},
 };
 
-impl From<DeleteTrainingMetricError> for StatusCode {
-    fn from(value: DeleteTrainingMetricError) -> Self {
-        match value {
-            DeleteTrainingMetricError::MetricDoesNotExist(_) => Self::NOT_FOUND,
-            _ => Self::UNPROCESSABLE_ENTITY,
+impl ApiErrorStatus for DeleteTrainingMetricError {
+    fn status_code(self) -> StatusCode {
+        match self {
+            DeleteTrainingMetricError::MetricDoesNotExist(_) => StatusCode::NOT_FOUND,
+            _ => StatusCode::UNPROCESSABLE_ENTITY,
         }
     }
 }
@@ -44,7 +45,7 @@ pub async fn delete_training_metric<
             if matches!(&err, DeleteTrainingMetricError::Unknown(_)) {
                 tracing::error!("Error deleting training metric: {}", err.to_string());
             }
-            Err(StatusCode::from(err))
+            Err(err.status_code())
         }
     }
 }

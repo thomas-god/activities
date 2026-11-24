@@ -4,7 +4,7 @@ use axum::{
     http::{StatusCode, request::Parts},
 };
 
-use crate::domain::models::UserId;
+use activities_domain::models::UserId;
 
 use crate::inbound::auth::AuthenticatedUser;
 

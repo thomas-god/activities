@@ -1,19 +1,20 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::{
     Extension, Json,
     extract::{Path, State},
     http::StatusCode,
 };
 
-use crate::domain::ports::{
-    activity::IActivityService,
-    preferences::IPreferencesService,
-    training::{GetTrainingNoteError, ITrainingService},
-};
-use crate::inbound::parser::ParseFile;
 use crate::{
     domain::models::training::TrainingNoteId,
     inbound::{auth::AuthenticatedUser, http::AppState},
 };
+use activities_domain::ports::{
+    activity::IActivityService,
+    preferences::IPreferencesService,
+    training::{GetTrainingNoteError, ITrainingService},
+};
+use activities_infra::parser::ParseFile;
 
 use super::get_training_notes::TrainingNoteResponse;
 
@@ -40,7 +41,7 @@ pub async fn get_training_note<
             if matches!(&err, GetTrainingNoteError::Unknown(_)) {
                 tracing::error!("Error getting training note: {}", err.to_string());
             }
-            return Err(StatusCode::from(err));
+            return Err(err.status_code());
         }
     };
 

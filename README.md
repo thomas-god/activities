@@ -156,12 +156,12 @@ invalidate sessions created after the backup.
 | ACTIVITIES_DB_BACKUP_PATH      | no       | Directory where the archives are written. Defaults to `<ACTIVITIES_DATA_PATH>/backups`. | /backups    |
 | ACTIVITIES_DB_BACKUP_RETENTION | no       | Number of most recent archives to keep (`0` keeps all of them). Defaults to `7`.        | 14          |
 
-Backups can also be triggered manually with `activities-app backup run`, which is useful before an upgrade or
-from an existing host scheduler:
+Backups can also be triggered manually with `activities-cli backup run`, which is useful before an
+upgrade or from an existing host scheduler:
 
 ```bash
 # Backup all the databases once (the archive path and duration are printed).
-docker exec -it <container> /activities/activities-app backup run
+docker exec -it <container> /activities/activities-cli backup run
 ```
 
 #### Admin role
@@ -174,24 +174,24 @@ An **admin** is a regular account flagged as administrator that has extra rights
   starting the container. The account is created if it does not exist, and promoted otherwise (with
   its password updated). Once an admin exists the variables become inert, so remove them from your
   configuration afterwards (cannot be used to additional admin users).
-- **with the CLI** — `activities-app admin ...` runs directly against the database, without a session and
-  without the rest of the server configuration. It is also the break-glass path when the server
-  cannot start or the current admin is locked out:
+- **with the CLI** — `activities-cli admin ...` runs directly against the database, without a
+  session and without the rest of the server configuration. It is also the break-glass path when the
+  server cannot start or the current admin is locked out:
 
   ```bash
   # Create an user as admin. Prefer --password-file to keep the secret out of the process list.
-  docker exec -it <container> /activities/activities-app admin bootstrap \
+  docker exec -it <container> /activities/activities-cli admin bootstrap \
     --email admin@your.domain --password-file /run/secrets/admin
 
   # Promote an existing user to admin. No-op if the user is already an admin.
-  docker exec -it <container> /activities/activities-app admin promote --email admin@your.domain
+  docker exec -it <container> /activities/activities-cli admin promote --email admin@your.domain
 
   # Bootstrapping can be used to reset the password of an existing admin user.
-   docker exec -it <container> /activities/activities-app admin bootstrap \
+   docker exec -it <container> /activities/activities-cli admin bootstrap \
      --email existing_admin@your.domain --password-file /run/secrets/new_admin_pwd
 
   # Clear the admin flag (fails if it would leave the instance with no admin).
-  docker exec -it <container> /activities/activities-app admin revoke --email admin@your.domain
+  docker exec -it <container> /activities/activities-cli admin revoke --email admin@your.domain
   ```
 
 #### Observability
@@ -203,11 +203,11 @@ like the variables above, so the `*_FILE` variant described above works for them
 is read directly by the `tracing` ecosystem instead, since it's a generic `tracing`/`log` convention
 rather than something specific to this app (the `*_FILE` variant does not apply to it).
 
-| Variable name               | Required | Purpose                                                                                                                                                                              | Example                    |
-| --------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- |
-| OTEL_EXPORTER_OTLP_ENDPOINT | no       | OTLP/HTTP (protobuf) collector base endpoint — `/v1/traces` is appended automatically. When unset, tracing spans are only logged to stdout and no OpenTelemetry exporter is started. | http://otel-collector:4318 |
-| OTEL_SERVICE_NAME           | no       | `service.name` resource attribute reported on exported spans. Defaults to `activities-app`.                                                                                          | activities-app             |
-| RUST_LOG                    | no       | Log/span level filter ([`EnvFilter` syntax](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html)). Defaults to `info`.                         | activities_app=debug,tower_http=info  |
+| Variable name               | Required | Purpose                                                                                                                                                                              | Example                              |
+| --------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| OTEL_EXPORTER_OTLP_ENDPOINT | no       | OTLP/HTTP (protobuf) collector base endpoint — `/v1/traces` is appended automatically. When unset, tracing spans are only logged to stdout and no OpenTelemetry exporter is started. | http://otel-collector:4318           |
+| OTEL_SERVICE_NAME           | no       | `service.name` resource attribute reported on exported spans. Defaults to `activities-app`.                                                                                          | activities-app                       |
+| RUST_LOG                    | no       | Log/span level filter ([`EnvFilter` syntax](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html)). Defaults to `info`.                         | activities_app=debug,tower_http=info |
 
 ## Migrating from a deprecated single-user instance
 

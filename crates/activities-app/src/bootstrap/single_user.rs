@@ -2,26 +2,24 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::anyhow;
 
-use crate::{
+use activities_auth::multi_user::{DisabledUserService, admin::DisabledAdminService};
+use activities_domain::services::{
+    activity::ActivityService, preferences::PreferencesService, search::SearchService,
+    training::TrainingService,
+};
+use activities_infra::{
     backup::BackupService,
     clock::Clock,
     config::{AppMode, BackupConfig, BaseConfig, SingleUserConfig, StdEnvironment},
-    domain::services::{
-        activity::ActivityService, preferences::PreferencesService, search::SearchService,
-        training::TrainingService,
-    },
-    inbound::{
-        http::{DisabledAdminService, DisabledUserService, HttpServer},
-        parser::Parser,
-    },
-    outbound::{
-        fs::FilesystemRawDataRepository,
-        sqlite::{
-            activity::SqliteActivityRepository, preferences::SqlitePreferencesRepository,
-            search::SearchRepository, training::SqliteTrainingRepository,
-        },
+    fs::FilesystemRawDataRepository,
+    parser::Parser,
+    sqlite::{
+        activity::SqliteActivityRepository, preferences::SqlitePreferencesRepository,
+        search::SearchRepository, training::SqliteTrainingRepository,
     },
 };
+
+use crate::inbound::http::HttpServer;
 
 type ActualActivityService = ActivityService<
     SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,

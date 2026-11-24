@@ -2,37 +2,32 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Ok, anyhow};
 
-use crate::{
+use activities_auth::multi_user::{
+    AuthMethods, MultiUserService, SessionService,
+    admin::AdminService,
+    service::{
+        UserRepository, spawn_expired_auth_links_cleanup, spawn_expired_email_change_tokens_cleanup,
+    },
+    spawn_expired_sessions_cleanup,
+};
+use activities_domain::services::{
+    activity::ActivityService, preferences::PreferencesService, search::SearchService,
+    training::TrainingService,
+};
+use activities_infra::{
     backup::BackupService,
     clock::Clock,
     config::{AppMode, BackupConfig, BaseConfig, EmailAuthConfig, MultiUserConfig, StdEnvironment},
-    domain::services::{
-        activity::ActivityService, preferences::PreferencesService, search::SearchService,
-        training::TrainingService,
-    },
-    inbound::{
-        auth::multi_user::{
-            MaybeMailProvider,
-            admin::AdminService,
-            service::{
-                UserRepository, spawn_expired_auth_links_cleanup,
-                spawn_expired_email_change_tokens_cleanup,
-            },
-        },
-        http::{
-            AuthMethods, DoNothingMailProvider, HttpServer, MultiUserService, SMTPEmailProvider,
-            SessionService, SqliteUsersRepository, spawn_expired_sessions_cleanup,
-        },
-        parser::Parser,
-    },
-    outbound::{
-        fs::FilesystemRawDataRepository,
-        sqlite::{
-            activity::SqliteActivityRepository, preferences::SqlitePreferencesRepository,
-            search::SearchRepository, training::SqliteTrainingRepository,
-        },
+    fs::FilesystemRawDataRepository,
+    mailer::{DoNothingMailProvider, MaybeMailProvider, smtp::SMTPEmailProvider},
+    parser::Parser,
+    sqlite::{
+        activity::SqliteActivityRepository, preferences::SqlitePreferencesRepository,
+        search::SearchRepository, training::SqliteTrainingRepository, users::SqliteUsersRepository,
     },
 };
+
+use crate::inbound::http::HttpServer;
 
 type ActualActivityService = ActivityService<
     SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
@@ -243,7 +238,7 @@ async fn build_user_service(
 
     if let Some(admin_bootstrap) = mode_config.admin_bootstrap.as_ref() {
         AdminService::new(users_repository.as_ref().clone(), Clock::new())
-            .apply_bootstrap_config(admin_bootstrap)
+            .apply_bootstrap(&admin_bootstrap.email, &admin_bootstrap.password)
             .await
             .map_err(|err| {
                 anyhow!(
@@ -292,7 +287,7 @@ async fn build_user_service(
     let admin_service = AdminService::new(users_repository.as_ref().clone(), Clock::new());
 
     let session_service = SessionService::new(users_repository.clone());
-    let auth_methods = AuthMethods::from(mode_config);
+    let auth_methods = AuthMethods::new(mode_config.email.is_some());
     let user_service = MultiUserService::new(
         users_repository,
         session_service,

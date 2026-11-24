@@ -1,3 +1,4 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::{
     Extension,
     extract::{Path, State},
@@ -14,12 +15,12 @@ use crate::{
     inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile},
 };
 
-impl From<DeleteActivityError> for StatusCode {
-    fn from(value: DeleteActivityError) -> Self {
-        match value {
-            DeleteActivityError::ActivityDoesNotExist(_) => Self::NOT_FOUND,
-            DeleteActivityError::UserDoesNotOwnActivity(_, _) => Self::FORBIDDEN,
-            _ => Self::UNPROCESSABLE_ENTITY,
+impl ApiErrorStatus for DeleteActivityError {
+    fn status_code(self) -> StatusCode {
+        match self {
+            DeleteActivityError::ActivityDoesNotExist(_) => StatusCode::NOT_FOUND,
+            DeleteActivityError::UserDoesNotOwnActivity(_, _) => StatusCode::FORBIDDEN,
+            _ => StatusCode::UNPROCESSABLE_ENTITY,
         }
     }
 }
@@ -46,7 +47,7 @@ pub async fn delete_activity<
                     err.to_string()
                 )
             }
-            StatusCode::from(err)
+            err.status_code()
         }
     }
 }

@@ -1,10 +1,10 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::{
     Extension,
     extract::{Path, State},
     http::StatusCode,
 };
 
-use crate::inbound::parser::ParseFile;
 use crate::{domain::models::preferences::PreferenceKey, inbound::http::AppState};
 use crate::{
     domain::ports::{
@@ -14,6 +14,7 @@ use crate::{
     },
     inbound::auth::AuthenticatedUser,
 };
+use activities_infra::parser::ParseFile;
 
 #[tracing::instrument(skip_all, err)]
 pub async fn delete_preference<
@@ -40,7 +41,7 @@ pub async fn delete_preference<
             if matches!(&err, DeletePreferenceError::Unknown(_)) {
                 tracing::error!("Error deleting preference: {}", err.to_string());
             }
-            Err(StatusCode::from(err))
+            Err(err.status_code())
         }
     }
 }

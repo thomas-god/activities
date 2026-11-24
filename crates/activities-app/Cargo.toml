@@ -4,70 +4,43 @@ version = "0.11.6"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0.99"
-argon2 = { version = "0.5.3", features = ["std"] }
-axum = { version = "0.8.4", features = ["macros", "multipart"] }
-axum-extra = { version = "0.12.6", features = ["cookie"] }
-base64 = "0.23.0"
-chrono = { version = "0.4.41", features = ["serde"] }
-clap = { version = "4.6.7", features = ["derive"] }
-const-hex = "1.19.1"
-cookie = "0.18.1"
-cron = "0.17.0"
-derive_more = { version = "2.0.1", features = ["full"] }
-email_address = "0.2.9"
-fit-parser = { path = "../fit-parser", features = [] }
-flate2 = "1.1.2"
-getrandom = { version = "0.4.3", features = ["sys_rng"] }
-handlebars = "6.3.2"
-hmac = "0.13.0"
-itertools = "0.15"
-lettre = { version = "0.11.22", features = [
-    "builder",
-    "smtp-transport",
-    "tokio1-rustls",
-    "ring",
-    "rustls-platform-verifier"
-], default-features = false }
-log = "0.4.34"
-opentelemetry = "0.33.0"
-opentelemetry-otlp = { version = "0.33.0", default-features = false, features = [
-    "http-proto",
-    "reqwest-blocking-client",
-    "internal-logs",
-] }
-opentelemetry-semantic-conventions = "0.33.0"
-opentelemetry_sdk = "0.33.0"
-rand = "0.10.1"
-roxmltree = "0.21.0"
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.143"
-sha2 = "0.11.0"
-sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-rustls-ring-native-roots", "sqlite", "chrono"] }
-subtle = "2.6.1"
-thiserror = "2.0.16"
-tokio = { version = "1.47.1", features = ["full"] }
-tokio-util = "0.7.18"
-tower = "0.5.2"
-tower-http = { version = "0.7.0", features = [
-    "compression-br",
-    "compression-gzip",
-    "cors",
-    "fs",
-    "trace",
-] }
-tracing = { version = "0.1.41", features = ["log"] }
-tracing-opentelemetry = "0.34.0"
-tracing-subscriber = { version = "0.3.20", features = ["env-filter", "registry"] }
-unicode-normalization = "0.1.25"
-unicode_categories = "0.1.1"
-uuid = { version = "1.18.1", features = ["v4", "serde"] }
-zip = { version = "9.0.0", features = ["deflate"] }
+activities-auth.workspace = true
+activities-domain.workspace = true
+activities-infra.workspace = true
+anyhow.workspace = true
+axum.workspace = true
+axum-extra.workspace = true
+chrono.workspace = true
+const-hex.workspace = true
+cookie.workspace = true
+derive_more.workspace = true
+flate2.workspace = true
+hmac.workspace = true
+itertools.workspace = true
+log.workspace = true
+opentelemetry.workspace = true
+opentelemetry-otlp.workspace = true
+opentelemetry-semantic-conventions.workspace = true
+opentelemetry_sdk.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-opentelemetry.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
+zip.workspace = true
 
 [dev-dependencies]
-assert_approx_eq = "1.1.0"
-axum-test = "21.0.0"
-mockall = "0.15.0"
-reqwest = "0.13.4"
-tempfile = "3.23.0"
-url = "2.5.8"
+activities-auth = { workspace = true, features = ["test-utils"] }
+activities-domain = { workspace = true, features = ["test-utils"] }
+activities-infra = { workspace = true, features = ["test-utils"] }
+axum-test.workspace = true
+mockall.workspace = true
+reqwest.workspace = true
+tempfile.workspace = true
+url.workspace = true

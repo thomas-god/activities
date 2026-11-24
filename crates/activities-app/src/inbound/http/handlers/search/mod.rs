@@ -7,8 +7,8 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::domain::ports::search::{ISearchService, SearchResult};
 use crate::inbound::auth::AuthenticatedUser;
+use activities_domain::ports::search::{ISearchService, SearchResult};
 
 #[derive(Debug, Deserialize)]
 pub struct SearchQuery {
@@ -65,7 +65,7 @@ mod tests {
     use axum::extract::Query;
 
     use super::*;
-    use crate::domain::{
+    use activities_domain::{
         models::{UserId, activity::ActivityId, training::TrainingNoteId},
         ports::search::search_test_utils::MockSearchService,
     };

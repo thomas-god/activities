@@ -1,3 +1,4 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::{
     Extension, Json,
     extract::{Path, Query, State},
@@ -6,8 +7,6 @@ use axum::{
 use chrono::{DateTime, FixedOffset, Local};
 use serde::{Deserialize, Serialize};
 
-use crate::domain::ports::{DateRange, training::GetTrainingNoteError};
-use crate::inbound::parser::ParseFile;
 use crate::{
     domain::{
         models::training::{TrainingNote, TrainingPeriodId},
@@ -18,6 +17,8 @@ use crate::{
     },
     inbound::{auth::AuthenticatedUser, http::AppState},
 };
+use activities_domain::ports::{DateRange, training::GetTrainingNoteError};
+use activities_infra::parser::ParseFile;
 
 #[derive(Debug, Deserialize)]
 pub struct TrainingNotesQuery {
@@ -59,9 +60,9 @@ impl From<TrainingNote> for TrainingNoteResponse {
     }
 }
 
-impl From<GetTrainingNoteError> for StatusCode {
-    fn from(_value: GetTrainingNoteError) -> Self {
-        Self::INTERNAL_SERVER_ERROR
+impl ApiErrorStatus for GetTrainingNoteError {
+    fn status_code(self) -> StatusCode {
+        StatusCode::INTERNAL_SERVER_ERROR
     }
 }
 
@@ -90,7 +91,7 @@ pub async fn get_training_notes<
             if matches!(&err, GetTrainingNoteError::Unknown(_)) {
                 tracing::error!("Error getting training notes: {}", err.to_string());
             }
-            Err(StatusCode::from(err))
+            Err(err.status_code())
         }
     }
 }

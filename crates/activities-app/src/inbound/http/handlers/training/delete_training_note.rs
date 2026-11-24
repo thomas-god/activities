@@ -1,3 +1,4 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::{
     Extension,
     extract::{Path, State},
@@ -16,9 +17,9 @@ use crate::{
     inbound::{auth::AuthenticatedUser, http::AppState},
 };
 
-impl From<DeleteTrainingNoteError> for StatusCode {
-    fn from(_value: DeleteTrainingNoteError) -> Self {
-        Self::UNPROCESSABLE_ENTITY
+impl ApiErrorStatus for DeleteTrainingNoteError {
+    fn status_code(self) -> StatusCode {
+        StatusCode::UNPROCESSABLE_ENTITY
     }
 }
 
@@ -45,7 +46,7 @@ pub async fn delete_training_note<
             if matches!(&err, DeleteTrainingNoteError::Unknown(_)) {
                 tracing::error!("Error deleting training note: {}", err.to_string());
             }
-            Err(StatusCode::from(err))
+            Err(err.status_code())
         }
     }
 }

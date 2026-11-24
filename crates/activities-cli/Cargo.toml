@@ -1,0 +1,16 @@
+[package]
+name = "activities-cli"
+version = "0.11.6"
+edition = "2024"
+
+[dependencies]
+activities-auth.workspace = true
+activities-domain.workspace = true
+activities-infra.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

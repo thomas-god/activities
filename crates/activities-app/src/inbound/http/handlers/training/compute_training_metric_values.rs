@@ -1,3 +1,4 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use std::collections::HashMap;
 
 use axum::{Extension, Json, extract::State, http::StatusCode, response::IntoResponse};
@@ -65,10 +66,10 @@ impl From<&ComputeMetricValuesRequest> for DateRange {
     }
 }
 
-impl From<ComputeTrainingMetricValuesError> for StatusCode {
-    fn from(value: ComputeTrainingMetricValuesError) -> Self {
-        match value {
-            ComputeTrainingMetricValuesError::Unknown(_) => Self::INTERNAL_SERVER_ERROR,
+impl ApiErrorStatus for ComputeTrainingMetricValuesError {
+    fn status_code(self) -> StatusCode {
+        match self {
+            ComputeTrainingMetricValuesError::Unknown(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
@@ -123,7 +124,7 @@ pub async fn compute_training_metric_values<
                     err.to_string()
                 );
             }
-            return Err(StatusCode::from(err));
+            return Err(err.status_code());
         }
     };
 
@@ -176,15 +177,15 @@ mod tests {
     use super::*;
     use serde_json;
 
-    use crate::domain::models::activity::{
-        ActivityRpe, BonkStatus, Sport, SportCategory, Unit, WorkoutType,
-    };
-    use crate::domain::models::training::{
-        ActivitySource, HooperIndexSource, SportFilter, TrainingMetricSummaryAverage,
-        TrainingMetricTarget, WeightAndNutritionSource,
-    };
     use crate::inbound::http::handlers::training::types::{
         APIActivitySource, APITrainingMetricActivityGroupBy, APITrainingMetricSummaryAverage,
+    };
+    use activities_domain::models::activity::{
+        ActivityRpe, BonkStatus, Sport, SportCategory, Unit, WorkoutType,
+    };
+    use activities_domain::models::training::{
+        ActivitySource, HooperIndexSource, SportFilter, TrainingMetricSummaryAverage,
+        TrainingMetricTarget, WeightAndNutritionSource,
     };
 
     fn extract_group_by(

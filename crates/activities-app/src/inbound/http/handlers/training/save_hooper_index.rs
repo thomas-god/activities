@@ -1,3 +1,4 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use std::str::FromStr;
 
 use axum::{
@@ -56,7 +57,7 @@ pub async fn save_hooper_index<
             if matches!(&err, HooperIndexError::Unknown(_)) {
                 tracing::error!("Error updating hooper index: {}", err);
             }
-            Err(StatusCode::from(err))
+            Err(err.status_code())
         }
     }
 }

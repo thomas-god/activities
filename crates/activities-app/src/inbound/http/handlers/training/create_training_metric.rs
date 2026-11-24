@@ -1,3 +1,4 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use serde::Deserialize;
 
@@ -68,9 +69,9 @@ fn build_request(
     ))
 }
 
-impl From<CreateTrainingMetricError> for StatusCode {
-    fn from(_value: CreateTrainingMetricError) -> Self {
-        Self::UNPROCESSABLE_ENTITY
+impl ApiErrorStatus for CreateTrainingMetricError {
+    fn status_code(self) -> StatusCode {
+        StatusCode::UNPROCESSABLE_ENTITY
     }
 }
 
@@ -99,7 +100,7 @@ pub async fn create_training_metric<
                 tracing::error!("Error creating training metric: {}", err.to_string());
             }
             Err((
-                StatusCode::from(err),
+                err.status_code(),
                 Json(serde_json::json!({ "error": "Failed to create training metric" })),
             ))
         }
@@ -111,7 +112,7 @@ mod tests_create_training_metric {
 
     use super::*;
 
-    use crate::domain::models::activity::Unit;
+    use activities_domain::models::activity::Unit;
 
     #[test]
     fn test_payload_format() {

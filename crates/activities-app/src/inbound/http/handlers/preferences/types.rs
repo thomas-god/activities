@@ -1,3 +1,4 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 
@@ -104,21 +105,21 @@ impl From<ActivityListSummary> for APIActivityListSummary {
     }
 }
 
-impl From<GetPreferenceError> for StatusCode {
-    fn from(_value: GetPreferenceError) -> Self {
-        Self::INTERNAL_SERVER_ERROR
+impl ApiErrorStatus for GetPreferenceError {
+    fn status_code(self) -> StatusCode {
+        StatusCode::INTERNAL_SERVER_ERROR
     }
 }
 
-impl From<SetPreferenceError> for StatusCode {
-    fn from(_value: SetPreferenceError) -> Self {
-        Self::INTERNAL_SERVER_ERROR
+impl ApiErrorStatus for SetPreferenceError {
+    fn status_code(self) -> StatusCode {
+        StatusCode::INTERNAL_SERVER_ERROR
     }
 }
 
-impl From<DeletePreferenceError> for StatusCode {
-    fn from(_value: DeletePreferenceError) -> Self {
-        Self::INTERNAL_SERVER_ERROR
+impl ApiErrorStatus for DeletePreferenceError {
+    fn status_code(self) -> StatusCode {
+        StatusCode::INTERNAL_SERVER_ERROR
     }
 }
 

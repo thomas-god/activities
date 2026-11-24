@@ -4,7 +4,7 @@ use chrono::{DateTime, FixedOffset, NaiveDate};
 use derive_more::Constructor;
 use serde::{Deserialize, Serialize};
 
-use crate::domain::{
+use activities_domain::{
     models::training::{
         ActivityWithTrainingContext, HooperIndex, ReferenceBestDurationCurve, TrainingContext,
     },
@@ -392,14 +392,14 @@ mod tests {
 
     use chrono::DateTime;
 
-    use crate::domain::models::UserId;
-    use crate::domain::models::activity::{
+    use activities_domain::models::UserId;
+    use activities_domain::models::activity::{
         ActiveTime, ActivityDuration, ActivityDurationCurve, ActivityDurationCurves, ActivityId,
         ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries,
         ActivityWithParsedData, DurationCurveType, Sport, Timeseries, TimeseriesActiveTime,
         TimeseriesMetric, TimeseriesTime, TimeseriesValue,
     };
-    use crate::domain::models::training::{
+    use activities_domain::models::training::{
         BestDurationCurve, HooperIndex, ReferenceBestDurationCurve, ReferenceDurationCurveKind,
         SubjectiveScale,
     };

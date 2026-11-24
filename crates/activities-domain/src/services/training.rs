@@ -1,0 +1,8296 @@
+use std::{collections::HashMap, sync::Arc};
+
+use anyhow::anyhow;
+use chrono::{Days, NaiveDate};
+use derive_more::Constructor;
+use tokio_util::sync::CancellationToken;
+
+use crate::{
+    models::{
+        UserId,
+        activity::{
+            ActivityId, ActivityMetric, ActivityStartTime, DURATION_CURVE_DURATIONS_SECOND,
+        },
+        search::{SearchDocument, SearchDocumentType},
+        training::{
+            ActivitySource, ActivityWithTrainingContext, DurationCurveSource, HooperIndex,
+            HooperIndexSource, ReferenceBestDurationCurve, ReferenceDurationCurveKind,
+            TrainingContext, TrainingMetric, TrainingMetricBin, TrainingMetricDefinition,
+            TrainingMetricId, TrainingMetricScope, TrainingMetricSource,
+            TrainingMetricSummaryValues, TrainingMetricValue, TrainingMetricValues,
+            TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote, TrainingNoteContent,
+            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
+            WeightAndNutrition, WeightAndNutritionSource,
+        },
+    },
+    ports::{
+        DateRange, IClock,
+        activity::{DurationCurveEvent, GetActivityError, IActivityService, ListActivitiesFilters},
+        search::{IDocumentsForSearch, RemainingDocuments},
+        training::{
+            ActivityWithTrainingContextError, ComputeTrainingMetricValuesError,
+            CopyTrainingMetricError, CopyTrainingMetricRequest, CreateTrainingMetricError,
+            CreateTrainingMetricRequest, CreateTrainingNoteError, CreateTrainingNoteRequest,
+            CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteHooperIndexRequest,
+            DeleteTrainingMetricError, DeleteTrainingMetricRequest, DeleteTrainingNoteError,
+            DeleteTrainingPeriodError, DeleteTrainingPeriodRequest,
+            DeleteWeightAndNutritionRequest, GetTrainingMetricValuesError,
+            GetTrainingMetricValuesRequest, GetTrainingMetricsOrderingError, GetTrainingNoteError,
+            HooperIndexError, ITrainingService, SaveBulkWeightAndNutritionRequest,
+            SaveHooperIndexRequest, SaveWeightAndNutritionRequest, SetTrainingMetricsOrderingError,
+            TrainingRepository, UpdateTrainingMetricError, UpdateTrainingMetricNameError,
+            UpdateTrainingMetricNameRequest, UpdateTrainingMetricRequest, UpdateTrainingNoteError,
+            UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
+            UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
+            UpdateTrainingPeriodNoteError, UpdateTrainingPeriodNoteRequest,
+            WeightAndNutritionError,
+        },
+    },
+};
+
+///////////////////////////////////////////////////////////////////
+// TRAINING SERVICE
+///////////////////////////////////////////////////////////////////
+
+const BATCH_SIZE: i64 = 100;
+
+#[derive(Debug, Clone, Constructor)]
+pub struct TrainingService<TR, AS, C>
+where
+    TR: TrainingRepository,
+    AS: IActivityService,
+    C: IClock,
+{
+    training_repository: TR,
+    activity_service: AS,
+    notify_new_document: Arc<tokio::sync::Notify>,
+    duration_curve_notify: Arc<tokio::sync::Notify>,
+    shutdown: CancellationToken,
+    clock: C,
+}
+
+impl<TR, AS, C> TrainingService<TR, AS, C>
+where
+    TR: TrainingRepository,
+    AS: IActivityService,
+    C: IClock,
+{
+    pub async fn run(&self) {
+        let _ = self.process_pending_outbox().await;
+        tracing::info!("Initial processing of duration curves pending outbox done");
+
+        let duration_curve_notified = self.duration_curve_notify.notified();
+        let shutdown = self.shutdown.cancelled();
+        tokio::pin!(duration_curve_notified, shutdown);
+
+        loop {
+            tokio::select! {
+                _ = &mut  duration_curve_notified =>  {
+                    if let Err(err) = self.process_pending_outbox().await {
+                        tracing::error!(
+                            "Error while processing duration curve notification: {}",
+                            err
+                        );
+                    }
+                    duration_curve_notified.set(self.duration_curve_notify.notified());
+                }
+                _ = &mut shutdown => return,
+            }
+        }
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn process_pending_outbox(&self) -> Result<(), anyhow::Error> {
+        let mut nb_errors = 0;
+
+        loop {
+            let notifications = self
+                .activity_service
+                .list_pending_duration_curve_notifications(BATCH_SIZE)
+                .await?;
+
+            if notifications.is_empty() {
+                break;
+            }
+
+            if nb_errors > BATCH_SIZE {
+                tracing::error!(
+                    "Too many errors while processing duration curves outbox, aborting further processing."
+                );
+                break;
+            }
+
+            for notification in notifications {
+                let res = match notification.event() {
+                    DurationCurveEvent::Created => {
+                        if let (Some(curve), Some(date)) =
+                            (notification.curve(), notification.activity_date())
+                        {
+                            self.training_repository
+                                .save_duration_curve(
+                                    notification.user(),
+                                    notification.activity(),
+                                    curve,
+                                    date,
+                                )
+                                .await
+                        } else {
+                            Ok(())
+                        }
+                    }
+                    DurationCurveEvent::Deleted => {
+                        self.training_repository
+                            .delete_duration_curve(notification.user(), notification.activity())
+                            .await
+                    }
+                };
+                if let Err(err) = res {
+                    nb_errors += 1;
+                    tracing::error!(
+                        "Error while processing duration curve notification for activity {}: {}",
+                        notification.activity(),
+                        err,
+                    );
+                    continue;
+                }
+
+                if let Err(err) = self
+                    .activity_service
+                    .mark_duration_curve_notifications_as_processed(
+                        notification.activity(),
+                        notification.user(),
+                        self.clock.now(),
+                    )
+                    .await
+                {
+                    nb_errors += 1;
+                    tracing::error!(
+                        "Error while marking duration curve notification as processed for activity {}: {}",
+                        notification.activity(),
+                        err,
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
+    /// Compute training metric values from a [TrainingMetricDefinition] and a [DateRange] using
+    /// activities within the [DateRange].
+    async fn compute_training_metric_values(
+        &self,
+        definition: &TrainingMetricDefinition,
+        date_range: &DateRange,
+    ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
+        match definition.source() {
+            TrainingMetricSource::Activity(source) => {
+                self.compute_training_metric_values_for_activity(definition, source, date_range)
+                    .await
+            }
+            TrainingMetricSource::HooperIndex(source) => {
+                self.compute_training_metric_values_for_hooper_index(definition, source, date_range)
+                    .await
+            }
+            TrainingMetricSource::WeightAndNutrition(source) => {
+                self.compute_training_metric_values_for_weight_and_nutrition(
+                    definition, source, date_range,
+                )
+                .await
+            }
+            TrainingMetricSource::DurationCurve(source) => {
+                self.compute_training_metric_values_for_duration_curve(
+                    definition, source, date_range,
+                )
+                .await
+            }
+        }
+    }
+
+    async fn compute_training_metric_values_for_activity(
+        &self,
+        definition: &TrainingMetricDefinition,
+        source: &ActivitySource,
+        date_range: &DateRange,
+    ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
+        let activities_with_metrics = self
+            .activity_service
+            .list_activities_with_metrics(
+                definition.user(),
+                &ListActivitiesFilters::empty().set_date_range(Some(date_range.clone())),
+                &[source.metric()],
+            )
+            .await
+            .map_err(|err| anyhow!(err))?
+            .into_iter()
+            .filter_map(|(activity, values)| {
+                if let Some(Some(value)) = values.get(&source.metric()).cloned() {
+                    Some((activity, value))
+                } else {
+                    None
+                }
+            });
+
+        let values = source.extract_values(definition.window(), activities_with_metrics);
+        Ok(definition.compute_training_metric_values(values))
+    }
+
+    async fn compute_training_metric_values_for_hooper_index(
+        &self,
+        definition: &TrainingMetricDefinition,
+        source: &HooperIndexSource,
+        date_range: &DateRange,
+    ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
+        let scales = self
+            .training_repository
+            .get_hooper_indexes(definition.user(), date_range)
+            .await
+            .map_err(|err| ComputeTrainingMetricValuesError::Unknown(anyhow!(err)))?
+            .into_iter();
+
+        let values = source.extract_values(definition.window(), scales);
+        Ok(definition.compute_training_metric_values(values))
+    }
+
+    async fn compute_training_metric_values_for_weight_and_nutrition(
+        &self,
+        definition: &TrainingMetricDefinition,
+        source: &WeightAndNutritionSource,
+        date_range: &DateRange,
+    ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
+        let values = self
+            .training_repository
+            .get_weight_and_nutritions(definition.user(), date_range)
+            .await
+            .map_err(|err| ComputeTrainingMetricValuesError::Unknown(anyhow!(err)))?
+            .into_iter();
+
+        let values = source.extract_values(definition.window(), values);
+        Ok(definition.compute_training_metric_values(values))
+    }
+
+    async fn compute_training_metric_values_for_duration_curve(
+        &self,
+        definition: &TrainingMetricDefinition,
+        source: &DurationCurveSource,
+        date_range: &DateRange,
+    ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
+        let curve = self
+            .training_repository
+            .get_best_duration_curves(definition.user(), *date_range.start(), *date_range.end())
+            .await
+            .map_err(|err| ComputeTrainingMetricValuesError::Unknown(anyhow!(err)))?
+            .into_iter()
+            .find_map(|curve| {
+                if curve.curve_type() == source.curve_type() {
+                    Some(curve.to_values())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default();
+
+        let values_by_bin = HashMap::from_iter(
+            std::iter::zip(curve.iter(), DURATION_CURVE_DURATIONS_SECOND).filter_map(
+                |(value, bin)| {
+                    value.map(|v| {
+                        (
+                            TrainingMetricBin::new_without_group(bin.to_string()),
+                            TrainingMetricValue::SingleValue(v as f64),
+                        )
+                    })
+                },
+            ),
+        );
+
+        Ok(TrainingMetricValues::new(
+            values_by_bin,
+            TrainingMetricSummaryValues::default(),
+            source.unit(),
+        ))
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_activity_best_duration_curves(
+        &self,
+        user: &UserId,
+        activity_start: &ActivityStartTime,
+        period: Option<TrainingPeriodId>,
+    ) -> Result<Vec<ReferenceBestDurationCurve>, ActivityWithTrainingContextError> {
+        let before = activity_start.naive_date();
+        let mut best_duration_curves = Vec::with_capacity(2);
+
+        // Always compare against the 12-week best
+        let twelve_week_since = before
+            .checked_sub_days(Days::new(12 * 7))
+            .ok_or_else(|| anyhow!("invalid activity date {before}"))?;
+        best_duration_curves.push(ReferenceBestDurationCurve::new(
+            ReferenceDurationCurveKind::TwelveWeek,
+            None,
+            twelve_week_since,
+            before,
+            self.training_repository
+                .get_best_duration_curves(user, twelve_week_since, before)
+                .await?,
+        ));
+
+        // Optionally compare against the period best
+        if let Some(period_id) = period
+            && let Some(period) = self
+                .training_repository
+                .get_training_period(user, &period_id)
+                .await
+        {
+            let period_start = *period.start();
+            let period_before = match period.end() {
+                Some(end) => before.min(end.checked_add_days(Days::new(1)).unwrap_or(*end)),
+                None => before,
+            };
+            if period_start < period_before {
+                best_duration_curves.push(ReferenceBestDurationCurve::new(
+                    ReferenceDurationCurveKind::TrainingPeriod,
+                    Some(period.name().to_string()),
+                    period_start,
+                    period_before,
+                    self.training_repository
+                        .get_best_duration_curves(user, period_start, period_before)
+                        .await?,
+                ));
+            }
+        }
+
+        Ok(best_duration_curves)
+    }
+}
+
+impl<TMR, AS, C> ITrainingService for TrainingService<TMR, AS, C>
+where
+    TMR: TrainingRepository,
+    AS: IActivityService,
+    C: IClock,
+{
+    #[tracing::instrument(skip_all, err)]
+    async fn create_metric(
+        &self,
+        req: CreateTrainingMetricRequest,
+    ) -> Result<TrainingMetricId, CreateTrainingMetricError> {
+        let default_sports = match req.scope() {
+            TrainingMetricScope::Global => None,
+            TrainingMetricScope::TrainingPeriod(period) => self
+                .training_repository
+                .get_training_period(req.user(), period)
+                .await
+                .ok_or(CreateTrainingMetricError::TrainingPeriodDoesNotExist(
+                    period.clone(),
+                ))?
+                .sports()
+                .items()
+                .cloned(),
+        };
+
+        let id = TrainingMetricId::new();
+
+        let definition = TrainingMetricDefinition::new(
+            req.user().clone(),
+            req.source().clone().merge_default_sports(&default_sports),
+            req.window().clone(),
+            req.summary().clone(),
+            *req.target(),
+        );
+        let training_metric = TrainingMetric::new(
+            id.clone(),
+            Some(req.name().clone()),
+            req.scope().clone(),
+            definition,
+        );
+        self.training_repository
+            .save_metric(training_metric.clone())
+            .await?;
+
+        Ok(id)
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn update_training_metric(
+        &self,
+        req: UpdateTrainingMetricRequest,
+    ) -> Result<(), UpdateTrainingMetricError> {
+        let metric = self
+            .training_repository
+            .get_metric(req.user(), req.id())
+            .await
+            .map_err(|err| UpdateTrainingMetricError::Unknown(anyhow!(err)))?
+            .ok_or_else(|| UpdateTrainingMetricError::MetricDoesNotExist(req.id().clone()))?;
+
+        let patched_metric = metric.apply_patch(req.patch());
+
+        self.training_repository
+            .save_metric(patched_metric)
+            .await
+            .map_err(UpdateTrainingMetricError::SaveMetricError)
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn copy_training_metric(
+        &self,
+        req: CopyTrainingMetricRequest,
+    ) -> Result<(), CopyTrainingMetricError> {
+        let source_definition = self
+            .training_repository
+            .get_metric(req.user(), req.source_metric())
+            .await
+            .map_err(|err| CopyTrainingMetricError::Unknown(anyhow!(err)))?
+            .ok_or_else(|| {
+                CopyTrainingMetricError::MetricDoesNotExist(req.source_metric().clone())
+            })?
+            .definition()
+            .clone();
+
+        let target_period = self
+            .training_repository
+            .get_training_period(req.user(), req.target_period())
+            .await
+            .ok_or_else(|| {
+                CopyTrainingMetricError::PeriodDoesNotExist(req.source_metric().clone())
+            })?;
+
+        let new_definition = source_definition.merge_default_sports(target_period.sport_items());
+
+        let new_metric = TrainingMetric::new(
+            TrainingMetricId::new(),
+            req.new_name().clone(),
+            TrainingMetricScope::TrainingPeriod(req.target_period().clone()),
+            new_definition,
+        );
+
+        self.training_repository.save_metric(new_metric).await?;
+
+        Ok(())
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_training_metrics_values(
+        &self,
+        user: &UserId,
+        date_range: &DateRange,
+        scope: &TrainingMetricScope,
+    ) -> Result<Vec<(TrainingMetric, TrainingMetricValues)>, GetTrainingMetricValuesError> {
+        let extra_sports = match scope {
+            TrainingMetricScope::Global => None,
+            TrainingMetricScope::TrainingPeriod(period) => self
+                .training_repository
+                .get_training_period(user, period)
+                .await
+                .ok_or(GetTrainingMetricValuesError::TrainingPeriodDoesNotExist(
+                    period.clone(),
+                ))?
+                .sports()
+                .items()
+                .cloned(),
+        };
+
+        let metrics = match scope {
+            TrainingMetricScope::Global => self.training_repository.get_global_metrics(user).await,
+            TrainingMetricScope::TrainingPeriod(period) => {
+                self.training_repository
+                    .get_period_metrics(user, period)
+                    .await
+            }
+        }
+        .map_err(|err| GetTrainingMetricValuesError::Unknown(anyhow!(err)))?;
+
+        let ordering = self
+            .training_repository
+            .get_training_metrics_ordering(user, scope)
+            .await
+            .unwrap_or_default();
+
+        let metrics = ordering.sort(metrics);
+
+        let mut res = vec![];
+        for metric in metrics {
+            let definition = metric
+                .definition()
+                .clone()
+                .merge_default_sports(&extra_sports);
+
+            let aligned_date_range =
+                align_date_range(date_range, scope, metric.definition().window());
+
+            if let Ok(values) = self
+                .compute_training_metric_values(&definition, &aligned_date_range)
+                .await
+            {
+                res.push((metric.clone(), values))
+            }
+        }
+
+        Ok(res)
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_training_metric_values(
+        &self,
+        req: GetTrainingMetricValuesRequest,
+        date_range: &DateRange,
+    ) -> Result<TrainingMetricValues, GetTrainingMetricValuesError> {
+        let definition = match req {
+            GetTrainingMetricValuesRequest::ByDefinition {
+                user,
+                source,
+                window,
+                summary,
+                target,
+            } => TrainingMetricDefinition::new(user, source, window, summary, target),
+            GetTrainingMetricValuesRequest::ByTrainingMetricId(user, id) => self
+                .training_repository
+                .get_metric(&user, &id)
+                .await
+                .map_err(|err| GetTrainingMetricValuesError::Unknown(err.into()))?
+                .ok_or(GetTrainingMetricValuesError::TrainingMetricDoesNotExist(id))?
+                .definition()
+                .clone(),
+        };
+
+        self.compute_training_metric_values(&definition, date_range)
+            .await
+            .map_err(GetTrainingMetricValuesError::from)
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn delete_metric(
+        &self,
+        req: DeleteTrainingMetricRequest,
+    ) -> Result<(), DeleteTrainingMetricError> {
+        self.training_repository
+            .delete_metric(req.user(), req.metric())
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn update_training_metric_name(
+        &self,
+        req: UpdateTrainingMetricNameRequest,
+    ) -> Result<(), UpdateTrainingMetricNameError> {
+        self.training_repository
+            .update_metric_name(req.user(), req.metric_id(), req.name().clone())
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn create_training_period(
+        &self,
+        req: CreateTrainingPeriodRequest,
+    ) -> Result<TrainingPeriodId, CreateTrainingPeriodError> {
+        let id = TrainingPeriodId::new();
+        let period = req
+            .to_period(&id)
+            .map_err(CreateTrainingPeriodError::InvalidPeriod)?;
+
+        self.training_repository
+            .save_training_period(period)
+            .await
+            .map_err(|err| CreateTrainingPeriodError::Unknown(err.into()))?;
+
+        Ok(id)
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn get_training_period(
+        &self,
+        user: &UserId,
+        period: &TrainingPeriodId,
+    ) -> Option<crate::models::training::TrainingPeriod> {
+        self.training_repository
+            .get_training_period(user, period)
+            .await
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn get_training_periods(
+        &self,
+        user: &UserId,
+    ) -> Vec<crate::models::training::TrainingPeriod> {
+        self.training_repository.get_training_periods(user).await
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn get_active_training_periods(
+        &self,
+        user: &UserId,
+        ref_date: &NaiveDate,
+    ) -> Vec<crate::models::training::TrainingPeriod> {
+        self.training_repository
+            .get_active_training_periods(user, ref_date)
+            .await
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn get_training_period_with_activities_with_metrics(
+        &self,
+        user: &UserId,
+        period_id: &TrainingPeriodId,
+        metrics: &[ActivityMetric],
+    ) -> Option<crate::models::training::TrainingPeriodWithActivities> {
+        use crate::models::training::TrainingPeriodWithActivities;
+
+        let period = self
+            .training_repository
+            .get_training_period(user, period_id)
+            .await?;
+
+        // Query activities within the period's date range
+        let filters =
+            ListActivitiesFilters::empty().set_date_range(Some(period.range_default_tomorrow()));
+
+        let Ok(activities) = self
+            .activity_service
+            .list_activities_with_metrics(user, &filters, metrics)
+            .await
+        else {
+            return None;
+        };
+
+        // Filter activities by the period's sport filters
+        let matching_activities: Vec<_> = activities
+            .into_iter()
+            .filter(|(activity, _)| period.matches(activity))
+            .collect();
+
+        Some(TrainingPeriodWithActivities::new(
+            period,
+            matching_activities,
+        ))
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn delete_training_period(
+        &self,
+        req: DeleteTrainingPeriodRequest,
+    ) -> Result<(), DeleteTrainingPeriodError> {
+        self.training_repository
+            .delete_training_period(req.user(), req.period_id())
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn update_training_period_name(
+        &self,
+        req: UpdateTrainingPeriodNameRequest,
+    ) -> Result<(), UpdateTrainingPeriodNameError> {
+        self.training_repository
+            .update_training_period_name(req.user(), req.period_id(), req.name().to_string())
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn update_training_period_note(
+        &self,
+        req: UpdateTrainingPeriodNoteRequest,
+    ) -> Result<(), UpdateTrainingPeriodNoteError> {
+        self.training_repository
+            .update_training_period_note(req.user(), req.period_id(), req.note().clone())
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn update_training_period_dates(
+        &self,
+        req: UpdateTrainingPeriodDatesRequest,
+    ) -> Result<(), UpdateTrainingPeriodDatesError> {
+        // Validate dates
+        if let Some(end_date) = req.end()
+            && req.start() > end_date
+        {
+            return Err(UpdateTrainingPeriodDatesError::EndDateBeforeStartDate);
+        }
+
+        // Update the period dates
+        self.training_repository
+            .update_training_period_dates(req.user(), req.period_id(), *req.start(), *req.end())
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn create_training_note(
+        &self,
+        req: CreateTrainingNoteRequest,
+    ) -> Result<TrainingNoteId, CreateTrainingNoteError> {
+        use crate::models::training::{TrainingNote, TrainingNoteId};
+
+        // Create the note
+        let note_id = TrainingNoteId::new();
+        let note = TrainingNote::new(
+            note_id.clone(),
+            req.user().clone(),
+            req.title().clone(),
+            req.content().clone(),
+            req.date().clone(),
+            chrono::Utc::now().into(),
+        );
+
+        // Save to repository
+        self.training_repository
+            .save_training_note(note)
+            .await
+            .map_err(|err| CreateTrainingNoteError::Unknown(err.into()))?;
+
+        self.notify_new_document.notify_one();
+
+        Ok(note_id)
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_training_note(
+        &self,
+        user: &UserId,
+        note_id: &TrainingNoteId,
+    ) -> Result<Option<TrainingNote>, GetTrainingNoteError> {
+        let note = self
+            .training_repository
+            .get_training_note(user, note_id)
+            .await?;
+
+        // Verify the note belongs to the user
+        if let Some(ref n) = note
+            && n.user() != user
+        {
+            return Ok(None);
+        }
+
+        Ok(note)
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_training_notes(
+        &self,
+        user: &UserId,
+        date_range: &Option<DateRange>,
+    ) -> Result<Vec<TrainingNote>, GetTrainingNoteError> {
+        self.training_repository
+            .get_training_notes(user, date_range)
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn update_training_note(
+        &self,
+        user: &UserId,
+        note_id: &TrainingNoteId,
+        title: Option<TrainingNoteTitle>,
+        content: TrainingNoteContent,
+        date: TrainingNoteDate,
+    ) -> Result<(), UpdateTrainingNoteError> {
+        let Some(existing_note) = self
+            .training_repository
+            .get_training_note(user, note_id)
+            .await
+            .map_err(|err| UpdateTrainingNoteError::Unknown(err.into()))?
+        else {
+            return Ok(());
+        };
+
+        let updated_note = existing_note.update(title, content, date);
+        self.training_repository
+            .save_training_note(updated_note)
+            .await
+            .map_err(|err| UpdateTrainingNoteError::Unknown(anyhow!(err)))?;
+
+        self.notify_new_document.notify_one();
+
+        Ok(())
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn delete_training_note(
+        &self,
+        user: &UserId,
+        note_id: &TrainingNoteId,
+    ) -> Result<(), DeleteTrainingNoteError> {
+        // Verify the note exists and belongs to the user
+        let note = self
+            .training_repository
+            .get_training_note(user, note_id)
+            .await
+            .map_err(|err| DeleteTrainingNoteError::Unknown(err.into()))?;
+
+        match note {
+            Some(n) if n.user() == user => {
+                self.training_repository
+                    .delete_training_note(user, note_id)
+                    .await?;
+                self.notify_new_document.notify_one();
+                Ok(())
+            }
+            _ => Err(DeleteTrainingNoteError::Unknown(anyhow::anyhow!(
+                "Training note not found or unauthorized"
+            ))),
+        }
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_training_period_notes(
+        &self,
+        user: &UserId,
+        period_id: &TrainingPeriodId,
+    ) -> Result<Vec<TrainingNote>, GetTrainingNoteError> {
+        // Get the training period to verify it exists and belongs to the user
+        let Some(period) = self
+            .training_repository
+            .get_training_period(user, period_id)
+            .await
+        else {
+            return Err(GetTrainingNoteError::Unknown(anyhow::anyhow!(
+                "Training period not found"
+            )));
+        };
+
+        // Get the date range from the period (use range_default_tomorrow to include today)
+        let date_range = period.range_default_tomorrow();
+
+        // Fetch notes using the existing method
+        self.get_training_notes(user, &Some(date_range)).await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_training_period_metrics_values(
+        &self,
+        user: &UserId,
+        period_id: &TrainingPeriodId,
+    ) -> Result<Vec<(TrainingMetric, TrainingMetricValues)>, GetTrainingMetricValuesError> {
+        // Get the training period to verify it exists and belongs to the user
+        let period = self
+            .training_repository
+            .get_training_period(user, period_id)
+            .await
+            .ok_or(GetTrainingMetricValuesError::TrainingPeriodDoesNotExist(
+                period_id.clone(),
+            ))?;
+
+        let date_range = period.range_default_tomorrow();
+
+        // Get metrics with TrainingMetricScope::TrainingPeriod
+        let scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
+        self.get_training_metrics_values(user, &date_range, &scope)
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_training_metrics_ordering(
+        &self,
+        user: &UserId,
+        scope: &TrainingMetricScope,
+    ) -> Result<TrainingMetricsOrdering, GetTrainingMetricsOrderingError> {
+        // If scope is TrainingPeriod, verify the period exists and belongs to user
+        if let Some(period_id) = scope.period() {
+            let _period = self
+                .training_repository
+                .get_training_period(user, &period_id)
+                .await
+                .ok_or(GetTrainingMetricsOrderingError::TrainingPeriodDoesNotExist(
+                    period_id,
+                ))?;
+        }
+
+        self.training_repository
+            .get_training_metrics_ordering(user, scope)
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn set_training_metrics_ordering(
+        &self,
+        user: &UserId,
+        scope: &TrainingMetricScope,
+        ordering: TrainingMetricsOrdering,
+    ) -> Result<(), SetTrainingMetricsOrderingError> {
+        // If scope is TrainingPeriod, verify the period exists and belongs to user
+        if let Some(period_id) = scope.period() {
+            let _period = self
+                .training_repository
+                .get_training_period(user, &period_id)
+                .await
+                .ok_or(SetTrainingMetricsOrderingError::TrainingPeriodDoesNotExist(
+                    period_id,
+                ))?;
+        }
+
+        self.training_repository
+            .set_training_metrics_ordering(user, scope, ordering)
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn save_hooper_index(&self, req: SaveHooperIndexRequest) -> Result<(), HooperIndexError> {
+        let existing = self
+            .training_repository
+            .get_hooper_index(req.user(), *req.date())
+            .await?
+            .unwrap_or_default();
+
+        let new = existing.patch(*req.patch());
+
+        self.training_repository
+            .save_hooper_index(req.user(), *req.date(), &new)
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_hooper_index(
+        &self,
+        user: &UserId,
+        date: &NaiveDate,
+    ) -> Result<Option<HooperIndex>, HooperIndexError> {
+        self.training_repository.get_hooper_index(user, *date).await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn delete_hooper_index(
+        &self,
+        req: DeleteHooperIndexRequest,
+    ) -> Result<(), HooperIndexError> {
+        self.training_repository
+            .delete_hooper_index(req.user(), *req.date())
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn save_weight_and_nutrition(
+        &self,
+        req: SaveWeightAndNutritionRequest,
+    ) -> Result<(), WeightAndNutritionError> {
+        let existing = self
+            .training_repository
+            .get_weight_and_nutrition(req.user(), *req.date())
+            .await?
+            .unwrap_or_default();
+
+        let new = existing.patch(*req.patch());
+
+        self.training_repository
+            .save_weight_and_nutrition(req.user(), *req.date(), &new)
+            .await
+    }
+
+    async fn save_bulk_weight_and_nutrition(
+        &self,
+        req: SaveBulkWeightAndNutritionRequest,
+    ) -> Result<(), WeightAndNutritionError> {
+        let user = req.user().clone();
+        let existing_values: HashMap<chrono::NaiveDate, WeightAndNutrition> = HashMap::from_iter(
+            self.training_repository
+                .get_weight_and_nutritions(req.user(), req.range())
+                .await?,
+        );
+
+        let values = req
+            .into_values()
+            .map(|(date, patch)| {
+                let existing_value = existing_values.get(&date).cloned().unwrap_or_default();
+                (date, existing_value.patch(patch))
+            })
+            .collect();
+
+        self.training_repository
+            .save_bulk_weight_and_nutrition(&user, values)
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_weight_and_nutrition(
+        &self,
+        user: &UserId,
+        date: &NaiveDate,
+    ) -> Result<Option<WeightAndNutrition>, WeightAndNutritionError> {
+        self.training_repository
+            .get_weight_and_nutrition(user, *date)
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn delete_weight_and_nutrition(
+        &self,
+        req: DeleteWeightAndNutritionRequest,
+    ) -> Result<(), WeightAndNutritionError> {
+        self.training_repository
+            .delete_weight_and_nutrition(req.user(), *req.date())
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_activity_with_training_context(
+        &self,
+        user: &UserId,
+        activity: &ActivityId,
+        metrics: &[ActivityMetric],
+        period: Option<TrainingPeriodId>,
+    ) -> Result<ActivityWithTrainingContext, ActivityWithTrainingContextError> {
+        let (activity, metrics) = self
+            .activity_service
+            .get_activity_with_parsed_data_and_metrics(user, activity, metrics)
+            .await?;
+
+        let weight = self
+            .training_repository
+            .get_last_weight(user, activity.start_time().naive_date())
+            .await?;
+
+        let best_duration_curves = self
+            .get_activity_best_duration_curves(user, activity.start_time(), period)
+            .await?;
+
+        let hooper_index = self
+            .get_hooper_index(user, &activity.start_time().naive_date())
+            .await
+            .map_err(|err| ActivityWithTrainingContextError::Unknown(anyhow!(err)))?
+            .unwrap_or_default();
+
+        Ok(ActivityWithTrainingContext::new(
+            activity,
+            TrainingContext::new(weight, best_duration_curves, hooper_index),
+            metrics,
+        ))
+    }
+}
+
+impl From<GetActivityError> for ActivityWithTrainingContextError {
+    fn from(value: GetActivityError) -> Self {
+        match value {
+            GetActivityError::ActivityDoesNotExist(id) => Self::ActivityDoesNotExist(id),
+            GetActivityError::Unknown(err) => Self::Unknown(err),
+        }
+    }
+}
+
+impl<TMR, AS, C> IDocumentsForSearch for TrainingService<TMR, AS, C>
+where
+    TMR: TrainingRepository,
+    AS: IActivityService,
+    C: IClock,
+{
+    #[tracing::instrument(skip_all, err)]
+    async fn snapshot_documents(
+        &self,
+        batch_size: i64,
+        page: i64,
+    ) -> Result<(Vec<SearchDocument>, RemainingDocuments), anyhow::Error> {
+        self.training_repository
+            .list_training_note_documents(batch_size, page)
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_pending_documents_to_process(
+        &self,
+    ) -> Result<Vec<crate::models::search::SearchDocument>, anyhow::Error> {
+        self.training_repository
+            .get_outbox_documents_to_process()
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn mark_document_as_processed(
+        &self,
+        document: &crate::models::search::SearchDocument,
+        processed_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), anyhow::Error> {
+        self.training_repository
+            .mark_outbox_document_as_processed(document, processed_at)
+            .await
+    }
+
+    fn service_kind(&self) -> SearchDocumentType {
+        SearchDocumentType::TrainingNote
+    }
+}
+
+/// Make sure the input [`DateRange`] is compatible with the scope and window, potentially extending
+/// it to match. Also make sure the range's end is included by extending it of one day.
+fn align_date_range(
+    date_range: &DateRange,
+    scope: &TrainingMetricScope,
+    window: &Option<TrainingMetricWindow>,
+) -> DateRange {
+    match (scope, window) {
+        (TrainingMetricScope::Global, Some(window)) => date_range.align_to(window.granularity()),
+        (TrainingMetricScope::Global, None) => date_range.extend_end(Days::new(1)),
+        // Implicitly assumes that date_range == training_period.range
+        (TrainingMetricScope::TrainingPeriod(_), _) => date_range.extend_end(Days::new(1)),
+    }
+}
+
+///////////////////////////////////////////////////////////////////
+// MOCK IMPLEMENTATIONS FOR TESTING
+///////////////////////////////////////////////////////////////////
+
+#[cfg(any(test, feature = "test-utils"))]
+pub mod test_utils {
+
+    use chrono::NaiveDate;
+    use mockall::mock;
+
+    use crate::{
+        models::{
+            activity::{ActivityDurationCurve, ActivityId},
+            search::SearchDocument,
+            training::{
+                BestDurationCurve, HooperIndex, TrainingMetricName, TrainingNote,
+                TrainingNoteContent, TrainingPeriod, TrainingPeriodWithActivities,
+            },
+        },
+        ports::training::{
+            CopyTrainingMetricError, CopyTrainingMetricRequest, CreateTrainingPeriodError,
+            CreateTrainingPeriodRequest, DeleteHooperIndexRequest, DeleteTrainingNoteError,
+            DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetTrainingMetricError,
+            GetTrainingMetricValuesRequest, GetTrainingMetricsDefinitionsError,
+            GetTrainingNoteError, HooperIndexError, SaveBulkWeightAndNutritionRequest,
+            SaveHooperIndexRequest, SaveTrainingMetricError, SaveTrainingNoteError,
+            SaveTrainingPeriodError, UpdateTrainingMetricError, UpdateTrainingMetricRequest,
+            UpdateTrainingNoteError,
+        },
+    };
+
+    use super::*;
+
+    mock! {
+        pub TrainingService {}
+
+        impl Clone for TrainingService {
+            fn clone(&self) -> Self;
+        }
+
+        impl ITrainingService for TrainingService {
+
+            async fn create_metric(
+                &self,
+                req: CreateTrainingMetricRequest
+            ) -> Result<TrainingMetricId, CreateTrainingMetricError>;
+
+            async fn get_training_metrics_values(
+                &self,
+                user: &UserId,
+                date_range: &DateRange,
+                scope: &TrainingMetricScope,
+            ) -> Result<Vec<(TrainingMetric, TrainingMetricValues)>, GetTrainingMetricValuesError>;
+
+            async fn copy_training_metric(
+                &self,
+                req: CopyTrainingMetricRequest,
+            ) -> Result<(), CopyTrainingMetricError>;
+
+            async fn delete_metric(
+                &self,
+                req: DeleteTrainingMetricRequest,
+            ) -> Result<(), DeleteTrainingMetricError>;
+
+            async fn update_training_metric(
+                &self,
+                req: UpdateTrainingMetricRequest,
+            ) -> Result<(), UpdateTrainingMetricError>;
+
+            async fn update_training_metric_name(
+                &self,
+                req: UpdateTrainingMetricNameRequest,
+            ) -> Result<(), UpdateTrainingMetricNameError>;
+
+            async fn create_training_period(
+                &self,
+                req: CreateTrainingPeriodRequest,
+            ) -> Result<TrainingPeriodId, CreateTrainingPeriodError>;
+
+            async fn get_training_periods(
+                &self,
+                user: &UserId,
+            ) -> Vec<TrainingPeriod>;
+
+            async fn get_active_training_periods(
+                &self,
+                user: &UserId,
+                ref_date: &NaiveDate,
+            ) -> Vec<TrainingPeriod>;
+
+            async fn get_training_period(
+                &self,
+                user: &UserId,
+                period: &TrainingPeriodId,
+            ) -> Option<TrainingPeriod>;
+
+            async fn get_training_period_with_activities_with_metrics(
+                &self,
+                user: &UserId,
+                period: &TrainingPeriodId,
+                metrics: &[ActivityMetric]
+            ) -> Option<TrainingPeriodWithActivities>;
+
+            async fn delete_training_period(
+                &self,
+                req: DeleteTrainingPeriodRequest,
+            ) -> Result<(), DeleteTrainingPeriodError>;
+
+            async fn update_training_period_name(
+                &self,
+                req: UpdateTrainingPeriodNameRequest,
+            ) -> Result<(), UpdateTrainingPeriodNameError>;
+
+            async fn update_training_period_note(
+                &self,
+                req: UpdateTrainingPeriodNoteRequest,
+            ) -> Result<(), UpdateTrainingPeriodNoteError>;
+
+            async fn update_training_period_dates(
+                &self,
+                req: UpdateTrainingPeriodDatesRequest,
+            ) -> Result<(), UpdateTrainingPeriodDatesError>;
+
+            async fn create_training_note(
+                &self,
+                req: CreateTrainingNoteRequest,
+            ) -> Result<TrainingNoteId, CreateTrainingNoteError>;
+
+            async fn get_training_note(
+                &self,
+                user: &UserId,
+                note_id: &TrainingNoteId,
+            ) -> Result<Option<TrainingNote>, GetTrainingNoteError>;
+
+            async fn get_training_notes(
+                &self,
+                user: &UserId,
+                date_range: &Option<DateRange>,
+            ) -> Result<Vec<TrainingNote>, GetTrainingNoteError>;
+
+            async fn update_training_note(
+                &self,
+                user: &UserId,
+                note_id: &TrainingNoteId,
+                title: Option<TrainingNoteTitle>,
+                content: TrainingNoteContent,
+                date: TrainingNoteDate,
+            ) -> Result<(), UpdateTrainingNoteError>;
+
+            async fn delete_training_note(
+                &self,
+                user: &UserId,
+                note_id: &TrainingNoteId,
+            ) -> Result<(), DeleteTrainingNoteError>;
+
+            async fn get_training_period_notes(
+                &self,
+                user: &UserId,
+                period_id: &TrainingPeriodId,
+            ) -> Result<Vec<TrainingNote>, GetTrainingNoteError>;
+
+            async fn get_training_period_metrics_values(
+                &self,
+                user: &UserId,
+                period_id: &TrainingPeriodId,
+            ) -> Result<Vec<(TrainingMetric, TrainingMetricValues)>, GetTrainingMetricValuesError>;
+
+            async fn get_training_metrics_ordering(
+                &self,
+                user: &UserId,
+                scope: &TrainingMetricScope,
+            ) -> Result<TrainingMetricsOrdering, GetTrainingMetricsOrderingError>;
+
+            async fn set_training_metrics_ordering(
+                &self,
+                user: &UserId,
+                scope: &TrainingMetricScope,
+                ordering: TrainingMetricsOrdering,
+            ) -> Result<(), SetTrainingMetricsOrderingError>;
+
+            async fn get_training_metric_values(
+                &self,
+                req: GetTrainingMetricValuesRequest,
+                date_range: &DateRange,
+            ) -> Result<TrainingMetricValues, GetTrainingMetricValuesError>;
+
+            async fn save_hooper_index(
+                &self,
+                req: SaveHooperIndexRequest,
+            ) -> Result<(), HooperIndexError>;
+
+            async fn get_hooper_index(
+                &self,
+                user: &UserId,
+                date: &NaiveDate,
+            ) -> Result<Option<HooperIndex>, HooperIndexError>;
+
+            async fn delete_hooper_index(
+                &self,
+                req: DeleteHooperIndexRequest,
+            ) -> Result<(), HooperIndexError>;
+
+            async fn save_weight_and_nutrition(
+                &self,
+                req: SaveWeightAndNutritionRequest,
+            ) -> Result<(), WeightAndNutritionError>;
+
+            async fn save_bulk_weight_and_nutrition(
+                &self,
+                req: SaveBulkWeightAndNutritionRequest
+            ) -> Result<(), WeightAndNutritionError>;
+
+            async fn get_weight_and_nutrition(
+                &self,
+                user: &UserId,
+                date: &NaiveDate,
+            ) -> Result<Option<WeightAndNutrition>, WeightAndNutritionError>;
+
+            async fn delete_weight_and_nutrition(
+                &self,
+                req: DeleteWeightAndNutritionRequest,
+            ) -> Result<(), WeightAndNutritionError>;
+
+            async fn get_activity_with_training_context(
+                &self,
+                user: &UserId,
+                activity: &ActivityId,
+                metrics: &[ActivityMetric],
+                period: Option<TrainingPeriodId>,
+             ) -> Result<ActivityWithTrainingContext, ActivityWithTrainingContextError>;
+        }
+    }
+
+    impl MockTrainingService {
+        pub fn test_default() -> Self {
+            let mut mock = Self::new();
+
+            mock.expect_create_metric()
+                .returning(|_| Ok(TrainingMetricId::default()));
+            mock.expect_get_training_metrics_values()
+                .returning(|_, _, _| Ok(vec![]));
+            mock.expect_delete_metric().returning(|_| Ok(()));
+
+            mock
+        }
+    }
+
+    mock! {
+        pub TrainingRepository {}
+
+        impl Clone for TrainingRepository {
+            fn clone(&self) -> Self;
+        }
+
+        impl TrainingRepository for TrainingRepository {
+            async fn save_metric(
+                &self,
+                metric: TrainingMetric,
+            ) -> Result<(), SaveTrainingMetricError>;
+
+            async fn get_global_metrics(
+                &self,
+                user: &UserId,
+            ) -> Result<Vec<TrainingMetric>, GetTrainingMetricsDefinitionsError>;
+
+            async fn get_period_metrics(
+                &self,
+                user: &UserId,
+                period: &TrainingPeriodId,
+            ) -> Result<Vec<TrainingMetric>, GetTrainingMetricsDefinitionsError>;
+
+            async fn get_metric(
+                &self,
+                user: &UserId,
+                metric: &TrainingMetricId,
+            ) -> Result<Option<TrainingMetric>, GetTrainingMetricError>;
+
+            async fn delete_metric(
+                &self,
+                user: &UserId,
+                metric: &TrainingMetricId,
+            ) -> Result<(), DeleteTrainingMetricError>;
+
+            async fn update_metric_name(
+                &self,
+                user: &UserId,
+                metric_id: &TrainingMetricId,
+                name: TrainingMetricName,
+            ) -> Result<(), UpdateTrainingMetricNameError>;
+
+            async fn save_training_period(
+                &self,
+                period: TrainingPeriod,
+            ) -> Result<(), SaveTrainingPeriodError>;
+
+            async fn get_training_periods(
+                &self,
+                user: &UserId,
+            ) -> Vec<TrainingPeriod>;
+
+            async fn get_active_training_periods(
+                &self,
+                user: &UserId,
+                ref_date: &NaiveDate,
+            ) -> Vec<TrainingPeriod>;
+
+            async fn get_training_period(
+                &self,
+                user: &UserId,
+                period: &TrainingPeriodId,
+            ) -> Option<TrainingPeriod>;
+
+            async fn delete_training_period(
+                &self,
+                user: &UserId,
+                period_id: &TrainingPeriodId,
+            ) -> Result<(), DeleteTrainingPeriodError>;
+
+            async fn update_training_period_name(
+                &self,
+                user: &UserId,
+                period_id: &TrainingPeriodId,
+                name: String,
+            ) -> Result<(), UpdateTrainingPeriodNameError>;
+
+            async fn update_training_period_note(
+                &self,
+                user: &UserId,
+                period_id: &TrainingPeriodId,
+                note: Option<String>,
+            ) -> Result<(), UpdateTrainingPeriodNoteError>;
+
+            async fn update_training_period_dates(
+                &self,
+                user: &UserId,
+                period_id: &TrainingPeriodId,
+                start: NaiveDate,
+                end: Option<NaiveDate>,
+            ) -> Result<(), UpdateTrainingPeriodDatesError>;
+
+            async fn save_training_note(
+                &self,
+                note: TrainingNote,
+            ) -> Result<(), SaveTrainingNoteError>;
+
+            async fn get_training_note(
+                &self,
+                user: &UserId,
+                note_id: &TrainingNoteId,
+            ) -> Result<Option<TrainingNote>, GetTrainingNoteError>;
+
+            async fn list_training_note_documents(
+                &self,
+                batch_size: i64,
+                page: i64,
+            ) -> Result<(Vec<SearchDocument>, RemainingDocuments), anyhow::Error>;
+
+            async fn get_training_notes(
+                &self,
+                user: &UserId,
+                date_range: &Option<DateRange>,
+            ) -> Result<Vec<TrainingNote>, GetTrainingNoteError>;
+
+            async fn delete_training_note(
+                &self,
+                user: &UserId,
+                note_id: &TrainingNoteId,
+            ) -> Result<(), DeleteTrainingNoteError>;
+
+            async fn get_training_metrics_ordering(
+                &self,
+                user: &UserId,
+                scope: &TrainingMetricScope,
+            ) -> Result<TrainingMetricsOrdering, GetTrainingMetricsOrderingError>;
+
+            async fn set_training_metrics_ordering(
+                &self,
+                user: &UserId,
+                scope: &TrainingMetricScope,
+                ordering: TrainingMetricsOrdering,
+            ) -> Result<(), SetTrainingMetricsOrderingError>;
+
+            async fn get_outbox_documents_to_process(
+                &self,
+            ) -> Result<Vec<SearchDocument>, anyhow::Error>;
+
+            async fn mark_outbox_document_as_processed(
+                &self,
+                document: &SearchDocument,
+                processed_at: chrono::DateTime<chrono::Utc>,
+            ) -> Result<(), anyhow::Error>;
+
+            async fn save_hooper_index(
+                &self,
+                user: &UserId,
+                date: chrono::NaiveDate,
+                value: &HooperIndex,
+            ) -> Result<(), HooperIndexError>;
+
+            async fn get_hooper_index(
+                &self,
+                user: &UserId,
+                date: chrono::NaiveDate,
+            ) -> Result<Option<HooperIndex>, HooperIndexError>;
+
+            async fn get_hooper_indexes(
+                &self,
+                user: &UserId,
+                range: &DateRange,
+            ) -> Result<Vec<(chrono::NaiveDate, HooperIndex)>, HooperIndexError>;
+
+            async fn delete_hooper_index(
+                &self,
+                user: &UserId,
+                date: chrono::NaiveDate,
+            ) -> Result<(), HooperIndexError>;
+
+            async fn save_weight_and_nutrition(
+                &self,
+                user: &UserId,
+                date: chrono::NaiveDate,
+                value: &WeightAndNutrition,
+            ) -> Result<(), WeightAndNutritionError>;
+
+            async fn save_bulk_weight_and_nutrition(
+                &self,
+                user: &UserId,
+                values: Vec<(chrono::NaiveDate, WeightAndNutrition)>
+            ) -> Result<(), WeightAndNutritionError>;
+
+            async fn get_weight_and_nutrition(
+                &self,
+                user: &UserId,
+                date: chrono::NaiveDate,
+            ) -> Result<Option<WeightAndNutrition>, WeightAndNutritionError>;
+
+            async fn get_weight_and_nutritions(
+                &self,
+                user: &UserId,
+                range: &DateRange,
+            ) -> Result<Vec<(chrono::NaiveDate, WeightAndNutrition)>, WeightAndNutritionError>;
+
+            async fn delete_weight_and_nutrition(
+                &self,
+                user: &UserId,
+                date: chrono::NaiveDate,
+            ) -> Result<(), WeightAndNutritionError>;
+
+            async fn get_last_weight(
+                &self,
+                user: &UserId,
+                date: chrono::NaiveDate,
+            ) -> Result<Option<f32>, anyhow::Error>;
+
+            async fn get_best_duration_curves(
+                &self,
+                user: &UserId,
+                since: chrono::NaiveDate,
+                before: chrono::NaiveDate,
+            ) -> Result<Vec<BestDurationCurve>, anyhow::Error>;
+
+            async fn save_duration_curve(
+                &self,
+                user: &UserId,
+                activity: &ActivityId,
+                curve: &ActivityDurationCurve,
+                activity_date: &chrono::DateTime<chrono::Utc>,
+            ) -> Result<(), anyhow::Error>;
+
+            async fn delete_duration_curve(
+                &self,
+                user: &UserId,
+                activity: &ActivityId,
+            ) -> Result<(), anyhow::Error>;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests_training_metrics_service {
+
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    use anyhow::anyhow;
+
+    use super::*;
+    use crate::clock::FakeClock;
+    use crate::models::activity::{
+        Activity, ActivityDuration, ActivityId, ActivityMetric, ActivityMetrics, ActivityStartTime,
+        Sport, Unit,
+    };
+
+    use crate::models::training::{
+        SportFilter, TrainingMetricBin, TrainingMetricSummary, TrainingMetricTarget,
+        TrainingMetricWindow, TrainingPeriod, TrainingPeriodSports,
+    };
+    use crate::ports::DateRange;
+    use crate::services::activity::test_utils::MockActivityService;
+    use crate::{
+        models::training::{
+            TrainingMetricActivityFilters, TrainingMetricActivityGroupBy, TrainingMetricAggregate,
+            TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricId,
+            TrainingMetricName,
+        },
+        ports::training::{GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
+        services::training::test_utils::MockTrainingRepository,
+    };
+    use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+
+    #[tokio::test]
+    async fn test_create_metric_ok() {
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_save_metric().returning(|_| Ok(()));
+        let activities = MockActivityService::new();
+
+        let service = TrainingService::new(
+            repository,
+            activities,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = CreateTrainingMetricRequest::new(
+            UserId::test_default(),
+            TrainingMetricName::from("Test Metric"),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Calories,
+                TrainingMetricActivityGroupBy::none(),
+                TrainingMetricActivityFilters::empty(),
+            )),
+            Some(TrainingMetricWindow::new(
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Average,
+            )),
+            TrainingMetricSummary::empty(),
+            TrainingMetricScope::Global,
+            None,
+        );
+
+        let _ = service
+            .create_metric(req)
+            .await
+            .expect("Should have return ok");
+    }
+
+    #[tokio::test]
+    async fn test_create_metric_with_target() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_metric()
+            .withf(|metric| {
+                metric.definition().target()
+                    == &Some(TrainingMetricTarget::new(100.0, Unit::Kilometer))
+            })
+            .returning(|_| Ok(()));
+        let activities = MockActivityService::new();
+
+        let service = TrainingService::new(
+            repository,
+            activities,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = CreateTrainingMetricRequest::new(
+            UserId::test_default(),
+            TrainingMetricName::from("Test Metric"),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Calories,
+                TrainingMetricActivityGroupBy::none(),
+                TrainingMetricActivityFilters::empty(),
+            )),
+            Some(TrainingMetricWindow::new(
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Average,
+            )),
+            TrainingMetricSummary::empty(),
+            TrainingMetricScope::Global,
+            Some(TrainingMetricTarget::new(100.0, Unit::Kilometer)),
+        );
+
+        let _ = service
+            .create_metric(req)
+            .await
+            .expect("Should have return ok");
+    }
+
+    #[tokio::test]
+    async fn test_create_metric_add_period_sports_to_metric_filters() {
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_get_training_period().returning(|_, _| {
+            Some(
+                TrainingPeriod::new(
+                    TrainingPeriodId::new(),
+                    UserId::test_default(),
+                    "2025-10-17".parse::<NaiveDate>().unwrap(),
+                    Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+                    "Test Period".to_string(),
+                    TrainingPeriodSports::new(Some(vec![
+                        SportFilter::Sport(Sport::Running),
+                        SportFilter::Sport(Sport::AlpineSki),
+                    ])),
+                    None,
+                )
+                .unwrap(),
+            )
+        });
+        repository
+            .expect_save_metric()
+            .withf(|metric| {
+                let TrainingMetricSource::Activity(source) = metric.definition().source() else {
+                    return false;
+                };
+                source.filters().sports() == &Some(vec![SportFilter::Sport(Sport::AlpineSki)])
+            })
+            .returning(|_| Ok(()));
+        let activities = MockActivityService::new();
+
+        let service = TrainingService::new(
+            repository,
+            activities,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = CreateTrainingMetricRequest::new(
+            UserId::test_default(),
+            TrainingMetricName::from("Test Metric"),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Calories,
+                TrainingMetricActivityGroupBy::none(),
+                TrainingMetricActivityFilters::empty()
+                    .merge_default_sports(&Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
+            )),
+            Some(TrainingMetricWindow::new(
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Average,
+            )),
+            TrainingMetricSummary::empty(),
+            TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
+            None,
+        );
+
+        let _ = service
+            .create_metric(req)
+            .await
+            .expect("Should have return ok");
+    }
+
+    #[tokio::test]
+    async fn test_create_metric_fails_if_training_period_does_not_exist() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_training_period()
+            .returning(|_, _| None);
+        repository.expect_save_metric().times(0);
+        let activities = MockActivityService::new();
+
+        let service = TrainingService::new(
+            repository,
+            activities,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = CreateTrainingMetricRequest::new(
+            UserId::test_default(),
+            TrainingMetricName::from("Test Metric"),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Calories,
+                TrainingMetricActivityGroupBy::none(),
+                TrainingMetricActivityFilters::empty()
+                    .merge_default_sports(&Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
+            )),
+            Some(TrainingMetricWindow::new(
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Average,
+            )),
+            TrainingMetricSummary::empty(),
+            TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
+            None,
+        );
+
+        let Err(CreateTrainingMetricError::TrainingPeriodDoesNotExist(period)) =
+            service.create_metric(req).await
+        else {
+            unreachable!("Should have err")
+        };
+        assert_eq!(period, TrainingPeriodId::from("period-id"))
+    }
+
+    #[tokio::test]
+    async fn test_create_metric_fails_to_save_definition() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_metric()
+            .returning(|_| Err(SaveTrainingMetricError::Unknown(anyhow!("error"))));
+        let activities = MockActivityService::new();
+        let service = TrainingService::new(
+            repository,
+            activities,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = CreateTrainingMetricRequest::new(
+            UserId::test_default(),
+            TrainingMetricName::from("Test Metric"),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Calories,
+                TrainingMetricActivityGroupBy::none(),
+                TrainingMetricActivityFilters::empty(),
+            )),
+            Some(TrainingMetricWindow::new(
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Average,
+            )),
+            TrainingMetricSummary::empty(),
+            TrainingMetricScope::Global,
+            None,
+        );
+
+        let _ = service
+            .create_metric(req)
+            .await
+            .expect_err("Should have return an err");
+    }
+
+    #[tokio::test]
+    async fn test_training_metrics_service_get_metrics_when_get_definitions_err() {
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_get_global_metrics().returning(|_| {
+            Err(GetTrainingMetricsDefinitionsError::Unknown(anyhow!(
+                "an error"
+            )))
+        });
+
+        let activity_service = MockActivityService::new();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let err = service
+            .get_training_metrics_values(
+                &UserId::test_default(),
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
+                &TrainingMetricScope::Global,
+            )
+            .await
+            .unwrap_err();
+
+        let GetTrainingMetricValuesError::Unknown(_err) = err else {
+            unreachable!("Should have err")
+        };
+    }
+
+    #[tokio::test]
+    async fn test_training_metrics_service_get_metrics_def_without_values() {
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_get_global_metrics().returning(|_| {
+            Ok(vec![TrainingMetric::new(
+                TrainingMetricId::from("test"),
+                None,
+                TrainingMetricScope::Global,
+                TrainingMetricDefinition::new(
+                    UserId::test_default(),
+                    TrainingMetricSource::Activity(ActivitySource::new(
+                        ActivityMetric::Calories,
+                        TrainingMetricActivityGroupBy::none(),
+                        TrainingMetricActivityFilters::empty(),
+                    )),
+                    Some(TrainingMetricWindow::new(
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Average,
+                    )),
+                    TrainingMetricSummary::empty(),
+                    None,
+                ),
+            )])
+        });
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
+
+        let mut activity_service = MockActivityService::default();
+        // When no date range is specified, it should query the user's history
+        activity_service
+            .expect_list_activities_with_metrics()
+            .returning(|_, _, _| Ok(vec![]));
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let res = service
+            .get_training_metrics_values(
+                &UserId::test_default(),
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
+                &TrainingMetricScope::Global,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.len(), 1);
+        let (def, value) = res.first().unwrap();
+        assert_eq!(
+            def,
+            &TrainingMetric::new(
+                TrainingMetricId::from("test"),
+                None,
+                TrainingMetricScope::Global,
+                TrainingMetricDefinition::new(
+                    UserId::test_default(),
+                    TrainingMetricSource::Activity(ActivitySource::new(
+                        ActivityMetric::Calories,
+                        TrainingMetricActivityGroupBy::none(),
+                        TrainingMetricActivityFilters::empty(),
+                    )),
+                    Some(TrainingMetricWindow::new(
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Average,
+                    )),
+                    TrainingMetricSummary::empty(),
+                    None,
+                ),
+            )
+        );
+        assert!(value.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_training_metrics_service_get_metrics_map_def_with_its_values() {
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_get_global_metrics().returning(|_| {
+            Ok(vec![TrainingMetric::new(
+                TrainingMetricId::from("test"),
+                None,
+                TrainingMetricScope::Global,
+                TrainingMetricDefinition::new(
+                    UserId::test_default(),
+                    TrainingMetricSource::Activity(ActivitySource::new(
+                        ActivityMetric::Calories,
+                        TrainingMetricActivityGroupBy::none(),
+                        TrainingMetricActivityFilters::empty(),
+                    )),
+                    Some(TrainingMetricWindow::new(
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Sum,
+                    )),
+                    TrainingMetricSummary::empty(),
+                    None,
+                ),
+            )])
+        });
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
+
+        let mut activity_service = MockActivityService::default();
+
+        activity_service
+            .expect_list_activities_with_metrics()
+            .returning(|_, _, _| {
+                // Empty as no activity has this metric
+                Ok(vec![])
+            });
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let res = service
+            .get_training_metrics_values(
+                &UserId::test_default(),
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
+                &TrainingMetricScope::Global,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.len(), 1);
+        let (def, value) = res.first().unwrap();
+        assert_eq!(
+            def,
+            &TrainingMetric::new(
+                TrainingMetricId::from("test"),
+                None,
+                TrainingMetricScope::Global,
+                TrainingMetricDefinition::new(
+                    UserId::test_default(),
+                    TrainingMetricSource::Activity(ActivitySource::new(
+                        ActivityMetric::Calories,
+                        TrainingMetricActivityGroupBy::none(),
+                        TrainingMetricActivityFilters::empty(),
+                    )),
+                    Some(TrainingMetricWindow::new(
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Sum,
+                    )),
+                    TrainingMetricSummary::empty(),
+                    None,
+                ),
+            )
+        );
+        // With default stats (no calories), should have empty values
+        assert!(value.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_training_service_get_metrics_with_date_range() {
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_get_global_metrics().returning(|_| {
+            Ok(vec![TrainingMetric::new(
+                TrainingMetricId::from("test"),
+                None,
+                TrainingMetricScope::Global,
+                TrainingMetricDefinition::new(
+                    UserId::test_default(),
+                    TrainingMetricSource::Activity(ActivitySource::new(
+                        ActivityMetric::Calories,
+                        TrainingMetricActivityGroupBy::none(),
+                        TrainingMetricActivityFilters::empty(),
+                    )),
+                    Some(TrainingMetricWindow::new(
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Average,
+                    )),
+                    TrainingMetricSummary::empty(),
+                    None,
+                ),
+            )])
+        });
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
+
+        let mut activity_service = MockActivityService::default();
+        // Should list activities in the date range
+        activity_service
+            .expect_list_activities_with_metrics()
+            .withf(|_, filters, _| {
+                // The date range should be aligned to full days (Sep 24-26)
+                filters.date_range().is_some()
+                    && filters.date_range().as_ref().unwrap().start()
+                        == &NaiveDate::from_ymd_opt(2025, 9, 24).unwrap()
+                    && filters.date_range().as_ref().unwrap().end()
+                        == &NaiveDate::from_ymd_opt(2025, 9, 26).unwrap()
+            })
+            .returning(|_, _, _| Ok(vec![]));
+
+        let activity_service = activity_service;
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let date_range = DateRange::new(
+            NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+            NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+        );
+
+        let res = service
+            .get_training_metrics_values(
+                &UserId::test_default(),
+                &date_range,
+                &TrainingMetricScope::Global,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_training_service_get_metrics_aligns_date_range_to_granularity() {
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_get_global_metrics().returning(|_| {
+            Ok(vec![TrainingMetric::new(
+                TrainingMetricId::from("test"),
+                None,
+                TrainingMetricScope::Global,
+                TrainingMetricDefinition::new(
+                    UserId::test_default(),
+                    TrainingMetricSource::Activity(ActivitySource::new(
+                        ActivityMetric::Distance,
+                        TrainingMetricActivityGroupBy::none(),
+                        TrainingMetricActivityFilters::empty(),
+                    )),
+                    Some(TrainingMetricWindow::new(
+                        TrainingMetricGranularity::Weekly,
+                        TrainingMetricAggregate::Sum,
+                    )),
+                    TrainingMetricSummary::empty(),
+                    None,
+                ),
+            )])
+        });
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
+
+        let mut activity_service = MockActivityService::default();
+        // The date range will be aligned to week boundaries (Monday)
+        // Input: Wed Sep 24 to Thu Sep 25, 2025
+        // Should be aligned to: Mon Sep 22 to Mon Sep 29, 2025
+        activity_service
+            .expect_list_activities_with_metrics()
+            .withf(|_, filters, _| {
+                let Some(range) = filters.date_range() else {
+                    return false;
+                };
+                // Verify that the range starts on Monday (Sep 22) and ends on following Monday (Sep 29)
+                *range.start() == NaiveDate::from_ymd_opt(2025, 9, 22).unwrap()
+                    && *range.end() == NaiveDate::from_ymd_opt(2025, 9, 29).unwrap()
+            })
+            .returning(|_, _, _| {
+                Ok(vec![(
+                    Activity::new_empty(
+                        ActivityId::from("test"),
+                        UserId::test_default(),
+                        ActivityStartTime::new(
+                            NaiveDateTime::new(
+                                NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                                NaiveTime::from_hms_opt(10, 0, 0).unwrap(),
+                            )
+                            .and_utc()
+                            .fixed_offset(),
+                        ),
+                        ActivityDuration::default(),
+                        Sport::Running,
+                    ),
+                    ActivityMetrics::new(HashMap::from([(ActivityMetric::Distance, Some(0.))])),
+                )])
+            });
+
+        let activity_service = activity_service;
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        // Input date range: Wednesday to Thursday (mid-week)
+        let date_range = DateRange::new(
+            NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(), // Wednesday
+            NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(), // Thursday
+        );
+
+        let res = service
+            .get_training_metrics_values(
+                &UserId::test_default(),
+                &date_range,
+                &TrainingMetricScope::Global,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metrics_values_with_global_scope() {
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_get_global_metrics().returning(|_| {
+            Ok(vec![TrainingMetric::new(
+                TrainingMetricId::from("global-metric"),
+                Some(TrainingMetricName::from("Global Metric")),
+                TrainingMetricScope::Global,
+                TrainingMetricDefinition::new(
+                    UserId::test_default(),
+                    TrainingMetricSource::Activity(ActivitySource::new(
+                        ActivityMetric::Distance,
+                        TrainingMetricActivityGroupBy::none(),
+                        TrainingMetricActivityFilters::empty(),
+                    )),
+                    Some(TrainingMetricWindow::new(
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Sum,
+                    )),
+                    TrainingMetricSummary::empty(),
+                    None,
+                ),
+            )])
+        });
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
+
+        let mut activity_service = MockActivityService::default();
+        activity_service
+            .expect_list_activities_with_metrics()
+            .returning(|_, _, _| Ok(vec![]));
+        let activity_service = activity_service;
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let res = service
+            .get_training_metrics_values(
+                &UserId::test_default(),
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
+                &TrainingMetricScope::Global,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].0.id(), &TrainingMetricId::from("global-metric"));
+        assert_eq!(
+            res[0].0.name(),
+            &Some(TrainingMetricName::from("Global Metric"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metrics_values_with_training_period_scope() {
+        let mut repository = MockTrainingRepository::new();
+
+        repository.expect_get_training_period().returning(|_, _| {
+            Some(
+                TrainingPeriod::new(
+                    TrainingPeriodId::from("test-period"),
+                    UserId::test_default(),
+                    "2025-10-17".parse::<NaiveDate>().unwrap(),
+                    Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+                    "Test Period".to_string(),
+                    TrainingPeriodSports::new(Some(vec![SportFilter::Sport(Sport::Running)])),
+                    None,
+                )
+                .unwrap(),
+            )
+        });
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
+
+        repository
+            .expect_get_period_metrics()
+            .withf(move |_, period| period == &TrainingPeriodId::from("test-period"))
+            .returning(|_, _| {
+                Ok(vec![TrainingMetric::new(
+                    TrainingMetricId::from("period-metric"),
+                    Some(TrainingMetricName::from("Period Metric")),
+                    TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("test-period")),
+                    TrainingMetricDefinition::new(
+                        UserId::test_default(),
+                        TrainingMetricSource::Activity(ActivitySource::new(
+                            ActivityMetric::Duration,
+                            TrainingMetricActivityGroupBy::none(),
+                            TrainingMetricActivityFilters::empty(),
+                        )),
+                        Some(TrainingMetricWindow::new(
+                            TrainingMetricGranularity::Weekly,
+                            TrainingMetricAggregate::Average,
+                        )),
+                        TrainingMetricSummary::empty(),
+                        None,
+                    ),
+                )])
+            });
+
+        let mut activity_service = MockActivityService::default();
+        activity_service
+            .expect_list_activities_with_metrics()
+            .returning(|_, _, _| Ok(vec![]));
+        let activity_service = activity_service;
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let res = service
+            .get_training_metrics_values(
+                &UserId::test_default(),
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
+                &TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("test-period")),
+            )
+            .await
+            .unwrap();
+
+        // Should have both global and period metrics merged
+        assert_eq!(res.len(), 1);
+
+        let period_metric = res
+            .iter()
+            .find(|(m, _)| m.id() == &TrainingMetricId::from("period-metric"));
+        assert!(period_metric.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metrics_values_with_training_period_handles_period_error() {
+        let period_id = TrainingPeriodId::new();
+        let mut repository = MockTrainingRepository::new();
+
+        repository.expect_get_training_period().returning(|_, _| {
+            Some(
+                TrainingPeriod::new(
+                    TrainingPeriodId::from("metric-1"),
+                    UserId::test_default(),
+                    "2025-10-17".parse::<NaiveDate>().unwrap(),
+                    Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+                    "Test Period".to_string(),
+                    TrainingPeriodSports::new(Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
+                    None,
+                )
+                .unwrap(),
+            )
+        });
+
+        // Period metrics returns error
+        let test_period_id = period_id.clone();
+        repository
+            .expect_get_period_metrics()
+            .withf(move |_, period| period == &test_period_id)
+            .returning(|_, _| {
+                Err(GetTrainingMetricsDefinitionsError::Unknown(anyhow!(
+                    "error"
+                )))
+            });
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let err = service
+            .get_training_metrics_values(
+                &UserId::test_default(),
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
+                &TrainingMetricScope::TrainingPeriod(period_id.clone()),
+            )
+            .await
+            .unwrap_err();
+
+        let GetTrainingMetricValuesError::Unknown(_err) = err else {
+            unreachable!("Should have err")
+        };
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metrics_values_returns_metrics_when_ordering_fails() {
+        let mut repository = MockTrainingRepository::new();
+
+        // Create two metrics
+        let metric_id_1 = TrainingMetricId::from("metric-1");
+        let metric_id_2 = TrainingMetricId::from("metric-2");
+
+        repository.expect_get_global_metrics().returning(move |_| {
+            Ok(vec![
+                TrainingMetric::new(
+                    metric_id_1.clone(),
+                    Some(TrainingMetricName::from("Metric 1")),
+                    TrainingMetricScope::Global,
+                    TrainingMetricDefinition::new(
+                        UserId::test_default(),
+                        TrainingMetricSource::Activity(ActivitySource::new(
+                            ActivityMetric::Distance,
+                            TrainingMetricActivityGroupBy::none(),
+                            TrainingMetricActivityFilters::empty(),
+                        )),
+                        Some(TrainingMetricWindow::new(
+                            TrainingMetricGranularity::Daily,
+                            TrainingMetricAggregate::Sum,
+                        )),
+                        TrainingMetricSummary::empty(),
+                        None,
+                    ),
+                ),
+                TrainingMetric::new(
+                    metric_id_2.clone(),
+                    Some(TrainingMetricName::from("Metric 2")),
+                    TrainingMetricScope::Global,
+                    TrainingMetricDefinition::new(
+                        UserId::test_default(),
+                        TrainingMetricSource::Activity(ActivitySource::new(
+                            ActivityMetric::Distance,
+                            TrainingMetricActivityGroupBy::none(),
+                            TrainingMetricActivityFilters::empty(),
+                        )),
+                        Some(TrainingMetricWindow::new(
+                            TrainingMetricGranularity::Daily,
+                            TrainingMetricAggregate::Sum,
+                        )),
+                        TrainingMetricSummary::empty(),
+                        None,
+                    ),
+                ),
+            ])
+        });
+
+        // Getting ordering returns an error
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(|_, _| {
+                Err(GetTrainingMetricsOrderingError::Unknown(anyhow!(
+                    "ordering error"
+                )))
+            });
+
+        let mut activity_service = MockActivityService::default();
+        activity_service
+            .expect_list_activities_with_metrics()
+            .returning(|_, _, _| Ok(vec![]));
+
+        let activity_service = activity_service;
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let res = service
+            .get_training_metrics_values(
+                &UserId::test_default(),
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
+                &TrainingMetricScope::Global,
+            )
+            .await
+            .unwrap();
+
+        // Metrics should still be returned even when ordering fails
+        assert_eq!(res.len(), 2);
+        // Verify both metrics are present (order doesn't matter since ordering failed)
+        let ids: Vec<_> = res.iter().map(|(m, _)| m.id()).collect();
+        assert!(ids.contains(&&TrainingMetricId::from("metric-1")));
+        assert!(ids.contains(&&TrainingMetricId::from("metric-2")));
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metrics_values_applies_ordering() {
+        let mut repository = MockTrainingRepository::new();
+
+        // Create three metrics
+        let metric_id_1 = TrainingMetricId::from("metric-1");
+        let metric_id_2 = TrainingMetricId::from("metric-2");
+        let metric_id_3 = TrainingMetricId::from("metric-3");
+
+        // Clone for use in ordering closure
+        let ordering_id_1 = metric_id_1.clone();
+        let ordering_id_2 = metric_id_2.clone();
+        let ordering_id_3 = metric_id_3.clone();
+
+        // Return metrics in one order (1, 2, 3)
+        repository.expect_get_global_metrics().returning(move |_| {
+            Ok(vec![
+                TrainingMetric::new(
+                    metric_id_1.clone(),
+                    Some(TrainingMetricName::from("Metric 1")),
+                    TrainingMetricScope::Global,
+                    TrainingMetricDefinition::new(
+                        UserId::test_default(),
+                        TrainingMetricSource::Activity(ActivitySource::new(
+                            ActivityMetric::Distance,
+                            TrainingMetricActivityGroupBy::none(),
+                            TrainingMetricActivityFilters::empty(),
+                        )),
+                        Some(TrainingMetricWindow::new(
+                            TrainingMetricGranularity::Daily,
+                            TrainingMetricAggregate::Sum,
+                        )),
+                        TrainingMetricSummary::empty(),
+                        None,
+                    ),
+                ),
+                TrainingMetric::new(
+                    metric_id_2.clone(),
+                    Some(TrainingMetricName::from("Metric 2")),
+                    TrainingMetricScope::Global,
+                    TrainingMetricDefinition::new(
+                        UserId::test_default(),
+                        TrainingMetricSource::Activity(ActivitySource::new(
+                            ActivityMetric::Distance,
+                            TrainingMetricActivityGroupBy::none(),
+                            TrainingMetricActivityFilters::empty(),
+                        )),
+                        Some(TrainingMetricWindow::new(
+                            TrainingMetricGranularity::Daily,
+                            TrainingMetricAggregate::Sum,
+                        )),
+                        TrainingMetricSummary::empty(),
+                        None,
+                    ),
+                ),
+                TrainingMetric::new(
+                    metric_id_3.clone(),
+                    Some(TrainingMetricName::from("Metric 3")),
+                    TrainingMetricScope::Global,
+                    TrainingMetricDefinition::new(
+                        UserId::test_default(),
+                        TrainingMetricSource::Activity(ActivitySource::new(
+                            ActivityMetric::Distance,
+                            TrainingMetricActivityGroupBy::none(),
+                            TrainingMetricActivityFilters::empty(),
+                        )),
+                        Some(TrainingMetricWindow::new(
+                            TrainingMetricGranularity::Daily,
+                            TrainingMetricAggregate::Sum,
+                        )),
+                        TrainingMetricSummary::empty(),
+                        None,
+                    ),
+                ),
+            ])
+        });
+
+        // Return ordering in different order: 3, 1, 2
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(move |_, _| {
+                Ok(TrainingMetricsOrdering::try_from(vec![
+                    ordering_id_3.clone(),
+                    ordering_id_1.clone(),
+                    ordering_id_2.clone(),
+                ])
+                .unwrap())
+            });
+
+        let mut activity_service = MockActivityService::default();
+        activity_service
+            .expect_list_activities_with_metrics()
+            .returning(|_, _, _| Ok(vec![]));
+
+        let activity_service = activity_service;
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let res = service
+            .get_training_metrics_values(
+                &UserId::test_default(),
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
+                &TrainingMetricScope::Global,
+            )
+            .await
+            .unwrap();
+
+        // Metrics should be returned in the order specified by ordering: 3, 1, 2
+        assert_eq!(res.len(), 3);
+        assert_eq!(res[0].0.id(), &TrainingMetricId::from("metric-3"));
+        assert_eq!(res[1].0.id(), &TrainingMetricId::from("metric-1"));
+        assert_eq!(res[2].0.id(), &TrainingMetricId::from("metric-2"));
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metrics_values_applies_training_period_sports_to_metrics_filters() {
+        let mut repository = MockTrainingRepository::new();
+
+        repository.expect_get_training_period().returning(|_, _| {
+            Some(
+                TrainingPeriod::new(
+                    TrainingPeriodId::from("metric-1"),
+                    UserId::test_default(),
+                    "2025-10-17".parse::<NaiveDate>().unwrap(),
+                    Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+                    "Test Period".to_string(),
+                    TrainingPeriodSports::new(Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
+                    None,
+                )
+                .unwrap(),
+            )
+        });
+
+        repository
+            .expect_get_period_metrics()
+            .returning(move |_, _| {
+                Ok(vec![
+                    TrainingMetric::new(
+                        TrainingMetricId::from("metric-1"),
+                        Some(TrainingMetricName::from("Metric 1")),
+                        TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
+                        TrainingMetricDefinition::new(
+                            UserId::test_default(),
+                            TrainingMetricSource::Activity(ActivitySource::new(
+                                ActivityMetric::Distance,
+                                TrainingMetricActivityGroupBy::none(),
+                                TrainingMetricActivityFilters::empty().merge_default_sports(&Some(
+                                    vec![SportFilter::Sport(Sport::AlpineSki)],
+                                )),
+                            )),
+                            Some(TrainingMetricWindow::new(
+                                TrainingMetricGranularity::Daily,
+                                TrainingMetricAggregate::Sum,
+                            )),
+                            TrainingMetricSummary::empty(),
+                            None,
+                        ),
+                    ),
+                    TrainingMetric::new(
+                        TrainingMetricId::from("metric-2"),
+                        Some(TrainingMetricName::from("Metric 2")),
+                        TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
+                        TrainingMetricDefinition::new(
+                            UserId::test_default(),
+                            TrainingMetricSource::Activity(ActivitySource::new(
+                                ActivityMetric::Distance,
+                                TrainingMetricActivityGroupBy::none(),
+                                TrainingMetricActivityFilters::empty(),
+                            )),
+                            Some(TrainingMetricWindow::new(
+                                TrainingMetricGranularity::Daily,
+                                TrainingMetricAggregate::Sum,
+                            )),
+                            TrainingMetricSummary::empty(),
+                            None,
+                        ),
+                    ),
+                ])
+            });
+
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(move |_, _| {
+                Ok(TrainingMetricsOrdering::try_from(vec![
+                    TrainingMetricId::from("metric-1"),
+                    TrainingMetricId::from("metric-2"),
+                ])
+                .unwrap())
+            });
+
+        let mut activity_service = MockActivityService::default();
+        activity_service
+            .expect_list_activities_with_metrics()
+            .returning(|_, _, _| {
+                Ok(vec![(
+                    Activity::new_empty(
+                        ActivityId::from("test"),
+                        UserId::test_default(),
+                        ActivityStartTime::new(
+                            NaiveDateTime::new(
+                                NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                                NaiveTime::from_hms_opt(10, 0, 0).unwrap(),
+                            )
+                            .and_utc()
+                            .fixed_offset(),
+                        ),
+                        ActivityDuration::default(),
+                        Sport::Running,
+                    ),
+                    ActivityMetrics::new(HashMap::from([(ActivityMetric::Distance, Some(10.))])),
+                )])
+            });
+
+        let activity_service = activity_service;
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let res = service
+            .get_training_metrics_values(
+                &UserId::test_default(),
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
+                &TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            res.get(0)
+                .unwrap()
+                .1
+                .get(&TrainingMetricBin::from_granule("2025-09-24")),
+            None // None as activity should be excluded from the metric computation
+        );
+        assert_eq!(
+            res.get(1)
+                .unwrap()
+                .1
+                .get(&TrainingMetricBin::from_granule("2025-09-24")),
+            None // None as activity should be excluded from the metric computation
+        )
+    }
+
+    #[tokio::test]
+    async fn test_training_service_delete_metric_does_not_exist() {
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_delete_metric().returning(|_, _| {
+            Err(DeleteTrainingMetricError::MetricDoesNotExist(
+                TrainingMetricId::from("test"),
+            ))
+        });
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = DeleteTrainingMetricRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+        );
+
+        let res = service.delete_metric(req).await;
+
+        let Err(DeleteTrainingMetricError::MetricDoesNotExist(metric)) = res else {
+            unreachable!("Should have returned an err")
+        };
+        assert_eq!(metric, TrainingMetricId::from("test"));
+    }
+
+    fn build_metric() -> TrainingMetric {
+        TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::from("metric")),
+            TrainingMetricScope::Global,
+            TrainingMetricDefinition::new(
+                "user".to_string().into(),
+                TrainingMetricSource::Activity(ActivitySource::new(
+                    ActivityMetric::Calories,
+                    TrainingMetricActivityGroupBy::none(),
+                    TrainingMetricActivityFilters::empty(),
+                )),
+                Some(TrainingMetricWindow::new(
+                    TrainingMetricGranularity::Daily,
+                    TrainingMetricAggregate::Average,
+                )),
+                TrainingMetricSummary::empty(),
+                None,
+            ),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_training_service_delete_metric() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_metric()
+            .returning(|_, _| Ok(Some(build_metric())));
+        repository
+            .expect_delete_metric()
+            .times(1)
+            .withf(|user, id| {
+                user == &UserId::from("user") && id == &TrainingMetricId::from("test")
+            })
+            .returning(|_, _| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = DeleteTrainingMetricRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+        );
+
+        let res = service.delete_metric(req).await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_training_service_update_metric_name_does_not_exist() {
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_update_metric_name().returning(|_, _, _| {
+            Err(UpdateTrainingMetricNameError::MetricDoesNotExist(
+                TrainingMetricId::from("test"),
+            ))
+        });
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = UpdateTrainingMetricNameRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+            TrainingMetricName::from("Updated Name"),
+        );
+
+        let res = service.update_training_metric_name(req).await;
+
+        let Err(UpdateTrainingMetricNameError::MetricDoesNotExist(metric)) = res else {
+            unreachable!("Should have returned an err")
+        };
+        assert_eq!(metric, TrainingMetricId::from("test"));
+    }
+
+    #[tokio::test]
+    async fn test_training_service_update_metric_name() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_metric()
+            .returning(|_, _| Ok(Some(build_metric())));
+        repository
+            .expect_update_metric_name()
+            .times(1)
+            .withf(|user, id, name| {
+                user == &UserId::from("user")
+                    && id == &TrainingMetricId::from("test")
+                    && name == &TrainingMetricName::from("Updated Name")
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = UpdateTrainingMetricNameRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+            TrainingMetricName::from("Updated Name"),
+        );
+
+        let res = service.update_training_metric_name(req).await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metric_ok() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_metric()
+            .times(1)
+            .returning(|_, _| Ok(Some(build_metric())));
+        repository
+            .expect_save_metric()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = UpdateTrainingMetricRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+            TrainingMetricName::from("Updated Metric"),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Distance,
+                TrainingMetricActivityGroupBy::none(),
+                TrainingMetricActivityFilters::empty(),
+            )),
+            Some(TrainingMetricWindow::new(
+                TrainingMetricGranularity::Weekly,
+                TrainingMetricAggregate::Sum,
+            )),
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let res = service.update_training_metric(req).await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metric_does_not_exist() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_metric()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        repository.expect_save_metric().times(0);
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = UpdateTrainingMetricRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+            TrainingMetricName::from("Updated Metric"),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Calories,
+                TrainingMetricActivityGroupBy::none(),
+                TrainingMetricActivityFilters::empty(),
+            )),
+            None,
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let res = service.update_training_metric(req).await;
+
+        let Err(UpdateTrainingMetricError::MetricDoesNotExist(id)) = res else {
+            unreachable!("Should have returned MetricDoesNotExist")
+        };
+        assert_eq!(id, TrainingMetricId::from("test"));
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metric_save_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_metric()
+            .times(1)
+            .returning(|_, _| Ok(Some(build_metric())));
+        repository
+            .expect_save_metric()
+            .times(1)
+            .returning(|_| Err(SaveTrainingMetricError::Unknown(anyhow!("save error"))));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = UpdateTrainingMetricRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+            TrainingMetricName::from("Updated Metric"),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Calories,
+                TrainingMetricActivityGroupBy::none(),
+                TrainingMetricActivityFilters::empty(),
+            )),
+            None,
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let res = service.update_training_metric(req).await;
+
+        let Err(UpdateTrainingMetricError::SaveMetricError(_)) = res else {
+            unreachable!("Should have returned SaveMetricError")
+        };
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metric_get_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_get_metric().times(1).returning(|_, _| {
+            Err(crate::ports::training::GetTrainingMetricError::Unknown(
+                anyhow!("db error"),
+            ))
+        });
+        repository.expect_save_metric().times(0);
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = UpdateTrainingMetricRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+            TrainingMetricName::from("Updated Metric"),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Calories,
+                TrainingMetricActivityGroupBy::none(),
+                TrainingMetricActivityFilters::empty(),
+            )),
+            None,
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let res = service.update_training_metric(req).await;
+
+        let Err(UpdateTrainingMetricError::Unknown(_)) = res else {
+            unreachable!("Should have returned Unknown")
+        };
+    }
+}
+
+#[cfg(test)]
+mod test_training_service_period {
+    use std::sync::Arc;
+
+    use anyhow::anyhow;
+    use chrono::NaiveDate;
+
+    use crate::{
+        clock::FakeClock,
+        {
+            models::{
+                activity::{ActivityDuration, ActivityMetrics},
+                training::{TrainingPeriod, TrainingPeriodSports},
+            },
+            ports::{
+                activity::ListActivitiesError,
+                training::{CreateTrainingPeriodRequest, SaveTrainingPeriodError},
+            },
+            services::{
+                activity::test_utils::MockActivityService,
+                training::test_utils::MockTrainingRepository,
+            },
+        },
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_training_service_create_training_period_ok() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_training_period()
+            .times(1)
+            .returning(|_| Ok(()));
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = CreateTrainingPeriodRequest::new(
+            UserId::test_default(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            None,
+            "test_period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        );
+
+        let res = service.create_training_period(req).await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_training_service_create_training_period_save_period_err() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_training_period()
+            .times(1)
+            .returning(|_| Err(SaveTrainingPeriodError::Unknown(anyhow!("repo error"))));
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = CreateTrainingPeriodRequest::new(
+            UserId::test_default(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            None,
+            "test_period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        );
+
+        let res = service.create_training_period(req).await;
+
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_with_activities_period_not_found() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| None);
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_training_period_with_activities_with_metrics(
+                &UserId::test_default(),
+                &TrainingPeriodId::new(),
+                &[],
+            )
+            .await;
+
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_with_activities_no_sport_filter() {
+        use crate::models::activity::{Activity, ActivityId, ActivityStartTime, Sport};
+
+        // Create test activities with different sports and dates
+        let activities = vec![
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-18T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Running,
+                ),
+                ActivityMetrics::default(),
+            ),
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-19T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Cycling,
+                ),
+                ActivityMetrics::default(),
+            ),
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-20T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Swimming,
+                ),
+                ActivityMetrics::default(),
+            ),
+        ];
+
+        let period = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None), // No sport filter = all sports
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let mut activity_service = MockActivityService::new();
+        let activities_clone = activities.clone();
+        activity_service
+            .expect_list_activities_with_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok(activities_clone.clone()));
+
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_training_period_with_activities_with_metrics(
+                &UserId::test_default(),
+                &TrainingPeriodId::new(),
+                &[],
+            )
+            .await;
+
+        assert!(result.is_some());
+        let period_with_activities = result.unwrap();
+        assert_eq!(period_with_activities.activities().len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_with_activities_with_sport_filter() {
+        use crate::models::activity::{Activity, ActivityId, ActivityStartTime, Sport};
+        use crate::models::training::SportFilter;
+
+        // Create test activities with different sports
+        let activities = vec![
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-18T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Running,
+                ),
+                ActivityMetrics::default(),
+            ),
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-19T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Cycling,
+                ),
+                ActivityMetrics::default(),
+            ),
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-20T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Swimming,
+                ),
+                ActivityMetrics::default(),
+            ),
+        ];
+
+        // Period with only Running filter
+        let period = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Running Period".to_string(),
+            TrainingPeriodSports::new(Some(vec![SportFilter::Sport(Sport::Running)])),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let mut activity_service = MockActivityService::new();
+        let activities_clone = activities.clone();
+        activity_service
+            .expect_list_activities_with_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok(activities_clone.clone()));
+
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_training_period_with_activities_with_metrics(
+                &UserId::test_default(),
+                &TrainingPeriodId::new(),
+                &[],
+            )
+            .await;
+
+        assert!(result.is_some());
+        let period_with_activities = result.unwrap();
+        // Should only include Running activity
+        assert_eq!(period_with_activities.activities().len(), 1);
+        assert_eq!(
+            period_with_activities.activities()[0].0.sport(),
+            &Sport::Running
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_with_activities_with_category_filter() {
+        use crate::models::activity::{
+            Activity, ActivityId, ActivityStartTime, Sport, SportCategory,
+        };
+        use crate::models::training::SportFilter;
+
+        // Create test activities with different sports in the Running category
+        let activities = vec![
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-18T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Running,
+                ),
+                ActivityMetrics::default(),
+            ),
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-19T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::TrailRunning,
+                ),
+                ActivityMetrics::default(),
+            ),
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-20T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Cycling,
+                ),
+                ActivityMetrics::default(),
+            ),
+        ];
+
+        // Period with Running category filter (should match Running and TrailRunning)
+        let period = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Running Category Period".to_string(),
+            TrainingPeriodSports::new(Some(vec![SportFilter::SportCategory(
+                SportCategory::Running,
+            )])),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let mut activity_service = MockActivityService::new();
+        let activities_clone = activities.clone();
+        activity_service
+            .expect_list_activities_with_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok(activities_clone.clone()));
+
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_training_period_with_activities_with_metrics(
+                &UserId::test_default(),
+                &TrainingPeriodId::new(),
+                &[],
+            )
+            .await;
+
+        assert!(result.is_some());
+        let period_with_activities = result.unwrap();
+        // Should include Running and TrailRunning, but not Cycling
+        assert_eq!(period_with_activities.activities().len(), 2);
+        assert!(
+            period_with_activities
+                .activities()
+                .iter()
+                .any(|a| a.0.sport() == &Sport::Running)
+        );
+        assert!(
+            period_with_activities
+                .activities()
+                .iter()
+                .any(|a| a.0.sport() == &Sport::TrailRunning)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_with_activities_date_filtering() {
+        use crate::models::activity::{Activity, ActivityId, ActivityStartTime, Sport};
+
+        // Create activities with dates both inside and outside the period
+        let activities = vec![
+            (
+                // Before period
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-16T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Running,
+                ),
+                ActivityMetrics::default(),
+            ),
+            (
+                // Inside period
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-18T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Running,
+                ),
+                ActivityMetrics::default(),
+            ),
+            (
+                // After period
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-22T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Running,
+                ),
+                ActivityMetrics::default(),
+            ),
+        ];
+
+        let period = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let mut activity_service = MockActivityService::new();
+        let activities_clone = activities.clone();
+        activity_service
+            .expect_list_activities_with_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok(activities_clone.clone()));
+
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_training_period_with_activities_with_metrics(
+                &UserId::test_default(),
+                &TrainingPeriodId::new(),
+                &[],
+            )
+            .await;
+
+        assert!(result.is_some());
+        let period_with_activities = result.unwrap();
+        // Should only include the activity inside the period (2025-10-18)
+        assert_eq!(period_with_activities.activities().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_with_activities_open_ended_includes_today() {
+        use crate::models::activity::{Activity, ActivityId, ActivityStartTime, Sport};
+        use chrono::{Days, Utc};
+
+        let today = Utc::now().date_naive();
+        let yesterday = today - Days::new(1);
+
+        // Create activities: yesterday and today
+        // Note: Tomorrow's activity wouldn't be returned by the repository
+        // because the date range filter is exclusive of the end date
+        let activities = vec![
+            (
+                // Yesterday - should be included
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        yesterday
+                            .and_hms_opt(10, 0, 0)
+                            .unwrap()
+                            .and_utc()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Running,
+                ),
+                ActivityMetrics::default(),
+            ),
+            (
+                // Today - should be included (this is the bug we're fixing)
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        today
+                            .and_hms_opt(14, 30, 0)
+                            .unwrap()
+                            .and_utc()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Cycling,
+                ),
+                ActivityMetrics::default(),
+            ),
+        ];
+
+        // Create an open-ended period (no end date) starting 7 days ago
+        let period = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            today - Days::new(7),
+            None, // Open-ended
+            "Open Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let mut activity_service = MockActivityService::new();
+        let activities_clone = activities.clone();
+        activity_service
+            .expect_list_activities_with_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok(activities_clone.clone()));
+
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_training_period_with_activities_with_metrics(
+                &UserId::test_default(),
+                &TrainingPeriodId::new(),
+                &[],
+            )
+            .await;
+
+        assert!(result.is_some());
+        let period_with_activities = result.unwrap();
+
+        // Should include yesterday and today's activities
+        // (Before the fix, today's activities would be excluded)
+        assert_eq!(
+            period_with_activities.activities().len(),
+            2,
+            "Open-ended period should include today's activities"
+        );
+
+        // Verify the activities are yesterday and today
+        let activity_sports: Vec<_> = period_with_activities
+            .activities()
+            .iter()
+            .map(|a| a.0.sport())
+            .collect();
+        assert!(activity_sports.contains(&&Sport::Running)); // yesterday
+        assert!(activity_sports.contains(&&Sport::Cycling)); // today
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_with_activities_repository_error() {
+        let period = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_list_activities_with_metrics()
+            .times(1)
+            .returning(|_, _, _| Err(ListActivitiesError::Unknown(anyhow!("database error"))));
+
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_training_period_with_activities_with_metrics(
+                &UserId::test_default(),
+                &TrainingPeriodId::new(),
+                &[],
+            )
+            .await;
+
+        // Should return None when repository fails
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_period_ok() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_delete_training_period()
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = DeleteTrainingPeriodRequest::new(user_id, period_id);
+        let result = service.delete_training_period(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_period_not_found() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+
+        let mut training_repository = MockTrainingRepository::new();
+        let period = period_id.clone();
+        training_repository
+            .expect_delete_training_period()
+            .times(1)
+            .returning(move |_, _| {
+                Err(DeleteTrainingPeriodError::PeriodDoesNotExist(
+                    period.clone(),
+                ))
+            });
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = DeleteTrainingPeriodRequest::new(user_id.clone(), period_id.clone());
+        let result = service.delete_training_period(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(DeleteTrainingPeriodError::PeriodDoesNotExist(id)) => {
+                assert_eq!(id, period_id);
+            }
+            _ => panic!("Expected PeriodDoesNotExist error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_period_repository_error() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_delete_training_period()
+            .times(1)
+            .returning(|_, _| {
+                Err(DeleteTrainingPeriodError::Unknown(anyhow!(
+                    "database error"
+                )))
+            });
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = DeleteTrainingPeriodRequest::new(user_id, period_id);
+        let result = service.delete_training_period(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(DeleteTrainingPeriodError::Unknown(_)) => {}
+            _ => panic!("Expected Unknown error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_name_ok() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_name = "Updated Period Name".to_string();
+
+        let mut training_repository = MockTrainingRepository::new();
+        let period_id_clone = period_id.clone();
+        training_repository
+            .expect_update_training_period_name()
+            .times(1)
+            .withf(move |user, id, name| {
+                user == &UserId::test_default()
+                    && id == &period_id_clone
+                    && name == "Updated Period Name"
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = UpdateTrainingPeriodNameRequest::new(user_id, period_id, new_name);
+        let result = service.update_training_period_name(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_name_period_not_found() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_name = "Updated Period Name".to_string();
+
+        let mut training_repository = MockTrainingRepository::new();
+        let period = period_id.clone();
+        training_repository
+            .expect_update_training_period_name()
+            .times(1)
+            .return_once(move |_, _, _| {
+                Err(UpdateTrainingPeriodNameError::PeriodDoesNotExist(
+                    period.clone(),
+                ))
+            });
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = UpdateTrainingPeriodNameRequest::new(user_id, period_id.clone(), new_name);
+        let result = service.update_training_period_name(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(UpdateTrainingPeriodNameError::PeriodDoesNotExist(id)) => {
+                assert_eq!(id, period_id);
+            }
+            _ => panic!("Expected PeriodDoesNotExist error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_name_repository_error() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_name = "Updated Period Name".to_string();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_update_training_period_name()
+            .times(1)
+            .returning(|_, _, _| {
+                Err(UpdateTrainingPeriodNameError::Unknown(anyhow!(
+                    "database error"
+                )))
+            });
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = UpdateTrainingPeriodNameRequest::new(user_id, period_id, new_name);
+        let result = service.update_training_period_name(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(UpdateTrainingPeriodNameError::Unknown(_)) => {}
+            _ => panic!("Expected Unknown error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_note_ok() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_note = Some("Updated note content".to_string());
+
+        let mut training_repository = MockTrainingRepository::new();
+
+        let period_id_clone = period_id.clone();
+        let new_note_clone = new_note.clone();
+        training_repository
+            .expect_update_training_period_note()
+            .times(1)
+            .withf(move |user, id, note| {
+                user == &UserId::test_default() && id == &period_id_clone && note == &new_note_clone
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = UpdateTrainingPeriodNoteRequest::new(user_id, period_id, new_note);
+        let result = service.update_training_period_note(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_note_clear_note() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_note = None;
+
+        let mut training_repository = MockTrainingRepository::new();
+        let period_id_clone = period_id.clone();
+        training_repository
+            .expect_update_training_period_note()
+            .times(1)
+            .withf(move |user, id, note| {
+                user == &UserId::test_default() && id == &period_id_clone && note.is_none()
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = UpdateTrainingPeriodNoteRequest::new(user_id, period_id, new_note);
+        let result = service.update_training_period_note(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_note_not_found() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_note = Some("Updated note".to_string());
+
+        let mut training_repository = MockTrainingRepository::new();
+        let period = period_id.clone();
+        training_repository
+            .expect_update_training_period_note()
+            .times(1)
+            .return_once(move |_, _, _| {
+                Err(UpdateTrainingPeriodNoteError::PeriodDoesNotExist(
+                    period.clone(),
+                ))
+            });
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = UpdateTrainingPeriodNoteRequest::new(user_id, period_id.clone(), new_note);
+        let result = service.update_training_period_note(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(UpdateTrainingPeriodNoteError::PeriodDoesNotExist(id)) => {
+                assert_eq!(id, period_id);
+            }
+            _ => panic!("Expected PeriodDoesNotExist error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_note_repository_error() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_note = Some("Updated note".to_string());
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_update_training_period_note()
+            .times(1)
+            .returning(|_, _, _| {
+                Err(UpdateTrainingPeriodNoteError::Unknown(anyhow!(
+                    "database error"
+                )))
+            });
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = UpdateTrainingPeriodNoteRequest::new(user_id, period_id, new_note);
+        let result = service.update_training_period_note(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(UpdateTrainingPeriodNoteError::Unknown(_)) => {}
+            _ => panic!("Expected Unknown error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_dates_ok() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_start = "2025-11-01".parse::<NaiveDate>().unwrap();
+        let new_end = Some("2025-11-30".parse::<NaiveDate>().unwrap());
+
+        let mut training_repository = MockTrainingRepository::new();
+
+        let period_id_clone = period_id.clone();
+        let new_start_clone = new_start;
+        let new_end_clone = new_end;
+        training_repository
+            .expect_update_training_period_dates()
+            .times(1)
+            .withf(move |user, id, start, end| {
+                user == &UserId::test_default()
+                    && id == &period_id_clone
+                    && start == &new_start_clone
+                    && end == &new_end_clone
+            })
+            .returning(|_, _, _, _| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
+        let result = service.update_training_period_dates(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_dates_clear_end_date() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_start = "2025-11-01".parse::<NaiveDate>().unwrap();
+        let new_end = None;
+
+        let mut training_repository = MockTrainingRepository::new();
+
+        let period_id_clone = period_id.clone();
+        let new_start_clone = new_start;
+        training_repository
+            .expect_update_training_period_dates()
+            .times(1)
+            .withf(move |user, id, start, end| {
+                user == &UserId::test_default()
+                    && id == &period_id_clone
+                    && start == &new_start_clone
+                    && end.is_none()
+            })
+            .returning(|_, _, _, _| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
+        let result = service.update_training_period_dates(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_dates_end_before_start() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_start = "2025-11-30".parse::<NaiveDate>().unwrap();
+        let new_end = Some("2025-11-01".parse::<NaiveDate>().unwrap());
+
+        let training_repository = MockTrainingRepository::new();
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
+        let result = service.update_training_period_dates(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(UpdateTrainingPeriodDatesError::EndDateBeforeStartDate) => {}
+            _ => panic!("Expected EndDateBeforeStartDate error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_dates_not_found() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_start = "2025-11-01".parse::<NaiveDate>().unwrap();
+        let new_end = Some("2025-11-30".parse::<NaiveDate>().unwrap());
+
+        let mut training_repository = MockTrainingRepository::new();
+        let period = period_id.clone();
+        training_repository
+            .expect_update_training_period_dates()
+            .times(1)
+            .return_once(move |_, _, _, _| {
+                Err(UpdateTrainingPeriodDatesError::PeriodDoesNotExist(
+                    period.clone(),
+                ))
+            });
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req =
+            UpdateTrainingPeriodDatesRequest::new(user_id, period_id.clone(), new_start, new_end);
+        let result = service.update_training_period_dates(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(UpdateTrainingPeriodDatesError::PeriodDoesNotExist(id)) => {
+                assert_eq!(id, period_id);
+            }
+            _ => panic!("Expected PeriodDoesNotExist error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_dates_repository_error() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_start = "2025-11-01".parse::<NaiveDate>().unwrap();
+        let new_end = Some("2025-11-30".parse::<NaiveDate>().unwrap());
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_update_training_period_dates()
+            .times(1)
+            .returning(|_, _, _, _| {
+                Err(UpdateTrainingPeriodDatesError::Unknown(anyhow!(
+                    "database error"
+                )))
+            });
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
+        let result = service.update_training_period_dates(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(UpdateTrainingPeriodDatesError::Unknown(_)) => {}
+            _ => panic!("Expected Unknown error"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_training_service_training_note {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    use super::*;
+    use crate::clock::FakeClock;
+    use crate::models::training::TrainingNoteContent;
+    use crate::ports::training::{
+        CreateTrainingNoteError, CreateTrainingNoteRequest, SaveTrainingNoteError,
+    };
+    use crate::services::activity::test_utils::MockActivityService;
+    use crate::services::training::test_utils::MockTrainingRepository;
+    use anyhow::anyhow;
+
+    ///////////////////////////////////////////////////////////////////
+    // Helpers to observe the `notify_new_document` notifications
+    ///////////////////////////////////////////////////////////////////
+
+    /// Registers a waiter on the given notify and asserts that the service
+    /// called `notify_one` (fails if no notification arrives in time).
+    async fn expect_notified(notify: &Arc<tokio::sync::Notify>) {
+        let notify = Arc::clone(notify);
+        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+        tokio::spawn(async move {
+            notify.notified().await;
+            let _ = tx.send(());
+        });
+
+        tokio::time::timeout(tokio::time::Duration::from_millis(500), rx)
+            .await
+            .expect("expected the training service to trigger notify_one")
+            .expect("the notify waiter task failed");
+    }
+
+    /// Asserts that the given notify has NOT been triggered, leaving the
+    /// waiter enough time to register and catch any spurious notification.
+    async fn expect_not_notified(notify: &Arc<tokio::sync::Notify>) {
+        let was_notified = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&was_notified);
+        let notify = Arc::clone(notify);
+        tokio::spawn(async move {
+            notify.notified().await;
+            flag.store(true, Ordering::SeqCst);
+        });
+
+        // Let the waiter register and any (unexpected) notify fire.
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        assert!(
+            !was_notified.load(Ordering::SeqCst),
+            "expected the training service NOT to trigger notify_one"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_create_training_note_ok() {
+        let user_id = UserId::from("user1");
+        let title = None;
+        let content = TrainingNoteContent::from("This is a test note");
+        let date = TrainingNoteDate::today();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_save_training_note()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
+        let result = service.create_training_note(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_create_training_note_repository_error() {
+        let user_id = UserId::from("user1");
+        let title = None;
+        let content = TrainingNoteContent::from("Note that fails to save");
+        let date = TrainingNoteDate::today();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_save_training_note()
+            .times(1)
+            .returning(|_| Err(SaveTrainingNoteError::Unknown(anyhow!("database error"))));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
+        let result = service.create_training_note(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(CreateTrainingNoteError::Unknown(_)) => {}
+            _ => panic!("Expected Unknown error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_training_note_triggers_notify() {
+        let user_id = UserId::from("user1");
+        let title = None;
+        let content = TrainingNoteContent::from("This is a test note");
+        let date = TrainingNoteDate::today();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_save_training_note()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
+        let result = service.create_training_note(req).await;
+        assert!(result.is_ok());
+
+        expect_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_create_training_note_repository_error_does_not_trigger_notify() {
+        let user_id = UserId::from("user1");
+        let title = None;
+        let content = TrainingNoteContent::from("Note that fails to save");
+        let date = TrainingNoteDate::today();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_save_training_note()
+            .times(1)
+            .returning(|_| Err(SaveTrainingNoteError::Unknown(anyhow!("database error"))));
+
+        let activity_service = MockActivityService::default();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
+        let result = service.create_training_note(req).await;
+        assert!(result.is_err());
+
+        expect_not_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_update_training_note_triggers_notify() {
+        let user_id = UserId::from("user1");
+        let note_id = TrainingNoteId::from("note1");
+
+        let mut training_repository = MockTrainingRepository::new();
+        let note_user = user_id.clone();
+        training_repository
+            .expect_get_training_note()
+            .times(1)
+            .returning(move |_, _| {
+                Ok(Some(TrainingNote::new(
+                    TrainingNoteId::from("note1"),
+                    note_user.clone(),
+                    None,
+                    TrainingNoteContent::from("Original content"),
+                    TrainingNoteDate::today(),
+                    chrono::Utc::now().into(),
+                )))
+            });
+        training_repository
+            .expect_save_training_note()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .update_training_note(
+                &user_id,
+                &note_id,
+                None,
+                TrainingNoteContent::from("Updated content"),
+                TrainingNoteDate::today(),
+            )
+            .await;
+        assert!(result.is_ok());
+
+        expect_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_update_training_note_not_found_does_not_trigger_notify() {
+        let user_id = UserId::from("user1");
+        let note_id = TrainingNoteId::from("note1");
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_note()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        training_repository.expect_save_training_note().times(0);
+
+        let activity_service = MockActivityService::default();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        // A missing note is silently treated as a no-op (returns Ok).
+        let result = service
+            .update_training_note(
+                &user_id,
+                &note_id,
+                None,
+                TrainingNoteContent::from("Updated content"),
+                TrainingNoteDate::today(),
+            )
+            .await;
+        assert!(result.is_ok());
+
+        expect_not_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_update_training_note_save_error_does_not_trigger_notify() {
+        let user_id = UserId::from("user1");
+        let note_id = TrainingNoteId::from("note1");
+
+        let mut training_repository = MockTrainingRepository::new();
+        let note_user = user_id.clone();
+        training_repository
+            .expect_get_training_note()
+            .times(1)
+            .returning(move |_, _| {
+                Ok(Some(TrainingNote::new(
+                    TrainingNoteId::from("note1"),
+                    note_user.clone(),
+                    None,
+                    TrainingNoteContent::from("Original content"),
+                    TrainingNoteDate::today(),
+                    chrono::Utc::now().into(),
+                )))
+            });
+        training_repository
+            .expect_save_training_note()
+            .times(1)
+            .returning(|_| Err(SaveTrainingNoteError::Unknown(anyhow!("database error"))));
+
+        let activity_service = MockActivityService::default();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .update_training_note(
+                &user_id,
+                &note_id,
+                None,
+                TrainingNoteContent::from("Updated content"),
+                TrainingNoteDate::today(),
+            )
+            .await;
+        assert!(result.is_err());
+
+        expect_not_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_note_triggers_notify() {
+        let user_id = UserId::from("user1");
+        let note_id = TrainingNoteId::from("note1");
+
+        let mut training_repository = MockTrainingRepository::new();
+        let note_user = user_id.clone();
+        training_repository
+            .expect_get_training_note()
+            .times(1)
+            .returning(move |_, _| {
+                Ok(Some(TrainingNote::new(
+                    TrainingNoteId::from("note1"),
+                    note_user.clone(),
+                    None,
+                    TrainingNoteContent::from("Some content"),
+                    TrainingNoteDate::today(),
+                    chrono::Utc::now().into(),
+                )))
+            });
+        training_repository
+            .expect_delete_training_note()
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service.delete_training_note(&user_id, &note_id).await;
+        assert!(result.is_ok());
+
+        expect_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_note_not_found_does_not_trigger_notify() {
+        let user_id = UserId::from("user1");
+        let note_id = TrainingNoteId::from("note1");
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_note()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        training_repository.expect_delete_training_note().times(0);
+
+        let activity_service = MockActivityService::default();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service.delete_training_note(&user_id, &note_id).await;
+        assert!(result.is_err());
+
+        expect_not_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_note_not_owned_does_not_trigger_notify() {
+        let user_id = UserId::from("user1");
+        let note_id = TrainingNoteId::from("note1");
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_note()
+            .times(1)
+            .returning(|_, _| {
+                Ok(Some(TrainingNote::new(
+                    TrainingNoteId::from("note1"),
+                    UserId::from("someone_else"),
+                    None,
+                    TrainingNoteContent::from("Some content"),
+                    TrainingNoteDate::today(),
+                    chrono::Utc::now().into(),
+                )))
+            });
+        training_repository.expect_delete_training_note().times(0);
+
+        let activity_service = MockActivityService::default();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service.delete_training_note(&user_id, &note_id).await;
+        assert!(result.is_err());
+
+        expect_not_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_notes_ok() {
+        let user_id = UserId::from("user1");
+        let period_id = TrainingPeriodId::new();
+        let start = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
+        let end = Some(NaiveDate::from_ymd_opt(2025, 1, 31).unwrap());
+
+        let mut training_repository = MockTrainingRepository::new();
+
+        // Mock get_training_period
+        let period_id_clone = period_id.clone();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(move |_, _| {
+                use crate::models::training::{TrainingPeriod, TrainingPeriodSports};
+                Some(
+                    TrainingPeriod::new(
+                        period_id_clone.clone(),
+                        UserId::from("user1"),
+                        start,
+                        end,
+                        "Test Period".to_string(),
+                        TrainingPeriodSports::new(None),
+                        None,
+                    )
+                    .unwrap(),
+                )
+            });
+
+        // Mock get_training_notes - will be called with a date range
+        training_repository
+            .expect_get_training_notes()
+            .times(1)
+            .returning(|_, _| {
+                use chrono::Utc;
+                Ok(vec![TrainingNote::new(
+                    TrainingNoteId::new(),
+                    UserId::from("user1"),
+                    None,
+                    TrainingNoteContent::from("Test note"),
+                    TrainingNoteDate::today(),
+                    Utc::now().into(),
+                )])
+            });
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_training_period_notes(&user_id, &period_id)
+            .await;
+
+        assert!(result.is_ok());
+        let notes = result.unwrap();
+        assert_eq!(notes.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_notes_period_not_found() {
+        let user_id = UserId::from("user1");
+        let period_id = TrainingPeriodId::new();
+
+        let mut training_repository = MockTrainingRepository::new();
+
+        // Mock get_training_period to return None
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| None);
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_training_period_notes(&user_id, &period_id)
+            .await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_metrics_values_ok() {
+        let user_id = UserId::from("user1");
+        let period_id = TrainingPeriodId::new();
+        let start = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
+        let end = Some(NaiveDate::from_ymd_opt(2025, 1, 31).unwrap());
+
+        let mut training_repository = MockTrainingRepository::new();
+
+        // Mock get_training_period
+        let period_id_clone = period_id.clone();
+        training_repository
+            .expect_get_training_period()
+            .times(2)
+            .returning(move |_, _| {
+                use crate::models::training::{TrainingPeriod, TrainingPeriodSports};
+                Some(
+                    TrainingPeriod::new(
+                        period_id_clone.clone(),
+                        UserId::from("user1"),
+                        start,
+                        end,
+                        "Test Period".to_string(),
+                        TrainingPeriodSports::new(None),
+                        None,
+                    )
+                    .unwrap(),
+                )
+            });
+
+        // Mock get_global_metrics and get_period_metrics for metrics values computation
+        training_repository
+            .expect_get_global_metrics()
+            .returning(|_| Ok(vec![]));
+        training_repository
+            .expect_get_period_metrics()
+            .returning(|_, _| Ok(vec![]));
+        training_repository
+            .expect_get_training_metrics_ordering()
+            .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_training_period_metrics_values(&user_id, &period_id)
+            .await
+            .unwrap();
+
+        assert!(result.is_empty()); // Empty because we mocked no metrics
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_metrics_values_period_not_found() {
+        let user_id = UserId::from("user1");
+        let period_id = TrainingPeriodId::new();
+
+        let mut training_repository = MockTrainingRepository::new();
+
+        // Mock get_training_period to return None
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| None);
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let err = service
+            .get_training_period_metrics_values(&user_id, &period_id)
+            .await
+            .unwrap_err();
+
+        let GetTrainingMetricValuesError::TrainingPeriodDoesNotExist(id) = err else {
+            unreachable!("Should have err")
+        };
+        assert_eq!(id, period_id);
+    }
+}
+
+#[cfg(test)]
+mod test_training_service_metric_values {
+    use anyhow::anyhow;
+    use chrono::NaiveDate;
+
+    use super::*;
+    use crate::clock::FakeClock;
+    use crate::models::activity::{
+        Activity, ActivityDuration, ActivityId, ActivityMetric, ActivityMetrics, ActivityStartTime,
+        DurationCurveType, Sport, Unit,
+    };
+    use crate::models::training::BestDurationCurve;
+    use crate::models::training::{
+        HooperIndexSource, SubjectiveScale, TrainingMetricActivityFilters,
+        TrainingMetricActivityGroupBy, TrainingMetricAggregate, TrainingMetricBin,
+        TrainingMetricGranularity, TrainingMetricSummary, TrainingMetricValue,
+        TrainingMetricWindow, WeightAndNutrition, WeightAndNutritionSource,
+    };
+    use crate::ports::training::GetTrainingMetricValuesError;
+    use crate::services::activity::test_utils::MockActivityService;
+    use crate::services::training::test_utils::MockTrainingRepository;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn test_get_training_metric_values_metric_not_found() {
+        let user_id = UserId::from("user1");
+        let metric_id = TrainingMetricId::new();
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-12-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_metric()
+            .times(1)
+            .return_once(move |_, _| Ok(None));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req =
+            GetTrainingMetricValuesRequest::ByTrainingMetricId(user_id.clone(), metric_id.clone());
+
+        let result = service.get_training_metric_values(req, &date_range).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(GetTrainingMetricValuesError::TrainingMetricDoesNotExist(_)) => {}
+            _ => panic!("Expected TrainingMetricDoesNotExists error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_ok() {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id,
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Distance,
+                TrainingMetricActivityGroupBy::none(),
+                TrainingMetricActivityFilters::empty(),
+            )),
+            Some(TrainingMetricWindow::new(
+                TrainingMetricGranularity::Weekly,
+                TrainingMetricAggregate::Sum,
+            )),
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let mut activity_service = MockActivityService::default();
+        activity_service
+            .expect_list_activities_with_metrics()
+            .times(1)
+            .returning(|_, _, _| Ok(vec![]));
+
+        let training_repository = MockTrainingRepository::new();
+        let activity_service = activity_service;
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_with_activities() {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id.clone(),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Distance,
+                TrainingMetricActivityGroupBy::none(),
+                TrainingMetricActivityFilters::empty(),
+            )),
+            Some(TrainingMetricWindow::new(
+                TrainingMetricGranularity::Weekly,
+                TrainingMetricAggregate::Sum,
+            )),
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        // Create some test activities
+        let activity = Activity::new_empty(
+            ActivityId::new(),
+            user_id.clone(),
+            ActivityStartTime::from_timestamp(1705315200).unwrap(), // 2024-01-15T10:00:00Z
+            ActivityDuration::default(),
+            Sport::Running,
+        );
+
+        let mut activity_service = MockActivityService::default();
+        activity_service
+            .expect_list_activities_with_metrics()
+            .times(1)
+            .returning(move |_, _, _| {
+                Ok(vec![(
+                    activity.clone(),
+                    ActivityMetrics::new(HashMap::from([(
+                        ActivityMetric::Distance,
+                        Some(10000.0),
+                    )])),
+                )])
+            });
+
+        let training_repository = MockTrainingRepository::new();
+        let activity_service = activity_service;
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        assert!(result.is_ok());
+        let values = result.unwrap();
+        // With weekly granularity and sum aggregate, we should have one bin with the activity distance
+        assert!(!values.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_with_hooper_index() {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id.clone(),
+            TrainingMetricSource::HooperIndex(HooperIndexSource::Fatigue),
+            None,
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let d1 = "2024-01-15".parse::<NaiveDate>().unwrap();
+        let d2 = "2024-01-16".parse::<NaiveDate>().unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        let expected_user = user_id.clone();
+        let expected_range = date_range.clone();
+        training_repository
+            .expect_get_hooper_indexes()
+            .times(1)
+            .withf(move |user, range| user == &expected_user && range == &expected_range)
+            .returning(move |_, _| {
+                Ok(vec![
+                    (
+                        d1,
+                        HooperIndex::new(
+                            Some(SubjectiveScale::try_from(4).unwrap()),
+                            None,
+                            None,
+                            None,
+                            None,
+                        ),
+                    ),
+                    (d2, HooperIndex::default()),
+                ])
+            });
+
+        let service = TrainingService::new(
+            training_repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        let values = result.expect("compute should succeed");
+        // The date with a missing fatigue value is skipped.
+        assert_eq!(values.len(), 1);
+        assert_eq!(
+            values.get(&TrainingMetricBin::new(
+                d1.to_string(),
+                Some(HooperIndexSource::Fatigue.to_string())
+            )),
+            Some(&TrainingMetricValue::Average(4.0))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_with_hooper_index_propagates_repository_error() {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id,
+            TrainingMetricSource::HooperIndex(HooperIndexSource::Fatigue),
+            None,
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_hooper_indexes()
+            .times(1)
+            .returning(|_, _| Err(HooperIndexError::Unknown(anyhow!("db error"))));
+
+        let service = TrainingService::new(
+            training_repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(ComputeTrainingMetricValuesError::Unknown(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_with_weight_and_nutrition() {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id.clone(),
+            TrainingMetricSource::WeightAndNutrition(WeightAndNutritionSource::TotalWeight),
+            None,
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let d1 = "2024-01-15".parse::<NaiveDate>().unwrap();
+        let d2 = "2024-01-16".parse::<NaiveDate>().unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        let expected_user = user_id.clone();
+        let expected_range = date_range.clone();
+        training_repository
+            .expect_get_weight_and_nutritions()
+            .times(1)
+            .withf(move |user, range| user == &expected_user && range == &expected_range)
+            .returning(move |_, _| {
+                Ok(vec![
+                    (
+                        d1,
+                        WeightAndNutrition::new(
+                            Some(70.5),
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                        ),
+                    ),
+                    (d2, WeightAndNutrition::default()),
+                ])
+            });
+
+        let service = TrainingService::new(
+            training_repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        let values = result.expect("compute should succeed");
+        // The date with a missing weight value is skipped.
+        assert_eq!(values.len(), 1);
+        assert_eq!(values.unit(), Unit::Kilogram);
+        assert_eq!(
+            values.get(&TrainingMetricBin::new(
+                d1.to_string(),
+                Some(WeightAndNutritionSource::TotalWeight.to_string())
+            )),
+            Some(&TrainingMetricValue::Average(70.5))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_with_weight_and_nutrition_propagates_repository_error()
+     {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id,
+            TrainingMetricSource::WeightAndNutrition(WeightAndNutritionSource::TotalWeight),
+            None,
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_weight_and_nutritions()
+            .times(1)
+            .returning(|_, _| Err(WeightAndNutritionError::Unknown(anyhow!("db error"))));
+
+        let service = TrainingService::new(
+            training_repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(ComputeTrainingMetricValuesError::Unknown(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_with_duration_curve() {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id.clone(),
+            TrainingMetricSource::DurationCurve(DurationCurveSource::Cycling),
+            None,
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let mut training_repository = MockTrainingRepository::new();
+        let expected_user = user_id.clone();
+        let expected_range = date_range.clone();
+        training_repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .withf(move |user, since, before| {
+                user == &expected_user
+                    && *since == *expected_range.start()
+                    && *before == *expected_range.end()
+            })
+            .returning(|_, _, _| {
+                Ok(vec![
+                    BestDurationCurve::new(
+                        DurationCurveType::Power,
+                        [
+                            Some(250.0),
+                            Some(240.0),
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                        ],
+                    ),
+                    // A curve of a different type should be ignored.
+                    BestDurationCurve::new(
+                        DurationCurveType::Pace,
+                        [
+                            None,
+                            None,
+                            Some(5.5),
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                        ],
+                    ),
+                ])
+            });
+
+        let service = TrainingService::new(
+            training_repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        let values = result.expect("compute should succeed");
+        // Missing values are skipped, so only the two defined power values produce bins.
+        assert_eq!(values.len(), 2);
+        assert_eq!(values.unit(), Unit::Watt);
+        assert_eq!(
+            values.get(&TrainingMetricBin::from_granule("5")),
+            Some(&TrainingMetricValue::SingleValue(250.0))
+        );
+        assert_eq!(
+            values.get(&TrainingMetricBin::from_granule("10")),
+            Some(&TrainingMetricValue::SingleValue(240.0))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_with_duration_curve_no_matching_curve() {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id,
+            TrainingMetricSource::DurationCurve(DurationCurveSource::Cycling),
+            None,
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .returning(|_, _, _| {
+                Ok(vec![BestDurationCurve::new(
+                    // Only a pace curve is available while the source requires power.
+                    DurationCurveType::Pace,
+                    [
+                        Some(5.5),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ],
+                )])
+            });
+
+        let service = TrainingService::new(
+            training_repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        let values = result.expect("compute should succeed");
+        assert!(values.is_empty());
+        assert_eq!(values.unit(), Unit::Watt);
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_with_duration_curve_propagates_repository_error() {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id,
+            TrainingMetricSource::DurationCurve(DurationCurveSource::Cycling),
+            None,
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .returning(|_, _, _| Err(anyhow!("db error")));
+
+        let service = TrainingService::new(
+            training_repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(ComputeTrainingMetricValuesError::Unknown(_))
+        ));
+    }
+}
+
+#[cfg(test)]
+mod test_training_service_metrics_ordering {
+    use std::sync::Arc;
+
+    use super::*;
+    use crate::clock::FakeClock;
+    use crate::models::training::{
+        TrainingMetricId, TrainingMetricsOrdering, TrainingPeriod, TrainingPeriodSports,
+    };
+    use crate::ports::training::{
+        GetTrainingMetricsOrderingError, SetTrainingMetricsOrderingError,
+    };
+    use crate::services::activity::test_utils::MockActivityService;
+    use crate::services::training::test_utils::MockTrainingRepository;
+    use anyhow::anyhow;
+    use chrono::NaiveDate;
+
+    #[tokio::test]
+    async fn test_get_training_metrics_ordering_global_scope_ok() {
+        let user_id = UserId::from("user1");
+        let scope = TrainingMetricScope::Global;
+        let ordering = TrainingMetricsOrdering::try_from(vec![
+            TrainingMetricId::from("metric1"),
+            TrainingMetricId::from("metric2"),
+        ])
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_metrics_ordering()
+            .times(1)
+            .returning(move |_, _| Ok(ordering.clone()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_training_metrics_ordering(&user_id, &scope)
+            .await;
+
+        assert!(result.is_ok());
+        let returned_ordering = result.unwrap();
+        assert_eq!(
+            returned_ordering,
+            TrainingMetricsOrdering::try_from(vec![
+                TrainingMetricId::from("metric1"),
+                TrainingMetricId::from("metric2"),
+            ])
+            .unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metrics_ordering_period_scope_ok() {
+        let user_id = UserId::from("user1");
+        let period_id = TrainingPeriodId::from("period1");
+        let scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
+        let ordering =
+            TrainingMetricsOrdering::try_from(vec![TrainingMetricId::from("metric1")]).unwrap();
+
+        let period = TrainingPeriod::new(
+            period_id.clone(),
+            user_id.clone(),
+            NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            None,
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(move |_, _| Some(period.clone()));
+        training_repository
+            .expect_get_training_metrics_ordering()
+            .times(1)
+            .returning(move |_, _| Ok(ordering.clone()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_training_metrics_ordering(&user_id, &scope)
+            .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metrics_ordering_period_does_not_exist() {
+        let user_id = UserId::from("user1");
+        let period_id = TrainingPeriodId::from("period1");
+        let scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| None);
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_training_metrics_ordering(&user_id, &scope)
+            .await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            GetTrainingMetricsOrderingError::TrainingPeriodDoesNotExist(id) => {
+                assert_eq!(id, period_id);
+            }
+            _ => panic!("Expected TrainingPeriodDoesNotExist error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metrics_ordering_repository_error() {
+        let user_id = UserId::from("user1");
+        let scope = TrainingMetricScope::Global;
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_metrics_ordering()
+            .times(1)
+            .returning(|_, _| {
+                Err(GetTrainingMetricsOrderingError::Unknown(anyhow!(
+                    "database error"
+                )))
+            });
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_training_metrics_ordering(&user_id, &scope)
+            .await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            GetTrainingMetricsOrderingError::Unknown(_) => {}
+            _ => panic!("Expected Unknown error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_set_training_metrics_ordering_global_scope_ok() {
+        let user_id = UserId::from("user1");
+        let scope = TrainingMetricScope::Global;
+        let ordering = TrainingMetricsOrdering::try_from(vec![
+            TrainingMetricId::from("metric1"),
+            TrainingMetricId::from("metric2"),
+        ])
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_set_training_metrics_ordering()
+            .times(1)
+            .returning(|_, _, _| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .set_training_metrics_ordering(&user_id, &scope, ordering)
+            .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_set_training_metrics_ordering_period_scope_ok() {
+        let user_id = UserId::from("user1");
+        let period_id = TrainingPeriodId::from("period1");
+        let scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
+        let ordering =
+            TrainingMetricsOrdering::try_from(vec![TrainingMetricId::from("metric1")]).unwrap();
+
+        let period = TrainingPeriod::new(
+            period_id.clone(),
+            user_id.clone(),
+            NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            None,
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(move |_, _| Some(period.clone()));
+        training_repository
+            .expect_set_training_metrics_ordering()
+            .times(1)
+            .returning(|_, _, _| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .set_training_metrics_ordering(&user_id, &scope, ordering)
+            .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_set_training_metrics_ordering_period_does_not_exist() {
+        let user_id = UserId::from("user1");
+        let period_id = TrainingPeriodId::from("period1");
+        let scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
+        let ordering =
+            TrainingMetricsOrdering::try_from(vec![TrainingMetricId::from("metric1")]).unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| None);
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .set_training_metrics_ordering(&user_id, &scope, ordering)
+            .await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            SetTrainingMetricsOrderingError::TrainingPeriodDoesNotExist(id) => {
+                assert_eq!(id, period_id);
+            }
+            _ => panic!("Expected TrainingPeriodDoesNotExist error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_set_training_metrics_ordering_repository_error() {
+        let user_id = UserId::from("user1");
+        let scope = TrainingMetricScope::Global;
+        let ordering =
+            TrainingMetricsOrdering::try_from(vec![TrainingMetricId::from("metric1")]).unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_set_training_metrics_ordering()
+            .times(1)
+            .returning(|_, _, _| {
+                Err(SetTrainingMetricsOrderingError::Unknown(anyhow!(
+                    "database error"
+                )))
+            });
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .set_training_metrics_ordering(&user_id, &scope, ordering)
+            .await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            SetTrainingMetricsOrderingError::Unknown(_) => {}
+            _ => panic!("Expected Unknown error"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_training_service_copy_metric {
+    use std::sync::Arc;
+
+    use super::*;
+    use crate::clock::FakeClock;
+    use crate::models::activity::ActivityMetric;
+    use crate::models::training::{
+        TrainingMetricActivityFilters, TrainingMetricActivityGroupBy, TrainingMetricAggregate,
+        TrainingMetricGranularity, TrainingMetricName, TrainingMetricSummary, TrainingMetricWindow,
+        TrainingPeriod, TrainingPeriodSports,
+    };
+    use crate::ports::training::{GetTrainingMetricError, SaveTrainingMetricError};
+    use crate::services::activity::test_utils::MockActivityService;
+    use crate::services::training::test_utils::MockTrainingRepository;
+    use anyhow::anyhow;
+
+    fn make_metric() -> TrainingMetric {
+        TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::from("metric")),
+            TrainingMetricScope::Global,
+            TrainingMetricDefinition::new(
+                UserId::test_default(),
+                TrainingMetricSource::Activity(ActivitySource::new(
+                    ActivityMetric::Distance,
+                    TrainingMetricActivityGroupBy::none(),
+                    TrainingMetricActivityFilters::empty(),
+                )),
+                Some(TrainingMetricWindow::new(
+                    TrainingMetricGranularity::Weekly,
+                    TrainingMetricAggregate::Sum,
+                )),
+                TrainingMetricSummary::empty(),
+                None,
+            ),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_copy_training_metric_ok() {
+        let source_id = TrainingMetricId::from("source");
+        let period_id = TrainingPeriodId::new();
+        let metric = make_metric();
+
+        let mut repository = MockTrainingRepository::new();
+
+        let metric_clone = metric.clone();
+        repository
+            .expect_get_metric()
+            .times(1)
+            .returning(move |_, _| Ok(Some(metric_clone.clone())));
+
+        repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| {
+                Some(
+                    TrainingPeriod::new(
+                        TrainingPeriodId::new(),
+                        UserId::test_default(),
+                        "2025-01-01".parse().unwrap(),
+                        None,
+                        "Test".to_string(),
+                        TrainingPeriodSports::new(None),
+                        None,
+                    )
+                    .unwrap(),
+                )
+            });
+
+        let period_id_clone = period_id.clone();
+        let metric_for_assert = metric.clone();
+        repository
+            .expect_save_metric()
+            .times(1)
+            .withf(move |metric| {
+                metric.scope() == &TrainingMetricScope::TrainingPeriod(period_id_clone.clone())
+                    && metric.definition() == metric_for_assert.definition()
+                    && metric.name() == &Some(TrainingMetricName::from("new-name"))
+            })
+            .returning(|_| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = CopyTrainingMetricRequest::new(
+            UserId::test_default(),
+            source_id,
+            period_id,
+            Some(TrainingMetricName::from("new-name")),
+        );
+
+        let result = service.copy_training_metric(req).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_copy_training_metric_source_metric_not_found() {
+        let source_id = TrainingMetricId::from("source");
+        let period_id = TrainingPeriodId::new();
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_metric()
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req = CopyTrainingMetricRequest::new(
+            UserId::test_default(),
+            source_id.clone(),
+            period_id,
+            None,
+        );
+
+        let result = service.copy_training_metric(req).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            CopyTrainingMetricError::MetricDoesNotExist(id) => assert_eq!(id, source_id),
+            _ => panic!("Expected MetricDoesNotExist"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_copy_training_metric_get_definition_error() {
+        let source_id = TrainingMetricId::from("source");
+        let period_id = TrainingPeriodId::new();
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_metric()
+            .times(1)
+            .returning(|_, _| Err(GetTrainingMetricError::Unknown(anyhow!("db error"))));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req =
+            CopyTrainingMetricRequest::new(UserId::test_default(), source_id, period_id, None);
+
+        let result = service.copy_training_metric(req).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            CopyTrainingMetricError::Unknown(_) => {}
+            _ => panic!("Expected Unknown error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_copy_training_metric_target_period_not_found() {
+        let source_id = TrainingMetricId::from("source");
+        let period_id = TrainingPeriodId::new();
+        let metric = make_metric();
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_metric()
+            .times(1)
+            .returning(move |_, _| Ok(Some(metric.clone())));
+
+        repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| None);
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req =
+            CopyTrainingMetricRequest::new(UserId::test_default(), source_id, period_id, None);
+
+        let result = service.copy_training_metric(req).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            CopyTrainingMetricError::PeriodDoesNotExist(_) => {}
+            _ => panic!("Expected PeriodDoesNotExist"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_copy_training_metric_save_error() {
+        let source_id = TrainingMetricId::from("source");
+        let period_id = TrainingPeriodId::new();
+        let metric = make_metric();
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_metric()
+            .times(1)
+            .returning(move |_, _| Ok(Some(metric.clone())));
+
+        repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| {
+                Some(
+                    crate::models::training::TrainingPeriod::new(
+                        TrainingPeriodId::new(),
+                        UserId::test_default(),
+                        "2025-01-01".parse().unwrap(),
+                        None,
+                        "Test".to_string(),
+                        crate::models::training::TrainingPeriodSports::new(None),
+                        None,
+                    )
+                    .unwrap(),
+                )
+            });
+
+        repository
+            .expect_save_metric()
+            .times(1)
+            .returning(|_| Err(SaveTrainingMetricError::Unknown(anyhow!("save error"))));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let req =
+            CopyTrainingMetricRequest::new(UserId::test_default(), source_id, period_id, None);
+
+        let result = service.copy_training_metric(req).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            CopyTrainingMetricError::SaveMetricError(_) => {}
+            _ => panic!("Expected SaveMetricError"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_training_service_hooper_index {
+    use std::sync::Arc;
+
+    use anyhow::anyhow;
+
+    use super::*;
+    use crate::clock::FakeClock;
+    use crate::models::training::{HooperIndex, HooperIndexPatch, SubjectiveScale};
+    use crate::services::activity::test_utils::MockActivityService;
+    use crate::services::training::test_utils::MockTrainingRepository;
+    use chrono::NaiveDate;
+
+    fn test_date() -> NaiveDate {
+        NaiveDate::from_ymd_opt(2026, 1, 15).unwrap()
+    }
+
+    fn scale(value: u8) -> SubjectiveScale {
+        SubjectiveScale::try_from(value).unwrap()
+    }
+
+    fn build_service(
+        repository: MockTrainingRepository,
+    ) -> TrainingService<MockTrainingRepository, MockActivityService, FakeClock> {
+        TrainingService::new(
+            repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_get_hooper_index_returns_value() {
+        let user = UserId::from("user1");
+        let date = test_date();
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .withf(move |u, d| u == &expected_user && *d == date)
+            .returning(|_, _| {
+                Ok(Some(HooperIndex::new(
+                    Some(scale(6)),
+                    None,
+                    None,
+                    None,
+                    None,
+                )))
+            });
+
+        let service = build_service(repository);
+
+        let result = service.get_hooper_index(&user, &date).await.unwrap();
+
+        assert_eq!(result.unwrap().fatigue(), &Some(scale(6)));
+    }
+
+    #[tokio::test]
+    async fn test_get_hooper_index_propagates_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Err(HooperIndexError::Unknown(anyhow!("db error"))));
+
+        let service = build_service(repository);
+
+        let result = service
+            .get_hooper_index(&UserId::test_default(), &test_date())
+            .await;
+
+        assert!(matches!(result, Err(HooperIndexError::Unknown(_))));
+    }
+
+    #[tokio::test]
+    async fn test_delete_hooper_index_deletes_on_date() {
+        let user = UserId::from("user1");
+        let date = test_date();
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        repository
+            .expect_delete_hooper_index()
+            .times(1)
+            .withf(move |u, d| u == &expected_user && *d == date)
+            .returning(|_, _| Ok(()));
+
+        let service = build_service(repository);
+
+        let req = DeleteHooperIndexRequest::new(user, date);
+        let result = service.delete_hooper_index(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_hooper_index_propagates_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_delete_hooper_index()
+            .times(1)
+            .returning(|_, _| Err(HooperIndexError::Unknown(anyhow!("db error"))));
+
+        let service = build_service(repository);
+
+        let req = DeleteHooperIndexRequest::new(UserId::test_default(), test_date());
+        let result = service.delete_hooper_index(req).await;
+
+        assert!(matches!(result, Err(HooperIndexError::Unknown(_))));
+    }
+
+    #[tokio::test]
+    async fn test_update_hooper_index_patches_existing_value() {
+        let user = UserId::from("user1");
+        let date = test_date();
+
+        let existing = HooperIndex::new(
+            Some(scale(1)),
+            Some(scale(2)),
+            Some(scale(3)),
+            Some(scale(4)),
+            Some(scale(5)),
+        );
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .withf(move |u, d| u == &expected_user && *d == date)
+            .returning(move |_, _| Ok(Some(existing)));
+
+        let expected_user = user.clone();
+        repository
+            .expect_save_hooper_index()
+            .times(1)
+            .withf(move |u, d, v| {
+                u == &expected_user
+                    && *d == date
+                    && v.fatigue() == &Some(scale(9))
+                    && v.sleep() == &Some(scale(2))
+                    && v.pain() == &None
+                    && v.stress() == &Some(scale(4))
+                    && v.mood() == &Some(scale(5))
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository);
+
+        // Override fatigue, clear pain, leave sleep/stress/mood untouched.
+        let patch = HooperIndexPatch::new(Some(Some(scale(9))), None, Some(None), None, None);
+
+        let req = SaveHooperIndexRequest::new(user, date, patch);
+        let result = service.save_hooper_index(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_hooper_index_without_existing_value_starts_from_default() {
+        let user = UserId::from("user1");
+        let date = test_date();
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let expected_user = user.clone();
+        repository
+            .expect_save_hooper_index()
+            .times(1)
+            .withf(move |u, d, v| {
+                u == &expected_user
+                    && *d == date
+                    && v.fatigue() == &Some(scale(7))
+                    && v.sleep() == &None
+                    && v.pain() == &None
+                    && v.stress() == &None
+                    && v.mood() == &None
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository);
+
+        let patch = HooperIndexPatch::new(Some(Some(scale(7))), None, None, None, None);
+        let req = SaveHooperIndexRequest::new(user, date, patch);
+        let result = service.save_hooper_index(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_hooper_index_propagates_get_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Err(HooperIndexError::Unknown(anyhow!("db error"))));
+        repository.expect_save_hooper_index().times(0);
+
+        let service = build_service(repository);
+
+        let req = SaveHooperIndexRequest::new(
+            UserId::test_default(),
+            test_date(),
+            HooperIndexPatch::default(),
+        );
+        let result = service.save_hooper_index(req).await;
+
+        assert!(matches!(result, Err(HooperIndexError::Unknown(_))));
+    }
+
+    #[tokio::test]
+    async fn test_update_hooper_index_propagates_save_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        repository
+            .expect_save_hooper_index()
+            .times(1)
+            .returning(|_, _, _| Err(HooperIndexError::Unknown(anyhow!("db error"))));
+
+        let service = build_service(repository);
+
+        let req = SaveHooperIndexRequest::new(
+            UserId::test_default(),
+            test_date(),
+            HooperIndexPatch::default(),
+        );
+        let result = service.save_hooper_index(req).await;
+
+        assert!(matches!(result, Err(HooperIndexError::Unknown(_))));
+    }
+}
+
+#[cfg(test)]
+mod test_training_service_weight_and_nutrition {
+    use std::sync::Arc;
+
+    use anyhow::anyhow;
+
+    use super::*;
+    use crate::clock::FakeClock;
+    use crate::models::training::{WeightAndNutrition, WeightAndNutritionPatch};
+    use crate::services::activity::test_utils::MockActivityService;
+    use crate::services::training::test_utils::MockTrainingRepository;
+    use chrono::NaiveDate;
+
+    fn test_date() -> NaiveDate {
+        NaiveDate::from_ymd_opt(2026, 1, 15).unwrap()
+    }
+
+    fn build_service(
+        repository: MockTrainingRepository,
+    ) -> TrainingService<MockTrainingRepository, MockActivityService, FakeClock> {
+        TrainingService::new(
+            repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        )
+    }
+
+    fn sample() -> WeightAndNutrition {
+        WeightAndNutrition::new(
+            Some(70.0),
+            Some(15.0),
+            Some(30.0),
+            Some(2000.0),
+            Some(50.0),
+            Some(250.0),
+            Some(150.0),
+            Some(2.5),
+            Some(0.0),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_get_weight_and_nutrition_returns_value() {
+        let user = UserId::from("user1");
+        let date = test_date();
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        repository
+            .expect_get_weight_and_nutrition()
+            .times(1)
+            .withf(move |u, d| u == &expected_user && *d == date)
+            .returning(|_, _| Ok(Some(sample())));
+
+        let service = build_service(repository);
+
+        let result = service
+            .get_weight_and_nutrition(&user, &date)
+            .await
+            .unwrap();
+
+        assert_eq!(result.unwrap().weight(), Some(70.0));
+    }
+
+    #[tokio::test]
+    async fn test_get_weight_and_nutrition_propagates_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_weight_and_nutrition()
+            .times(1)
+            .returning(|_, _| Err(WeightAndNutritionError::Unknown(anyhow!("db error"))));
+
+        let service = build_service(repository);
+
+        let result = service
+            .get_weight_and_nutrition(&UserId::test_default(), &test_date())
+            .await;
+
+        assert!(matches!(result, Err(WeightAndNutritionError::Unknown(_))));
+    }
+
+    #[tokio::test]
+    async fn test_delete_weight_and_nutrition_deletes_on_date() {
+        let user = UserId::from("user1");
+        let date = test_date();
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        repository
+            .expect_delete_weight_and_nutrition()
+            .times(1)
+            .withf(move |u, d| u == &expected_user && *d == date)
+            .returning(|_, _| Ok(()));
+
+        let service = build_service(repository);
+
+        let req = DeleteWeightAndNutritionRequest::new(user, date);
+        let result = service.delete_weight_and_nutrition(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_weight_and_nutrition_propagates_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_delete_weight_and_nutrition()
+            .times(1)
+            .returning(|_, _| Err(WeightAndNutritionError::Unknown(anyhow!("db error"))));
+
+        let service = build_service(repository);
+
+        let req = DeleteWeightAndNutritionRequest::new(UserId::test_default(), test_date());
+        let result = service.delete_weight_and_nutrition(req).await;
+
+        assert!(matches!(result, Err(WeightAndNutritionError::Unknown(_))));
+    }
+
+    #[tokio::test]
+    async fn test_update_weight_and_nutrition_patches_existing_value() {
+        let user = UserId::from("user1");
+        let date = test_date();
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        repository
+            .expect_get_weight_and_nutrition()
+            .times(1)
+            .withf(move |u, d| u == &expected_user && *d == date)
+            .returning(|_, _| Ok(Some(sample())));
+
+        let expected_user = user.clone();
+        repository
+            .expect_save_weight_and_nutrition()
+            .times(1)
+            .withf(move |u, d, v| {
+                u == &expected_user
+                    && *d == date
+                    && v.weight() == Some(72.0)
+                    && v.fat() == Some(15.0)
+                    && v.muscle() == None
+                    && v.calories() == Some(2000.0)
+                    && v.lipid() == Some(50.0)
+                    && v.carbs() == Some(250.0)
+                    && v.protein() == Some(150.0)
+                    && v.water() == Some(2.5)
+                    && v.alcohol() == Some(0.0)
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository);
+
+        // Override weight, clear muscle, leave every other field untouched.
+        let patch = WeightAndNutritionPatch::new(
+            Some(Some(72.0)),
+            None,
+            Some(None),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let req = SaveWeightAndNutritionRequest::new(user, date, patch);
+        let result = service.save_weight_and_nutrition(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_weight_and_nutrition_without_existing_value_starts_from_default() {
+        let user = UserId::from("user1");
+        let date = test_date();
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_weight_and_nutrition()
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let expected_user = user.clone();
+        repository
+            .expect_save_weight_and_nutrition()
+            .times(1)
+            .withf(move |u, d, v| {
+                u == &expected_user
+                    && *d == date
+                    && v.weight() == Some(68.0)
+                    && v.fat() == None
+                    && v.muscle() == None
+                    && v.calories() == None
+                    && v.lipid() == None
+                    && v.carbs() == None
+                    && v.protein() == None
+                    && v.water() == None
+                    && v.alcohol() == None
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository);
+
+        let patch = WeightAndNutritionPatch::new(
+            Some(Some(68.0)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+        let req = SaveWeightAndNutritionRequest::new(user, date, patch);
+        let result = service.save_weight_and_nutrition(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_weight_and_nutrition_propagates_get_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_weight_and_nutrition()
+            .times(1)
+            .returning(|_, _| Err(WeightAndNutritionError::Unknown(anyhow!("db error"))));
+        repository.expect_save_weight_and_nutrition().times(0);
+
+        let service = build_service(repository);
+
+        let req = SaveWeightAndNutritionRequest::new(
+            UserId::test_default(),
+            test_date(),
+            WeightAndNutritionPatch::default(),
+        );
+        let result = service.save_weight_and_nutrition(req).await;
+
+        assert!(matches!(result, Err(WeightAndNutritionError::Unknown(_))));
+    }
+
+    #[tokio::test]
+    async fn test_update_weight_and_nutrition_propagates_save_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_weight_and_nutrition()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        repository
+            .expect_save_weight_and_nutrition()
+            .times(1)
+            .returning(|_, _, _| Err(WeightAndNutritionError::Unknown(anyhow!("db error"))));
+
+        let service = build_service(repository);
+
+        let req = SaveWeightAndNutritionRequest::new(
+            UserId::test_default(),
+            test_date(),
+            WeightAndNutritionPatch::default(),
+        );
+        let result = service.save_weight_and_nutrition(req).await;
+
+        assert!(matches!(result, Err(WeightAndNutritionError::Unknown(_))));
+    }
+
+    #[tokio::test]
+    async fn test_save_bulk_weight_and_nutrition_patches_existing_and_defaults_missing() {
+        let user = UserId::from("user1");
+        let existing_date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+        let new_date = NaiveDate::from_ymd_opt(2026, 1, 16).unwrap();
+        let range = DateRange::new(existing_date, NaiveDate::from_ymd_opt(2026, 1, 20).unwrap());
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        let expected_range = range.clone();
+        repository
+            .expect_get_weight_and_nutritions()
+            .times(1)
+            .withf(move |u, r| u == &expected_user && r == &expected_range)
+            .returning(move |_, _| Ok(vec![(existing_date, sample())]));
+
+        let expected_user = user.clone();
+        repository
+            .expect_save_bulk_weight_and_nutrition()
+            .times(1)
+            .withf(move |u, values| {
+                u == &expected_user
+                    && values.len() == 2
+                    // Existing value is patched: weight overridden, muscle cleared,
+                    // all other fields kept from the stored value.
+                    && values[0].0 == existing_date
+                    && values[0].1.weight() == Some(72.0)
+                    && values[0].1.fat() == Some(15.0)
+                    && values[0].1.muscle() == None
+                    && values[0].1.calories() == Some(2000.0)
+                    && values[0].1.water() == Some(2.5)
+                    // No stored value for this date, so it starts from the default.
+                    && values[1].0 == new_date
+                    && values[1].1.weight() == Some(68.0)
+                    && values[1].1.fat() == None
+                    && values[1].1.muscle() == None
+                    && values[1].1.calories() == None
+            })
+            .returning(|_, _| Ok(()));
+
+        let service = build_service(repository);
+
+        let patches = vec![
+            (
+                existing_date,
+                WeightAndNutritionPatch::new(
+                    Some(Some(72.0)),
+                    None,
+                    Some(None),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            ),
+            (
+                new_date,
+                WeightAndNutritionPatch::new(
+                    Some(Some(68.0)),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            ),
+        ];
+
+        let req = SaveBulkWeightAndNutritionRequest::new(user, patches, range);
+        let result = service.save_bulk_weight_and_nutrition(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_save_bulk_weight_and_nutrition_empty_values_still_delegates() {
+        let user = UserId::from("user1");
+        let range = DateRange::new(test_date(), test_date());
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_weight_and_nutritions()
+            .times(1)
+            .returning(|_, _| Ok(vec![]));
+        repository
+            .expect_save_bulk_weight_and_nutrition()
+            .times(1)
+            .withf(|_, values| values.is_empty())
+            .returning(|_, _| Ok(()));
+
+        let service = build_service(repository);
+
+        let req = SaveBulkWeightAndNutritionRequest::new(user, vec![], range);
+        let result = service.save_bulk_weight_and_nutrition(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_save_bulk_weight_and_nutrition_propagates_get_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_weight_and_nutritions()
+            .times(1)
+            .returning(|_, _| Err(WeightAndNutritionError::Unknown(anyhow!("db error"))));
+        repository.expect_save_bulk_weight_and_nutrition().times(0);
+
+        let service = build_service(repository);
+
+        let req = SaveBulkWeightAndNutritionRequest::new(
+            UserId::test_default(),
+            vec![(test_date(), WeightAndNutritionPatch::default())],
+            DateRange::new(test_date(), test_date()),
+        );
+        let result = service.save_bulk_weight_and_nutrition(req).await;
+
+        assert!(matches!(result, Err(WeightAndNutritionError::Unknown(_))));
+    }
+
+    #[tokio::test]
+    async fn test_save_bulk_weight_and_nutrition_propagates_save_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_weight_and_nutritions()
+            .times(1)
+            .returning(|_, _| Ok(vec![]));
+        repository
+            .expect_save_bulk_weight_and_nutrition()
+            .times(1)
+            .returning(|_, _| Err(WeightAndNutritionError::Unknown(anyhow!("db error"))));
+
+        let service = build_service(repository);
+
+        let req = SaveBulkWeightAndNutritionRequest::new(
+            UserId::test_default(),
+            vec![(test_date(), WeightAndNutritionPatch::default())],
+            DateRange::new(test_date(), test_date()),
+        );
+        let result = service.save_bulk_weight_and_nutrition(req).await;
+
+        assert!(matches!(result, Err(WeightAndNutritionError::Unknown(_))));
+    }
+}
+
+#[cfg(test)]
+mod test_align_date_range {
+    use crate::models::training::{TrainingMetricAggregate, TrainingMetricGranularity};
+
+    use super::*;
+
+    #[test]
+    fn test_align_date_range_when_scope_is_global_and_window_granularity_daily() {
+        let date_range = DateRange::new(
+            "2026-06-23".parse::<NaiveDate>().unwrap(),
+            "2026-06-25".parse::<NaiveDate>().unwrap(),
+        );
+        let scope = TrainingMetricScope::Global;
+        let window = Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Sum,
+        ));
+
+        let aligned_date_range = align_date_range(&date_range, &scope, &window);
+
+        assert_eq!(
+            aligned_date_range,
+            DateRange::new(
+                "2026-06-23".parse::<NaiveDate>().unwrap(), // Unchanged
+                "2026-06-26".parse::<NaiveDate>().unwrap(), // +1 day to make the range end inclusive
+            )
+        )
+    }
+
+    #[test]
+    fn test_align_date_range_when_scope_is_global_and_window_granularity_weekly() {
+        let date_range = DateRange::new(
+            "2026-06-16".parse::<NaiveDate>().unwrap(),
+            "2026-06-23".parse::<NaiveDate>().unwrap(),
+        );
+        let scope = TrainingMetricScope::Global;
+        let window = Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Sum,
+        ));
+
+        let aligned_date_range = align_date_range(&date_range, &scope, &window);
+
+        assert_eq!(
+            aligned_date_range,
+            DateRange::new(
+                "2026-06-15".parse::<NaiveDate>().unwrap(), // Start of the first week
+                "2026-06-29".parse::<NaiveDate>().unwrap(), // Next monday to make the range end inclusive
+            )
+        )
+    }
+
+    #[test]
+    fn test_align_date_range_when_scope_is_global_and_window_granularity_monthly() {
+        let date_range = DateRange::new(
+            "2026-05-23".parse::<NaiveDate>().unwrap(),
+            "2026-06-25".parse::<NaiveDate>().unwrap(),
+        );
+        let scope = TrainingMetricScope::Global;
+        let window = Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Monthly,
+            TrainingMetricAggregate::Sum,
+        ));
+
+        let aligned_date_range = align_date_range(&date_range, &scope, &window);
+
+        assert_eq!(
+            aligned_date_range,
+            DateRange::new(
+                "2026-05-01".parse::<NaiveDate>().unwrap(), // Start of the first month
+                "2026-07-01".parse::<NaiveDate>().unwrap(), // Start of next month to make the range end inclusive
+            )
+        )
+    }
+
+    #[test]
+    fn test_align_date_range_when_scope_is_global_and_window_none() {
+        let date_range = DateRange::new(
+            "2026-05-23".parse::<NaiveDate>().unwrap(),
+            "2026-06-25".parse::<NaiveDate>().unwrap(),
+        );
+        let scope = TrainingMetricScope::Global;
+        let window = None;
+
+        let aligned_date_range = align_date_range(&date_range, &scope, &window);
+
+        assert_eq!(
+            aligned_date_range,
+            DateRange::new(
+                "2026-05-23".parse::<NaiveDate>().unwrap(), // Unchanged
+                "2026-06-26".parse::<NaiveDate>().unwrap(), // +1 day to make the range end inclusive
+            )
+        )
+    }
+
+    #[test]
+    fn test_align_date_range_when_scope_is_metric() {
+        let date_range = DateRange::new(
+            "2026-05-23".parse::<NaiveDate>().unwrap(),
+            "2026-06-25".parse::<NaiveDate>().unwrap(),
+        );
+        let scope = TrainingMetricScope::TrainingPeriod(TrainingPeriodId::new());
+        let window = None;
+
+        let aligned_date_range = align_date_range(&date_range, &scope, &window);
+
+        assert_eq!(
+            aligned_date_range,
+            DateRange::new(
+                "2026-05-23".parse::<NaiveDate>().unwrap(), // Unchanged
+                "2026-06-26".parse::<NaiveDate>().unwrap(), // +1 day to make the range end inclusive
+            )
+        )
+    }
+}
+
+#[cfg(test)]
+mod test_training_service_activity_with_training_context {
+    use std::sync::Arc;
+
+    use anyhow::anyhow;
+    use chrono::{DateTime, FixedOffset};
+
+    use super::*;
+    use crate::clock::FakeClock;
+    use crate::models::activity::{
+        Activity, ActivityDuration, ActivityDurationCurve, ActivityDurationCurves, ActivityId,
+        ActivityMetrics, ActivityStartTime, ActivityStatistics, ActivityTimeseries,
+        ActivityWithParsedData, DurationCurveType, Sport,
+    };
+    use crate::models::training::{
+        BestDurationCurve, HooperIndex, SubjectiveScale, TrainingPeriod, TrainingPeriodSports,
+    };
+    use crate::services::activity::test_utils::MockActivityService;
+    use crate::services::training::test_utils::MockTrainingRepository;
+
+    fn scale(value: u8) -> SubjectiveScale {
+        SubjectiveScale::try_from(value).unwrap()
+    }
+
+    fn build_activity_with_parsed_data(start_time: &str) -> ActivityWithParsedData {
+        ActivityWithParsedData::new(
+            Activity::new_empty(
+                ActivityId::from("activity-1"),
+                UserId::test_default(),
+                ActivityStartTime::new(start_time.parse::<DateTime<FixedOffset>>().unwrap()),
+                ActivityDuration::default(),
+                Sport::Cycling,
+            ),
+            ActivityTimeseries::empty(),
+            ActivityStatistics::new(HashMap::new()),
+            ActivityDurationCurves::default(),
+        )
+    }
+
+    fn build_activity_with_power_curve(start_time: &str) -> ActivityWithParsedData {
+        let base = build_activity_with_parsed_data(start_time);
+        ActivityWithParsedData::new(
+            base.activity().clone(),
+            base.timeseries().clone(),
+            base.statistics().clone(),
+            ActivityDurationCurves::new(vec![ActivityDurationCurve::new(
+                DurationCurveType::Power,
+                [Some(200.0); 12],
+            )]),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_returns_last_weight() {
+        let user = UserId::from("user1");
+        let activity = build_activity_with_parsed_data("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let expected_user = user.clone();
+        let expected_activity_id = activity_id.clone();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .withf(move |u, id, _| u == &expected_user && *id == expected_activity_id)
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .withf(move |u, d| u == &expected_user && *d == activity.start_time().naive_date())
+            .returning(|_, _| Ok(Some(85.0)));
+        repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .returning(|_, _, _| Ok(vec![]));
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+                None,
+            )
+            .await
+            .expect("Should have succeeded");
+
+        assert_eq!(result.activity().id(), &activity_id);
+        assert_eq!(result.metrics(), &metrics);
+        assert_eq!(result.training_context().weight(), &Some(85.0));
+        assert_eq!(
+            result.training_context().hooper_index(),
+            &HooperIndex::default()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_returns_hooper_index() {
+        let user = UserId::from("user1");
+        let activity = build_activity_with_parsed_data("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .returning(|_, _, _| Ok(vec![]));
+        let expected_user = user.clone();
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .withf(move |u, d| {
+                u == &expected_user && *d == "2025-09-03".parse::<NaiveDate>().unwrap()
+            })
+            .returning(|_, _| {
+                Ok(Some(HooperIndex::new(
+                    Some(scale(6)),
+                    Some(scale(2)),
+                    Some(scale(3)),
+                    Some(scale(4)),
+                    Some(scale(5)),
+                )))
+            });
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+                None,
+            )
+            .await
+            .expect("Should have succeeded");
+
+        let hooper_index = result.training_context().hooper_index();
+        assert_eq!(hooper_index.fatigue(), &Some(scale(6)));
+        assert_eq!(hooper_index.sleep(), &Some(scale(2)));
+        assert_eq!(hooper_index.pain(), &Some(scale(3)));
+        assert_eq!(hooper_index.stress(), &Some(scale(4)));
+        assert_eq!(hooper_index.mood(), &Some(scale(5)));
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_propagates_hooper_index_error() {
+        let user = UserId::from("user1");
+        let activity = build_activity_with_parsed_data("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .returning(|_, _, _| Ok(vec![]));
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Err(HooperIndexError::Unknown(anyhow!("db error"))));
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+                None,
+            )
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(ActivityWithTrainingContextError::Unknown(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_without_weight() {
+        let user = UserId::from("user1");
+        let activity = build_activity_with_parsed_data("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .returning(|_, _, _| Ok(vec![]));
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+                None,
+            )
+            .await
+            .expect("Should have succeeded");
+
+        assert_eq!(result.training_context().weight(), &None);
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_activity_does_not_exist() {
+        let user = UserId::from("user1");
+        let activity_id = ActivityId::from("activity-1");
+
+        let mut activity_service = MockActivityService::new();
+        let expected_user = user.clone();
+        let expected_activity_id = activity_id.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .withf(move |u, id, _| u == &expected_user && *id == expected_activity_id)
+            .returning(|_, _, _| {
+                Err(GetActivityError::ActivityDoesNotExist(ActivityId::from(
+                    "activity-1",
+                )))
+            });
+
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_get_last_weight().times(0);
+        repository.expect_get_best_duration_curves().times(0);
+        repository.expect_get_hooper_index().times(0);
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let err = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+                None,
+            )
+            .await
+            .expect_err("Should have failed");
+
+        let ActivityWithTrainingContextError::ActivityDoesNotExist(id) = err else {
+            unreachable!(
+                "Should have returned ActivityWithTrainingContextError::ActivityDoesNotExist"
+            )
+        };
+        assert_eq!(id, activity_id);
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_propagates_get_last_weight_error() {
+        let user = UserId::from("user1");
+        let activity = build_activity_with_parsed_data("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .returning(|_, _| Err(anyhow!("db error")));
+        repository.expect_get_best_duration_curves().times(0);
+        repository.expect_get_hooper_index().times(0);
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+                None,
+            )
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(ActivityWithTrainingContextError::Unknown(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_fetches_best_duration_curves() {
+        let user = UserId::from("user1");
+        let activity = build_activity_with_power_curve("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        let expected_user = user.clone();
+        repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .withf(move |u, since, before| {
+                u == &expected_user
+                    && *since == "2025-06-11".parse::<NaiveDate>().unwrap() // - 12 weeks
+                    && *before == "2025-09-03".parse::<NaiveDate>().unwrap()
+            })
+            .returning(|_, _, _| {
+                Ok(vec![
+                    BestDurationCurve::new(
+                        DurationCurveType::Power,
+                        [
+                            Some(250.0),
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                        ],
+                    ),
+                    BestDurationCurve::new(
+                        DurationCurveType::Pace,
+                        [
+                            None,
+                            Some(5.5),
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                        ],
+                    ),
+                ])
+            });
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+                None,
+            )
+            .await
+            .expect("Should have succeeded");
+
+        // All curve types are returned, whatever the activity's own curve type is: the client
+        // reconciles the ones matching the activity's curves.
+        let references = result.training_context().reference_best_duration_curves();
+        assert_eq!(references.len(), 1);
+        assert_eq!(
+            references[0].kind(),
+            &ReferenceDurationCurveKind::TwelveWeek
+        );
+        let curves = references[0].curves();
+        assert_eq!(curves.len(), 2);
+        let power_curve = curves
+            .iter()
+            .find(|curve| curve.curve_type() == DurationCurveType::Power)
+            .expect("Power curve should be set");
+        assert_eq!(power_curve.values()[0], Some(250.0));
+        let pace_curve = curves
+            .iter()
+            .find(|curve| curve.curve_type() == DurationCurveType::Pace)
+            .expect("Pace curve should be set");
+        assert_eq!(pace_curve.values()[1], Some(5.5));
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_without_duration_curves_returns_empty_list() {
+        let user = UserId::from("user1");
+        let activity = build_activity_with_parsed_data("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        // The curves are fetched regardless of the activity's own curves, since they describe
+        // the user's history over all curve types.
+        repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .returning(|_, _, _| Ok(vec![]));
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+                None,
+            )
+            .await
+            .expect("Should have succeeded");
+
+        let references = result.training_context().reference_best_duration_curves();
+        assert_eq!(references.len(), 1);
+        assert!(references[0].curves().is_empty());
+    }
+
+    fn training_period(start: &str, end: Option<&str>, name: &str) -> TrainingPeriod {
+        TrainingPeriod::new(
+            TrainingPeriodId::from("period-1"),
+            UserId::test_default(),
+            start.parse::<NaiveDate>().unwrap(),
+            end.map(|end| end.parse::<NaiveDate>().unwrap()),
+            name.to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_adds_period_reference() {
+        let user = UserId::from("user1");
+        // The activity is after the period start, so the period window is [start, activity).
+        let activity = build_activity_with_parsed_data("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        // 12-week reference, then the period reference.
+        repository
+            .expect_get_best_duration_curves()
+            .times(2)
+            .returning(|_, _, _| Ok(vec![]));
+        repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| {
+                Some(training_period(
+                    "2025-07-07",
+                    Some("2025-12-31"),
+                    "Base training",
+                ))
+            });
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+                Some(TrainingPeriodId::from("period-1")),
+            )
+            .await
+            .expect("Should have succeeded");
+
+        let references = result.training_context().reference_best_duration_curves();
+        assert_eq!(references.len(), 2);
+        assert_eq!(
+            references[0].kind(),
+            &ReferenceDurationCurveKind::TwelveWeek
+        );
+        assert_eq!(
+            references[1].kind(),
+            &ReferenceDurationCurveKind::TrainingPeriod
+        );
+        assert_eq!(references[1].label().as_deref(), Some("Base training"));
+        assert_eq!(
+            references[1].start(),
+            &"2025-07-07".parse::<NaiveDate>().unwrap()
+        );
+        assert_eq!(
+            references[1].end(),
+            &"2025-09-03".parse::<NaiveDate>().unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_missing_period_falls_back_to_twelve_week() {
+        let user = UserId::from("user1");
+        let activity = build_activity_with_parsed_data("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .returning(|_, _, _| Ok(vec![]));
+        repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| None);
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+                Some(TrainingPeriodId::from("period-1")),
+            )
+            .await
+            .expect("Should have succeeded");
+
+        let references = result.training_context().reference_best_duration_curves();
+        assert_eq!(references.len(), 1);
+        assert_eq!(
+            references[0].kind(),
+            &ReferenceDurationCurveKind::TwelveWeek
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_period_window_capped_at_period_end() {
+        let user = UserId::from("user1");
+        // The activity is after the period end: the window must not extend past it.
+        let activity = build_activity_with_parsed_data("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        repository
+            .expect_get_best_duration_curves()
+            .times(2)
+            .returning(|_, _, _| Ok(vec![]));
+        repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| Some(training_period("2025-07-07", Some("2025-08-31"), "Base")));
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+                Some(TrainingPeriodId::from("period-1")),
+            )
+            .await
+            .expect("Should have succeeded");
+
+        let references = result.training_context().reference_best_duration_curves();
+        assert_eq!(
+            references[1].end(),
+            &"2025-09-01".parse::<NaiveDate>().unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_period_started_on_activity_day_is_omitted() {
+        let user = UserId::from("user1");
+        let activity = build_activity_with_parsed_data("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        // Only the 12-week reference is fetched: the period window is empty.
+        repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .returning(|_, _, _| Ok(vec![]));
+        repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| Some(training_period("2025-09-03", None, "Base")));
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+                Some(TrainingPeriodId::from("period-1")),
+            )
+            .await
+            .expect("Should have succeeded");
+
+        let references = result.training_context().reference_best_duration_curves();
+        assert_eq!(references.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod tests_duration_curve_outbox {
+    //! Tests for `TrainingService::run` and `process_pending_outbox`.
+    //!
+    //! Modeled after the `SearchService` outbox tests:
+    //!
+    //! - `run()` is an infinite `tokio::select!` loop and never returns on its
+    //!   own. Tests spawn it and stop it by cancelling `service.shutdown`, then
+    //!   await the spawned handle.
+    //! - A `done` `Notify` is used purely as a synchronization probe: mock
+    //!   methods notify it, and the test awaits it to know processing finished
+    //!   before cancelling shutdown. This avoids sleeps and races.
+
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use anyhow::anyhow;
+
+    use super::*;
+    use crate::clock::FakeClock;
+    use crate::{
+        models::activity::{ActivityDurationCurve, DurationCurveType},
+        ports::activity::DurationCurveNotification,
+        services::{
+            activity::test_utils::MockActivityService, training::test_utils::MockTrainingRepository,
+        },
+    };
+
+    fn processed_at() -> chrono::DateTime<chrono::Utc> {
+        chrono::DateTime::<chrono::Utc>::from_timestamp(1_700_000_000, 0).unwrap()
+    }
+
+    fn curve() -> ActivityDurationCurve {
+        ActivityDurationCurve::new(DurationCurveType::Power, [Some(1.0); 12])
+    }
+
+    fn notification(event: DurationCurveEvent) -> DurationCurveNotification {
+        let (curve, activity_date) = match event {
+            DurationCurveEvent::Created => (Some(curve()), Some(processed_at())),
+            DurationCurveEvent::Deleted => (None, None),
+        };
+        DurationCurveNotification::new(
+            event,
+            ActivityId::from("activity-1"),
+            UserId::test_default(),
+            curve,
+            activity_date,
+            processed_at(),
+        )
+    }
+
+    /// Set up the `list_pending_duration_curve_notifications` expectation to return the
+    /// given batches in order. The last batch is typically empty to end the processing
+    /// loop.
+    fn expect_list_pending_batches(
+        activity_service: &mut MockActivityService,
+        batches: Vec<Vec<DurationCurveNotification>>,
+    ) {
+        let nb_calls = batches.len();
+        let batches = Arc::new(std::sync::Mutex::new(batches));
+        activity_service
+            .expect_list_pending_duration_curve_notifications()
+            .times(nb_calls)
+            .returning(move |limit| {
+                assert_eq!(limit, BATCH_SIZE);
+                let mut batches = batches.lock().unwrap();
+                if batches.is_empty() {
+                    panic!("unexpected extra call to list_pending_duration_curve_notifications");
+                }
+                Ok(batches.remove(0))
+            });
+    }
+
+    fn build_service(
+        repository: MockTrainingRepository,
+        activity_service: MockActivityService,
+    ) -> TrainingService<MockTrainingRepository, MockActivityService, FakeClock> {
+        TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::new(processed_at()),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_does_nothing_without_notifications() {
+        let mut repository = MockTrainingRepository::new();
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_list_pending_duration_curve_notifications()
+            .return_once(|_| Ok(vec![]));
+
+        // Expect no side effects
+        repository.expect_save_duration_curve().times(0);
+        repository.expect_delete_duration_curve().times(0);
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(0);
+
+        let service = build_service(repository, activity_service);
+
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_returns_error_when_fetching_notifications_fails() {
+        let mut repository = MockTrainingRepository::new();
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_list_pending_duration_curve_notifications()
+            .return_once(|_| Err(anyhow!("failed to fetch notifications")));
+
+        // Expect no side effects
+        repository.expect_save_duration_curve().times(0);
+        repository.expect_delete_duration_curve().times(0);
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(0);
+
+        let service = build_service(repository, activity_service);
+
+        let res = service.process_pending_outbox().await;
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_saves_curve_and_marks_processed() {
+        let expected_user = UserId::test_default();
+        let expected_curve = curve();
+        let expected_date = processed_at();
+        let expected_processed_at = processed_at();
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_duration_curve()
+            .times(1)
+            .withf({
+                let expected_user = expected_user.clone();
+                move |user, activity, curve, date| {
+                    user == &expected_user
+                        && activity == &ActivityId::from("activity-1")
+                        && curve == &expected_curve
+                        && date == &expected_date
+                }
+            })
+            .returning(|_, _, _, _| Ok(()));
+
+        let mut activity_service = MockActivityService::new();
+        expect_list_pending_batches(
+            &mut activity_service,
+            vec![vec![notification(DurationCurveEvent::Created)], vec![]],
+        );
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(1)
+            .withf(move |activity, user, at| {
+                activity == &ActivityId::from("activity-1")
+                    && user == &expected_user
+                    && *at == expected_processed_at
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository, activity_service);
+
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_deletes_curve_and_marks_processed() {
+        let expected_user = UserId::test_default();
+        let expected_processed_at = processed_at();
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_delete_duration_curve()
+            .times(1)
+            .withf({
+                let expected_user = expected_user.clone();
+                move |user, activity| {
+                    user == &expected_user && activity == &ActivityId::from("activity-1")
+                }
+            })
+            .returning(|_, _| Ok(()));
+        repository.expect_save_duration_curve().times(0);
+
+        let mut activity_service = MockActivityService::new();
+        expect_list_pending_batches(
+            &mut activity_service,
+            vec![vec![notification(DurationCurveEvent::Deleted)], vec![]],
+        );
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(1)
+            .withf(move |activity, user, at| {
+                activity == &ActivityId::from("activity-1")
+                    && user == &expected_user
+                    && *at == expected_processed_at
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository, activity_service);
+
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_marks_processed_even_when_curve_is_missing() {
+        // A `Created` notification without a curve/activity date is skipped for saving,
+        // but is still marked as processed so it is not picked up again.
+        let expected_user = UserId::test_default();
+        let expected_processed_at = processed_at();
+        let incomplete = DurationCurveNotification::new(
+            DurationCurveEvent::Created,
+            ActivityId::from("activity-1"),
+            UserId::test_default(),
+            None,
+            None,
+            processed_at(),
+        );
+
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_save_duration_curve().times(0);
+        repository.expect_delete_duration_curve().times(0);
+
+        let mut activity_service = MockActivityService::new();
+        expect_list_pending_batches(&mut activity_service, vec![vec![incomplete], vec![]]);
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(1)
+            .withf(move |activity, user, at| {
+                activity == &ActivityId::from("activity-1")
+                    && user == &expected_user
+                    && *at == expected_processed_at
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository, activity_service);
+
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_skips_marking_when_save_fails() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_duration_curve()
+            .times(1)
+            .returning(|_, _, _, _| Err(anyhow!("failed to save duration curve")));
+
+        let mut activity_service = MockActivityService::new();
+        // The failed notification stays pending, so the loop refetches; drain the
+        // outbox to end the loop. The save failure is counted toward the error
+        // threshold, so a permanently failing notification cannot spin forever.
+        expect_list_pending_batches(
+            &mut activity_service,
+            vec![vec![notification(DurationCurveEvent::Created)], vec![]],
+        );
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(0);
+
+        let service = build_service(repository, activity_service);
+
+        // Saving failure is swallowed: the notification is retried later.
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_continues_when_marking_fails() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_delete_duration_curve()
+            .times(2)
+            .returning(|_, _| Ok(()));
+
+        let mut activity_service = MockActivityService::new();
+        expect_list_pending_batches(
+            &mut activity_service,
+            vec![
+                vec![
+                    notification(DurationCurveEvent::Deleted),
+                    notification(DurationCurveEvent::Deleted),
+                ],
+                vec![],
+            ],
+        );
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(2)
+            .returning(|_, _, _| Err(anyhow!("failed to mark notification")));
+
+        let service = build_service(repository, activity_service);
+
+        // Marking failure is swallowed: processing continues for other notifications.
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_processes_until_outbox_is_empty() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_duration_curve()
+            .times(1)
+            .returning(|_, _, _, _| Ok(()));
+        repository
+            .expect_delete_duration_curve()
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        let mut activity_service = MockActivityService::new();
+        expect_list_pending_batches(
+            &mut activity_service,
+            vec![
+                vec![notification(DurationCurveEvent::Created)],
+                vec![notification(DurationCurveEvent::Deleted)],
+                vec![],
+            ],
+        );
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(2)
+            .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository, activity_service);
+
+        // Batches are processed in a loop until the repository returns an empty
+        // batch.
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_aborts_after_too_many_errors() {
+        let nb_notifications = BATCH_SIZE as usize + 2;
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_delete_duration_curve()
+            .times(nb_notifications)
+            .returning(|_, _| Ok(()));
+
+        let mut activity_service = MockActivityService::new();
+        // If the loop did not abort after too many errors, the second batch would be
+        // processed too, and the expectations below would fail.
+        expect_list_pending_batches(
+            &mut activity_service,
+            vec![
+                (0..nb_notifications)
+                    .map(|_| notification(DurationCurveEvent::Deleted))
+                    .collect(),
+                vec![notification(DurationCurveEvent::Deleted)],
+            ],
+        );
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(nb_notifications)
+            .returning(|_, _, _| Err(anyhow!("failed to mark notification")));
+
+        let service = build_service(repository, activity_service);
+
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_aborts_after_too_many_save_errors() {
+        let nb_notifications = BATCH_SIZE as usize + 2;
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_duration_curve()
+            .times(nb_notifications)
+            .returning(|_, _, _, _| Err(anyhow!("failed to save duration curve")));
+
+        let mut activity_service = MockActivityService::new();
+        // If save errors were not counted toward the error threshold, the same
+        // (unprocessed) notifications would be refetched and retried forever.
+        expect_list_pending_batches(
+            &mut activity_service,
+            vec![
+                (0..nb_notifications)
+                    .map(|_| notification(DurationCurveEvent::Created))
+                    .collect(),
+                vec![notification(DurationCurveEvent::Created)],
+            ],
+        );
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(0);
+
+        let service = build_service(repository, activity_service);
+
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_run_returns_when_shutdown_is_cancelled() {
+        let mut activity_service = MockActivityService::new();
+        // Startup outbox processing finds nothing before shutdown kicks in.
+        activity_service
+            .expect_list_pending_duration_curve_notifications()
+            .return_once(|_| Ok(vec![]));
+
+        let service = build_service(MockTrainingRepository::new(), activity_service);
+
+        let shutdown = service.shutdown.clone();
+        let handle = tokio::spawn(async move {
+            service.run().await;
+        });
+
+        shutdown.cancel();
+        handle
+            .await
+            .expect("run should return once shutdown is cancelled");
+    }
+
+    #[tokio::test]
+    async fn test_run_processes_pending_outbox_on_startup() {
+        let done = Arc::new(tokio::sync::Notify::new());
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_duration_curve()
+            .times(1)
+            .returning(|_, _, _, _| Ok(()));
+
+        let mut activity_service = MockActivityService::new();
+        expect_list_pending_batches(
+            &mut activity_service,
+            vec![vec![notification(DurationCurveEvent::Created)], vec![]],
+        );
+        let done_clone = done.clone();
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(1)
+            .returning(move |_, _, _| {
+                done_clone.notify_one();
+                Ok(())
+            });
+
+        let service = build_service(repository, activity_service);
+        let shutdown = service.shutdown.clone();
+
+        let handle = tokio::spawn(async move {
+            service.run().await;
+        });
+
+        done.notified().await;
+
+        shutdown.cancel();
+        handle
+            .await
+            .expect("run should return after shutdown is cancelled");
+    }
+
+    #[tokio::test]
+    async fn test_run_processes_outbox_when_notified_then_stops_on_shutdown() {
+        let done = Arc::new(tokio::sync::Notify::new());
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_duration_curve()
+            .times(1)
+            .returning(|_, _, _, _| Ok(()));
+
+        let mut activity_service = MockActivityService::new();
+        // The first `process_pending_outbox` call happens on startup and finds nothing;
+        // the notification is only processed once `duration_curve_notify` fires, and the
+        // loop refetches once more before the outbox is drained.
+        let list_calls = Arc::new(AtomicUsize::new(0));
+        let list_calls_clone = list_calls.clone();
+        activity_service
+            .expect_list_pending_duration_curve_notifications()
+            .times(3)
+            .returning(
+                move |_| match list_calls_clone.fetch_add(1, Ordering::SeqCst) {
+                    0 => Ok(vec![]),
+                    1 => Ok(vec![notification(DurationCurveEvent::Created)]),
+                    _ => Ok(vec![]),
+                },
+            );
+        let done_clone = done.clone();
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(1)
+            .returning(move |_, _, _| {
+                done_clone.notify_one();
+                Ok(())
+            });
+
+        let service = build_service(repository, activity_service);
+        let duration_curve_notify = service.duration_curve_notify.clone();
+        let shutdown = service.shutdown.clone();
+
+        let handle = tokio::spawn(async move {
+            service.run().await;
+        });
+
+        duration_curve_notify.notify_one();
+        done.notified().await;
+
+        shutdown.cancel();
+        handle
+            .await
+            .expect("run should return after shutdown is cancelled");
+    }
+}

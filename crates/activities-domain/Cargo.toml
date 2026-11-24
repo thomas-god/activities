@@ -1,0 +1,27 @@
+[package]
+name = "activities-domain"
+version = "0.11.6"
+edition = "2024"
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+derive_more.workspace = true
+itertools.workspace = true
+log.workspace = true
+mockall = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true
+sqlx = { workspace = true, optional = true }
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+mockall.workspace = true
+
+[features]
+test-utils = ["dep:mockall"]
+sqlx = ["dep:sqlx"]

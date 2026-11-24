@@ -34,15 +34,6 @@ async fn run() -> anyhow::Result<()> {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    match activities_app::cli::parse_env() {
-        Some(Ok(command)) => return activities_app::cli::run(command).await,
-        Some(Err(err)) => {
-            let _ = err.print();
-            std::process::exit(2);
-        }
-        None => {}
-    }
-
     let telemetry_config = TelemetryConfig::from_env(&StdEnvironment {});
     let telemetry = activities_app::telemetry::init(&telemetry_config)?;
     let result = run().await;

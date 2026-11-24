@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn test_response_body_item_serialize() {
-        use crate::domain::models::{
+        use activities_domain::models::{
             UserId,
             training::{TrainingPeriodId, TrainingPeriodSports},
         };

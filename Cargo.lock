@@ -6,43 +6,31 @@ version = 4
 name = "activities-app"
 version = "0.11.6"
 dependencies = [
+ "activities-auth",
+ "activities-domain",
+ "activities-infra",
  "anyhow",
- "argon2",
- "assert_approx_eq",
  "axum",
  "axum-extra",
  "axum-test",
- "base64 0.23.1",
  "chrono",
- "clap",
  "const-hex",
  "cookie",
- "cron",
  "derive_more",
- "email_address",
- "fit-parser",
  "flate2",
- "getrandom 0.4.3",
- "handlebars",
  "hmac 0.13.0",
  "itertools 0.15.0",
- "lettre",
  "log",
  "mockall",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-semantic-conventions",
  "opentelemetry_sdk",
- "rand 0.10.4",
  "reqwest",
- "roxmltree",
  "serde",
  "serde_json",
  "sha2 0.11.1",
- "sqlx",
- "subtle",
  "tempfile",
- "thiserror",
  "tokio",
  "tokio-util",
  "tower",
@@ -50,9 +38,98 @@ dependencies = [
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
+ "url",
+ "uuid",
+ "zip",
+]
+
+[[package]]
+name = "activities-auth"
+version = "0.11.6"
+dependencies = [
+ "activities-domain",
+ "anyhow",
+ "argon2",
+ "base64 0.23.1",
+ "chrono",
+ "const-hex",
+ "derive_more",
+ "email_address",
+ "mockall",
+ "rand 0.10.4",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "subtle",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "activities-cli"
+version = "0.11.6"
+dependencies = [
+ "activities-auth",
+ "activities-domain",
+ "activities-infra",
+ "anyhow",
+ "clap",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "activities-domain"
+version = "0.11.6"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "derive_more",
+ "itertools 0.15.0",
+ "log",
+ "mockall",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "activities-infra"
+version = "0.11.6"
+dependencies = [
+ "activities-auth",
+ "activities-domain",
+ "anyhow",
+ "argon2",
+ "assert_approx_eq",
+ "chrono",
+ "cron",
+ "derive_more",
+ "fit-parser",
+ "handlebars",
+ "itertools 0.15.0",
+ "lettre",
+ "log",
+ "mockall",
+ "rand 0.10.4",
+ "roxmltree",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
  "unicode-normalization",
  "unicode_categories",
- "url",
  "uuid",
  "zip",
 ]

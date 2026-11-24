@@ -1,3 +1,4 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use std::{
     collections::HashMap,
     fmt::{Display, Write},
@@ -703,9 +704,9 @@ impl TryFrom<APIHooperIndexPatch> for HooperIndexPatch {
     }
 }
 
-impl From<HooperIndexError> for StatusCode {
-    fn from(_value: HooperIndexError) -> Self {
-        Self::UNPROCESSABLE_ENTITY
+impl ApiErrorStatus for HooperIndexError {
+    fn status_code(self) -> StatusCode {
+        StatusCode::UNPROCESSABLE_ENTITY
     }
 }
 
@@ -806,9 +807,9 @@ impl From<APIWeightAndNutritionPatch> for WeightAndNutritionPatch {
     }
 }
 
-impl From<WeightAndNutritionError> for StatusCode {
-    fn from(_value: WeightAndNutritionError) -> Self {
-        Self::UNPROCESSABLE_ENTITY
+impl ApiErrorStatus for WeightAndNutritionError {
+    fn status_code(self) -> StatusCode {
+        StatusCode::UNPROCESSABLE_ENTITY
     }
 }
 
@@ -816,8 +817,8 @@ impl From<WeightAndNutritionError> for StatusCode {
 mod tests {
     use super::*;
 
-    use crate::domain::models::activity::{Sport, SportCategory, Unit};
-    use crate::domain::models::training::{
+    use activities_domain::models::activity::{Sport, SportCategory, Unit};
+    use activities_domain::models::training::{
         HooperIndex, HooperIndexPatch, SportFilter, SubjectiveScale, TrainingMetricTarget,
         TrainingPeriodSports, WeightAndNutrition, WeightAndNutritionPatch,
     };

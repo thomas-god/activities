@@ -1,3 +1,4 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use std::str::FromStr;
 
 use axum::{
@@ -49,7 +50,7 @@ pub async fn get_weight_and_nutrition<
             if matches!(&err, WeightAndNutritionError::Unknown(_)) {
                 tracing::error!("Error getting weight and nutrition: {}", err);
             }
-            Err(StatusCode::from(err))
+            Err(err.status_code())
         }
     }
 }

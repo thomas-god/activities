@@ -32,32 +32,7 @@ pub mod set_password;
 pub mod update_email;
 pub mod validate_login;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum UserRegistration {
-    Allowed,
-    Closed,
-}
-
-impl From<&bool> for UserRegistration {
-    fn from(value: &bool) -> Self {
-        if *value { Self::Allowed } else { Self::Closed }
-    }
-}
-
-impl From<bool> for UserRegistration {
-    fn from(value: bool) -> Self {
-        Self::from(&value)
-    }
-}
-
-impl From<&UserRegistration> for bool {
-    fn from(value: &UserRegistration) -> Self {
-        match value {
-            UserRegistration::Allowed => true,
-            UserRegistration::Closed => false,
-        }
-    }
-}
+pub use crate::inbound::auth::UserRegistration;
 
 #[derive(Debug, Clone)]
 pub struct AuthAppState<UR: IMultiUserService> {

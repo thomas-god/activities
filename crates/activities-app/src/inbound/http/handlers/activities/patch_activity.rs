@@ -1,3 +1,4 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::{
     Extension, Json,
     extract::{Path, State},
@@ -26,12 +27,12 @@ use crate::{
     },
 };
 
-impl From<PatchActivityError> for StatusCode {
-    fn from(value: PatchActivityError) -> Self {
-        match value {
-            PatchActivityError::ActivityDoesNotExist(_) => Self::NOT_FOUND,
-            PatchActivityError::UserDoesNotOwnActivity(_, _) => Self::FORBIDDEN,
-            _ => Self::UNPROCESSABLE_ENTITY,
+impl ApiErrorStatus for PatchActivityError {
+    fn status_code(self) -> StatusCode {
+        match self {
+            PatchActivityError::ActivityDoesNotExist(_) => StatusCode::NOT_FOUND,
+            PatchActivityError::UserDoesNotOwnActivity(_, _) => StatusCode::FORBIDDEN,
+            _ => StatusCode::UNPROCESSABLE_ENTITY,
         }
     }
 }
@@ -180,7 +181,7 @@ pub async fn patch_activity<
             if let PatchActivityError::Unknown(_) = &err {
                 tracing::error!("Error while patching activity {activity_id}: {err}");
             }
-            StatusCode::from(err).into_response()
+            err.status_code().into_response()
         }
     }
 }

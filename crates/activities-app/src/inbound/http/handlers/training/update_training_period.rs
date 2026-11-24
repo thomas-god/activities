@@ -6,18 +6,18 @@ use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::domain::models::training::TrainingPeriodId;
+use activities_domain::models::training::TrainingPeriodId;
 
-use crate::domain::ports::activity::IActivityService;
-use crate::domain::ports::preferences::IPreferencesService;
-use crate::domain::ports::training::{
+use crate::inbound::auth::AuthenticatedUser;
+use crate::inbound::http::AppState;
+use activities_domain::ports::activity::IActivityService;
+use activities_domain::ports::preferences::IPreferencesService;
+use activities_domain::ports::training::{
     ITrainingService, UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
     UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest, UpdateTrainingPeriodNoteError,
     UpdateTrainingPeriodNoteRequest,
 };
-use crate::inbound::auth::AuthenticatedUser;
-use crate::inbound::http::AppState;
-use crate::inbound::parser::ParseFile;
+use activities_infra::parser::ParseFile;
 
 #[derive(Serialize)]
 struct ErrorResponse {

@@ -5,25 +5,25 @@ use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::domain::models::UserId;
-use crate::domain::models::activity::ActivityMetric;
-use crate::domain::models::training::{
-    TrainingMetricActivityFilters, TrainingMetricId, TrainingMetricName, TrainingMetricScope,
-    TrainingMetricSource, TrainingMetricTarget, TrainingMetricWindow, TrainingPeriodId,
-};
-use crate::domain::ports::training::{UpdateTrainingMetricError, UpdateTrainingMetricRequest};
-use crate::domain::ports::{
-    activity::IActivityService,
-    preferences::IPreferencesService,
-    training::{ITrainingService, UpdateTrainingMetricNameError, UpdateTrainingMetricNameRequest},
-};
 use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::inbound::http::handlers::training::types::{
     APITimeseriesWindow, APITrainingMetricFilters, APITrainingMetricScope, APITrainingMetricSource,
     APITrainingMetricSummary, APITrainingMetricTarget,
 };
-use crate::inbound::parser::ParseFile;
+use activities_domain::models::UserId;
+use activities_domain::models::activity::ActivityMetric;
+use activities_domain::models::training::{
+    TrainingMetricActivityFilters, TrainingMetricId, TrainingMetricName, TrainingMetricScope,
+    TrainingMetricSource, TrainingMetricTarget, TrainingMetricWindow, TrainingPeriodId,
+};
+use activities_domain::ports::training::{UpdateTrainingMetricError, UpdateTrainingMetricRequest};
+use activities_domain::ports::{
+    activity::IActivityService,
+    preferences::IPreferencesService,
+    training::{ITrainingService, UpdateTrainingMetricNameError, UpdateTrainingMetricNameRequest},
+};
+use activities_infra::parser::ParseFile;
 
 #[derive(Deserialize)]
 pub struct UpdateTrainingMetricBody {

@@ -1,3 +1,4 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use std::io::Read;
 
 use anyhow::anyhow;
@@ -23,9 +24,9 @@ use crate::{
     },
 };
 
-impl From<CreateActivityError> for StatusCode {
-    fn from(_value: CreateActivityError) -> Self {
-        Self::UNPROCESSABLE_ENTITY
+impl ApiErrorStatus for CreateActivityError {
+    fn status_code(self) -> StatusCode {
+        StatusCode::UNPROCESSABLE_ENTITY
     }
 }
 
@@ -311,7 +312,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_upload_with_unprocessable_files() {
-        use crate::domain::ports::activity::CreateActivityError;
+        use activities_domain::ports::activity::CreateActivityError;
 
         let mut seq = Sequence::new();
         let mut service = MockActivityService::new();

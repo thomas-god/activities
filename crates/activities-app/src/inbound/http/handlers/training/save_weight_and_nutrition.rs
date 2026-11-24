@@ -1,3 +1,4 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use std::{io::Read, str::FromStr};
 
 use anyhow::anyhow;
@@ -68,7 +69,7 @@ pub async fn save_weight_and_nutrition<
             if matches!(&err, WeightAndNutritionError::Unknown(_)) {
                 tracing::error!("Error updating weight and nutrition: {}", err);
             }
-            Err(StatusCode::from(err))
+            Err(err.status_code())
         }
     }
 }
@@ -136,7 +137,8 @@ pub async fn upload_bulk_weight_and_nutrition<
     state
         .training_metrics_service
         .save_bulk_weight_and_nutrition(req)
-        .await?;
+        .await
+        .map_err(|err| err.status_code())?;
 
     Ok((
         StatusCode::CREATED,
@@ -569,7 +571,7 @@ not-a-date,71.0\n\
     fn test_server(metrics: MockTrainingService) -> TestServer {
         let state = AppState {
             activity_service: Arc::new(
-                crate::domain::services::activity::test_utils::MockActivityService::new(),
+                activities_domain::services::activity::test_utils::MockActivityService::new(),
             ),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(MockFileParser::new()),

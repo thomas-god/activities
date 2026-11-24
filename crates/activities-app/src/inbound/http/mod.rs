@@ -27,20 +27,19 @@ use tower_http::cors::CorsLayer;
 use tower_http::services::{ServeDir, ServeFile};
 
 use crate::config::{AppMode, BaseConfig};
-use crate::domain::ports::{
+use activities_domain::ports::{
     activity::IActivityService, preferences::IPreferencesService, search::ISearchService,
     training::ITrainingService,
 };
 
-use crate::inbound::auth::AuthStrategy;
-use crate::inbound::auth::infra::add_auth_router;
 use crate::inbound::auth::multi_user::{
     IMultiUserService, admin::IAdminService, infra::handlers::admin::admin_routes,
 };
+use crate::inbound::auth::{auth_strategy_from_mode, infra::add_auth_router};
 use crate::inbound::http::handlers::{
     get_default_activity_metrics, get_training_metric_templates, upload_bulk_weight_and_nutrition,
 };
-use crate::inbound::parser::ParseFile;
+use activities_infra::parser::ParseFile;
 use handlers::{
     compute_training_metric_values, copy_training_metric, create_standalone_activity,
     create_training_metric, create_training_note, create_training_period, delete_activity,
@@ -55,15 +54,7 @@ use handlers::{
     update_training_period, upload_activities,
 };
 
-pub use crate::inbound::auth::multi_user::infra::mailer::smtp::SMTPEmailProvider;
-
-pub use crate::inbound::auth::multi_user::{
-    AuthMethods, DisabledUserService, MultiUserService, SessionService,
-    admin::DisabledAdminService,
-    infra::{mailer::DoNothingMailProvider, sqlite::SqliteUsersRepository},
-    spawn_expired_sessions_cleanup,
-};
-
+mod error_status;
 mod handlers;
 pub mod middlewares;
 mod shared;
@@ -201,7 +192,7 @@ impl<
         let admin_router = matches!(mode, AppMode::MultiUser(_))
             .then(|| admin_routes(user_service.clone(), admin_service));
 
-        let auth_strategy = AuthStrategy::from(mode);
+        let auth_strategy = auth_strategy_from_mode(mode);
         tracing::info!(
             "App starting with authentication strategy: {:?}",
             &auth_strategy
@@ -535,7 +526,11 @@ mod tests {
     use super::*;
     use axum_test::TestServer;
 
-    use crate::domain::{
+    use crate::inbound::{
+        auth::{AuthStrategy, SinglePassword, multi_user::test_utils::MockUserService},
+        parser::test_utils::MockFileParser,
+    };
+    use activities_domain::{
         models::{UserId, activity::ActivityId},
         ports::search::{SearchResult, search_test_utils::MockSearchService},
         services::{
@@ -543,10 +538,6 @@ mod tests {
             preferences::tests_utils::MockPreferencesService,
             training::test_utils::MockTrainingService,
         },
-    };
-    use crate::inbound::{
-        auth::{SinglePassword, multi_user::test_utils::MockUserService},
-        parser::test_utils::MockFileParser,
     };
 
     #[test]
@@ -710,7 +701,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_hooper_index_route_calls_service() {
-        use crate::domain::models::training::SubjectiveScale;
+        use activities_domain::models::training::SubjectiveScale;
 
         let mut training_service = MockTrainingService::new();
         training_service
@@ -814,7 +805,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_hooper_index_route_returns_values() {
-        use crate::domain::models::training::{HooperIndex, SubjectiveScale};
+        use activities_domain::models::training::{HooperIndex, SubjectiveScale};
 
         let mut training_service = MockTrainingService::new();
         training_service
@@ -961,7 +952,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_weight_and_nutrition_route_returns_values() {
-        use crate::domain::models::training::WeightAndNutrition;
+        use activities_domain::models::training::WeightAndNutrition;
 
         let mut training_service = MockTrainingService::new();
         training_service

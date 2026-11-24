@@ -1,9 +1,6 @@
-pub mod backup;
+pub use activities_domain as domain;
+
 pub mod bootstrap;
-pub mod cli;
-pub mod clock;
 pub mod config;
-pub mod domain;
 pub mod inbound;
-pub mod outbound;
 pub mod telemetry;

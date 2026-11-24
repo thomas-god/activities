@@ -1,0 +1,41 @@
+[package]
+name = "activities-infra"
+version = "0.11.6"
+edition = "2024"
+
+[dependencies]
+activities-auth.workspace = true
+activities-domain = { workspace = true, features = ["sqlx"] }
+anyhow.workspace = true
+chrono.workspace = true
+cron.workspace = true
+derive_more.workspace = true
+fit-parser.workspace = true
+handlebars.workspace = true
+itertools.workspace = true
+lettre.workspace = true
+log.workspace = true
+mockall = { workspace = true, optional = true }
+roxmltree.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+unicode-normalization.workspace = true
+unicode_categories.workspace = true
+uuid.workspace = true
+zip.workspace = true
+
+[dev-dependencies]
+activities-domain = { workspace = true, features = ["test-utils"] }
+argon2.workspace = true
+assert_approx_eq.workspace = true
+mockall.workspace = true
+rand.workspace = true
+tempfile.workspace = true
+
+[features]
+test-utils = ["dep:mockall"]

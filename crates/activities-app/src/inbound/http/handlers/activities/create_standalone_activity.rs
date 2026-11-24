@@ -1,8 +1,7 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
 
-use crate::domain::ports::activity::CreateActivityError;
-use crate::domain::ports::{preferences::IPreferencesService, training::ITrainingService};
 use crate::inbound::auth::AuthenticatedUser;
 use crate::{
     domain::ports::activity::IActivityService,
@@ -11,6 +10,8 @@ use crate::{
         parser::{ParseBytesError, ParseFile, ParsedFileContent, json::StandaloneActivity},
     },
 };
+use activities_domain::ports::activity::CreateActivityError;
+use activities_domain::ports::{preferences::IPreferencesService, training::ITrainingService};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateStandaloneActivityResponse {
@@ -47,7 +48,7 @@ pub async fn create_standalone_activity<
                     err.to_string()
                 );
             }
-            Err(StatusCode::from(err))
+            Err(err.status_code())
         }
     }
 }
@@ -59,7 +60,6 @@ mod tests {
     use axum::{Router, middleware::from_extractor, routing::post};
     use axum_test::TestServer;
 
-    use crate::domain::models::activity::Activity;
     use crate::{
         domain::{
             models::{
@@ -74,6 +74,7 @@ mod tests {
         },
         inbound::{auth::no_auth::DefaultUserExtractor, parser::test_utils::MockFileParser},
     };
+    use activities_domain::models::activity::Activity;
 
     use super::*;
 

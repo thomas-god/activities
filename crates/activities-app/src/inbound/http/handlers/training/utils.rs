@@ -7,7 +7,7 @@ use chrono::{DateTime, FixedOffset, Local};
 use derive_more::Constructor;
 use serde::{Deserialize, Serialize};
 
-use crate::domain::{
+use activities_domain::{
     models::{
         activity::{ActivityMetricSource, ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
         training::{
@@ -249,8 +249,8 @@ mod tests {
 
     use chrono::DateTime;
 
-    use crate::domain::models::activity::{TimeseriesAggregate, Unit};
-    use crate::domain::models::training::{
+    use activities_domain::models::activity::{TimeseriesAggregate, Unit};
+    use activities_domain::models::training::{
         TrainingMetricAggregate, TrainingMetricBin, TrainingMetricGranularity,
         TrainingMetricTarget, TrainingMetricValue, TrainingMetricValues,
     };
@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_convert_metric_values_distance_statistic_converts_to_kilometers() {
-        use crate::domain::models::training::TrainingMetricAggregate;
+        use activities_domain::models::training::TrainingMetricAggregate;
 
         // Distance statistic should be converted from meters to kilometers
         let values = GroupedMetricValues::new(
@@ -374,7 +374,7 @@ mod tests {
 
     #[test]
     fn test_convert_metric_values_duration_statistic_no_conversion() {
-        use crate::domain::models::training::TrainingMetricAggregate;
+        use activities_domain::models::training::TrainingMetricAggregate;
 
         // Duration should keep its unit (seconds) and values unchanged
         let values = GroupedMetricValues::new(
@@ -445,7 +445,7 @@ mod tests {
 
     #[test]
     fn test_convert_metric_values_with_multiple_groups() {
-        use crate::domain::models::training::TrainingMetricAggregate;
+        use activities_domain::models::training::TrainingMetricAggregate;
 
         // Test that conversion works correctly with multiple groups
         let values = GroupedMetricValues::new(
@@ -527,7 +527,7 @@ mod tests {
 
     #[test]
     fn test_convert_metric_values_pace_with_multiple_groups() {
-        use crate::domain::models::training::TrainingMetricAggregate;
+        use activities_domain::models::training::TrainingMetricAggregate;
 
         // Test pace conversion with multiple sports
         let values = GroupedMetricValues::new(
@@ -602,7 +602,7 @@ mod tests {
 
 #[cfg(test)]
 mod test_grouping_metric_values {
-    use crate::domain::models::training::{TrainingMetricSummaryValues, TrainingMetricValue};
+    use activities_domain::models::training::{TrainingMetricSummaryValues, TrainingMetricValue};
 
     use super::*;
 
@@ -754,7 +754,7 @@ mod test_grouping_metric_values {
 mod test_fill_grouped_metric_values {
     use chrono::NaiveDate;
 
-    use crate::domain::models::training::TrainingMetricActivityGroupBy;
+    use activities_domain::models::training::TrainingMetricActivityGroupBy;
 
     use super::*;
 

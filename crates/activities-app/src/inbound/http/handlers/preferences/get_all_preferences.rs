@@ -1,11 +1,12 @@
+use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::{Extension, Json, extract::State, http::StatusCode};
 
-use crate::domain::ports::{
+use crate::inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile};
+use activities_domain::ports::{
     activity::IActivityService,
     preferences::{GetPreferenceError, IPreferencesService},
     training::ITrainingService,
 };
-use crate::inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile};
 
 use super::types::PreferencePayload;
 
@@ -29,7 +30,7 @@ pub async fn get_all_preferences<
             if matches!(&err, GetPreferenceError::Unknown(_)) {
                 tracing::error!("Error getting all preferences: {}", err.to_string());
             }
-            return Err(StatusCode::from(err));
+            return Err(err.status_code());
         }
     };
 

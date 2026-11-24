@@ -1,3 +1,3 @@
 pub mod auth;
 pub mod http;
-pub mod parser;
+pub use activities_infra::parser;

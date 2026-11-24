@@ -107,7 +107,7 @@ mod tests {
     }
 
     fn build_server(mode: &AppMode, user_service: MockUserService) -> TestServer {
-        let strategy = AuthStrategy::from(mode);
+        let strategy = crate::inbound::auth::auth_strategy_from_mode(mode);
         // `add_auth_router` adds a `route_layer`, which panics if the base router has no route
         // yet; give it one so the middleware has something to wrap.
         let base_router = Router::new().route("/", get(|| async { StatusCode::OK }));
