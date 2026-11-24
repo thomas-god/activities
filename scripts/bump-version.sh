@@ -75,10 +75,8 @@ if ! command -v npm &> /dev/null; then
     exit 1
 fi
 
-echo "Updating Activities crate versions..."
-cargo set-version \
-    -p activities-app -p activities-auth -p activities-cli -p activities-domain -p activities-infra \
-    "$VERSION"
+echo "Updating workspace version..."
+cargo set-version --workspace "$VERSION"
 
 echo "Updating client/package.json..."
 cd "$PROJECT_ROOT/client"
@@ -94,7 +92,7 @@ git diff --name-only
 
 echo ""
 echo "Committing changes..."
-git add crates/activities-app/Cargo.toml crates/activities-auth/Cargo.toml crates/activities-cli/Cargo.toml crates/activities-domain/Cargo.toml crates/activities-infra/Cargo.toml Cargo.lock client/package.json client/package-lock.json
+git add Cargo.toml Cargo.lock client/package.json client/package-lock.json
 git commit -m "chore: bump version to $VERSION"
 
 echo -e "${GREEN}✓ Version bump committed${NC}"

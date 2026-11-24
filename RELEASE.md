@@ -22,7 +22,7 @@ Run the version bump script to sync versions across the sub-projects:
 
 This will:
 
-- Update versions in all `crates/activities-*/Cargo.toml`
+- Update the shared version in the workspace `Cargo.toml`
 - Update version in `client/package.json`
 - Create a commit with message: `chore: bump version to 1.0.0`
 

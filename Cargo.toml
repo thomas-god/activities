@@ -11,6 +11,10 @@ members = [
 ]
 default-members = ["crates/activities-app"]
 
+[workspace.package]
+version = "0.11.6"
+edition = "2024"
+
 [workspace.dependencies]
 # Internal workspace crates
 activities-app = { path = "crates/activities-app" }
