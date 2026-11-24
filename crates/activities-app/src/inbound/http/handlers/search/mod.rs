@@ -7,7 +7,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::inbound::auth::AuthenticatedUser;
+use activities_auth::infra::http::AuthenticatedUser;
 use activities_domain::search::ports::{ISearchService, SearchResult};
 
 #[derive(Debug, Deserialize)]

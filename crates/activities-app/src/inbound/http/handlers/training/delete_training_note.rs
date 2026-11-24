@@ -9,9 +9,9 @@ use crate::domain::activity::ports::IActivityService;
 use crate::domain::preferences::ports::IPreferencesService;
 use crate::domain::training::models::TrainingNoteId;
 use crate::domain::training::ports::ITrainingService;
-use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::{domain::training::ports::DeleteTrainingNoteError, inbound::parser::ParseFile};
+use activities_auth::infra::http::AuthenticatedUser;
 
 impl ApiErrorStatus for DeleteTrainingNoteError {
     fn status_code(self) -> StatusCode {

@@ -21,10 +21,10 @@ use crate::domain::activity::ports::PatchActivityError;
 use crate::domain::activity::ports::PatchActivityRequest;
 use crate::domain::preferences::ports::IPreferencesService;
 use crate::domain::training::ports::ITrainingService;
-use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::inbound::http::shared::PatchField;
 use crate::inbound::parser::ParseFile;
+use activities_auth::infra::http::AuthenticatedUser;
 
 impl ApiErrorStatus for PatchActivityError {
     fn status_code(self) -> StatusCode {

@@ -11,9 +11,9 @@ use crate::domain::training::models::TrainingMetricId;
 use crate::domain::training::ports::DeleteTrainingMetricError;
 use crate::domain::training::ports::DeleteTrainingMetricRequest;
 use crate::domain::training::ports::ITrainingService;
-use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::inbound::parser::ParseFile;
+use activities_auth::infra::http::AuthenticatedUser;
 
 impl ApiErrorStatus for DeleteTrainingMetricError {
     fn status_code(self) -> StatusCode {

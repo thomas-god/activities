@@ -1,7 +1,9 @@
 use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::{Extension, Json, extract::State, http::StatusCode};
 
-use crate::inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile};
+use crate::inbound::http::AppState;
+use crate::inbound::parser::ParseFile;
+use activities_auth::infra::http::AuthenticatedUser;
 use activities_domain::activity::ports::IActivityService;
 use activities_domain::preferences::ports::GetPreferenceError;
 use activities_domain::preferences::ports::IPreferencesService;

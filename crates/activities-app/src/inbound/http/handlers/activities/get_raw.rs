@@ -14,9 +14,9 @@ use crate::domain::activity::ports::GetAllActivitiesRequest;
 use crate::domain::activity::ports::IActivityService;
 use crate::domain::preferences::ports::IPreferencesService;
 use crate::domain::training::ports::ITrainingService;
-use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::inbound::parser::ParseFile;
+use activities_auth::infra::http::AuthenticatedUser;
 use activities_domain::activity::models::ActivityId;
 use activities_domain::activity::ports::{
     GetAllActivitiesError, GetRawActivityError, GetRawActivityRequest, RawActivity,

@@ -5,10 +5,9 @@ use axum::{
     http::StatusCode,
 };
 
-use crate::{
-    domain::training::models::TrainingNoteId,
-    inbound::{auth::AuthenticatedUser, http::AppState},
-};
+use crate::domain::training::models::TrainingNoteId;
+use crate::inbound::http::AppState;
+use activities_auth::infra::http::AuthenticatedUser;
 use activities_domain::activity::ports::IActivityService;
 use activities_domain::preferences::ports::IPreferencesService;
 use activities_domain::training::ports::GetTrainingNoteError;

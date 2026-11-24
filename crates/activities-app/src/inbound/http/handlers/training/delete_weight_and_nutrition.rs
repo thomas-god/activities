@@ -13,9 +13,9 @@ use crate::domain::preferences::ports::IPreferencesService;
 use crate::domain::training::ports::DeleteWeightAndNutritionRequest;
 use crate::domain::training::ports::ITrainingService;
 use crate::domain::training::ports::WeightAndNutritionError;
-use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::inbound::parser::ParseFile;
+use activities_auth::infra::http::AuthenticatedUser;
 
 #[tracing::instrument(skip_all, err)]
 pub async fn delete_weight_and_nutrition<

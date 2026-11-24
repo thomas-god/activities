@@ -3,19 +3,41 @@ use std::sync::Arc;
 use chrono::TimeDelta;
 use derive_more::Constructor;
 
-use crate::{
-    domain::shared::UserId,
-    multi_user::{
-        AuthLink, AuthLinkValidationResult, AuthMethods, AuthToken, CheckSessionResult,
-        EmailAddress, EmailChangeFinalizeResult, EmailChangeToken, EmailChangeValidationResult,
-        EmailVerificationResult, GenerateAuthLinkRequest, GenerateAuthLinkResult, HashedAuthLink,
-        HashedAuthToken, HashedEmailChangeToken, HashedPassword, HashedSessionToken,
-        IMultiUserService, ISessionService, MailProvider, Password, RegisterPasswordRequest,
-        RegisterPasswordResult, RevokeSessionsResult, SessionToken, UpdateEmailRequest,
-        UpdateEmailResult, UpdatePasswordRequest, UpdatePasswordResult, UserInfo, UserInfoResult,
-        UserLoginResult, UserRegistrationRequest, UserRegistrationResult,
-    },
-};
+use crate::domain::shared::UserId;
+use crate::multi_user::AuthLink;
+use crate::multi_user::AuthLinkValidationResult;
+use crate::multi_user::AuthMethods;
+use crate::multi_user::AuthToken;
+use crate::multi_user::CheckSessionResult;
+use crate::multi_user::EmailAddress;
+use crate::multi_user::EmailChangeFinalizeResult;
+use crate::multi_user::EmailChangeToken;
+use crate::multi_user::EmailChangeValidationResult;
+use crate::multi_user::EmailVerificationResult;
+use crate::multi_user::GenerateAuthLinkRequest;
+use crate::multi_user::GenerateAuthLinkResult;
+use crate::multi_user::HashedAuthLink;
+use crate::multi_user::HashedAuthToken;
+use crate::multi_user::HashedEmailChangeToken;
+use crate::multi_user::HashedPassword;
+use crate::multi_user::HashedSessionToken;
+use crate::multi_user::IMultiUserService;
+use crate::multi_user::ISessionService;
+use crate::multi_user::MailProvider;
+use crate::multi_user::Password;
+use crate::multi_user::RegisterPasswordRequest;
+use crate::multi_user::RegisterPasswordResult;
+use crate::multi_user::RevokeSessionsResult;
+use crate::multi_user::SessionToken;
+use crate::multi_user::UpdateEmailRequest;
+use crate::multi_user::UpdateEmailResult;
+use crate::multi_user::UpdatePasswordRequest;
+use crate::multi_user::UpdatePasswordResult;
+use crate::multi_user::UserInfo;
+use crate::multi_user::UserInfoResult;
+use crate::multi_user::UserLoginResult;
+use crate::multi_user::UserRegistrationRequest;
+use crate::multi_user::UserRegistrationResult;
 
 #[derive(Debug, Clone, Constructor)]
 pub struct MultiUserService<UR, SS, MP> {
@@ -843,17 +865,14 @@ mod test_utils {
 mod test_user_service_register_new_user {
     use anyhow::anyhow;
 
-    use crate::{
-        domain::shared::UserId,
-        multi_user::{
-            UserRegistrationResult,
-            service::test_utils::{
-                MockUserRepository, TEST_EMAIL, mail_and_password_service, password_only_service,
-                registration_request,
-            },
-            test_utils::MockMailProvider,
-        },
-    };
+    use crate::domain::shared::UserId;
+    use crate::multi_user::UserRegistrationResult;
+    use crate::multi_user::service::test_utils::MockUserRepository;
+    use crate::multi_user::service::test_utils::TEST_EMAIL;
+    use crate::multi_user::service::test_utils::mail_and_password_service;
+    use crate::multi_user::service::test_utils::password_only_service;
+    use crate::multi_user::service::test_utils::registration_request;
+    use crate::multi_user::test_utils::MockMailProvider;
 
     use super::*;
 
@@ -1125,17 +1144,18 @@ mod test_user_service_login_user {
     use anyhow::anyhow;
     use chrono::{TimeDelta, Utc};
 
-    use crate::{
-        domain::shared::UserId,
-        multi_user::{
-            GenerateSessionTokenResult, HashedPassword, Password, SessionToken,
-            service::test_utils::{
-                MockUserRepository, TEST_EMAIL, mail_and_password_service,
-                mail_and_password_service_with_session, password_only_service_with_session,
-            },
-            test_utils::{MockMailProvider, MockSessionService},
-        },
-    };
+    use crate::domain::shared::UserId;
+    use crate::multi_user::GenerateSessionTokenResult;
+    use crate::multi_user::HashedPassword;
+    use crate::multi_user::Password;
+    use crate::multi_user::SessionToken;
+    use crate::multi_user::service::test_utils::MockUserRepository;
+    use crate::multi_user::service::test_utils::TEST_EMAIL;
+    use crate::multi_user::service::test_utils::mail_and_password_service;
+    use crate::multi_user::service::test_utils::mail_and_password_service_with_session;
+    use crate::multi_user::service::test_utils::password_only_service_with_session;
+    use crate::multi_user::test_utils::MockMailProvider;
+    use crate::multi_user::test_utils::MockSessionService;
 
     use super::*;
 
@@ -1459,15 +1479,19 @@ mod test_user_service_login_user {
 mod test_user_service_password_management {
     use chrono::{TimeDelta, Utc};
 
-    use crate::multi_user::{
-        GenerateSessionTokenResult, HashedPassword, Password, RegisterPasswordRequest,
-        RegisterPasswordResult, SessionToken, UpdatePasswordRequest, UpdatePasswordResult,
-        service::test_utils::{
-            MockUserRepository, mail_and_password_service_with_session,
-            password_only_service_with_session,
-        },
-        test_utils::{MockMailProvider, MockSessionService},
-    };
+    use crate::multi_user::GenerateSessionTokenResult;
+    use crate::multi_user::HashedPassword;
+    use crate::multi_user::Password;
+    use crate::multi_user::RegisterPasswordRequest;
+    use crate::multi_user::RegisterPasswordResult;
+    use crate::multi_user::SessionToken;
+    use crate::multi_user::UpdatePasswordRequest;
+    use crate::multi_user::UpdatePasswordResult;
+    use crate::multi_user::service::test_utils::MockUserRepository;
+    use crate::multi_user::service::test_utils::mail_and_password_service_with_session;
+    use crate::multi_user::service::test_utils::password_only_service_with_session;
+    use crate::multi_user::test_utils::MockMailProvider;
+    use crate::multi_user::test_utils::MockSessionService;
 
     use super::*;
 
@@ -1883,12 +1907,15 @@ impl IMultiUserService for DisabledUserService {
 mod test_user_service_validate_auth_link {
     use chrono::{TimeDelta, Utc};
 
-    use crate::multi_user::{
-        AuthLinkValidationResult, AuthToken, GenerateSessionTokenResult, HashedAuthLink,
-        SessionToken,
-        service::test_utils::{MockUserRepository, mail_and_password_service_with_session},
-        test_utils::{MockMailProvider, MockSessionService},
-    };
+    use crate::multi_user::AuthLinkValidationResult;
+    use crate::multi_user::AuthToken;
+    use crate::multi_user::GenerateSessionTokenResult;
+    use crate::multi_user::HashedAuthLink;
+    use crate::multi_user::SessionToken;
+    use crate::multi_user::service::test_utils::MockUserRepository;
+    use crate::multi_user::service::test_utils::mail_and_password_service_with_session;
+    use crate::multi_user::test_utils::MockMailProvider;
+    use crate::multi_user::test_utils::MockSessionService;
 
     use super::*;
 
@@ -2099,11 +2126,11 @@ mod test_user_service_validate_auth_link {
 
 #[cfg(test)]
 mod test_user_service_check_session_token {
-    use crate::multi_user::{
-        SessionToken,
-        service::test_utils::{MockUserRepository, mail_and_password_service_with_session},
-        test_utils::{MockMailProvider, MockSessionService},
-    };
+    use crate::multi_user::SessionToken;
+    use crate::multi_user::service::test_utils::MockUserRepository;
+    use crate::multi_user::service::test_utils::mail_and_password_service_with_session;
+    use crate::multi_user::test_utils::MockMailProvider;
+    use crate::multi_user::test_utils::MockSessionService;
 
     use super::*;
 
@@ -2222,15 +2249,19 @@ mod test_user_service_update_email {
     use anyhow::anyhow;
     use chrono::{TimeDelta, Utc};
 
-    use crate::multi_user::{
-        EmailAddress, EmailChangeFinalizeResult, EmailChangeToken, EmailChangeValidationResult,
-        HashedEmailChangeToken,
-        service::test_utils::{
-            MockUserRepository, TEST_EMAIL, mail_and_password_service,
-            mail_and_password_service_with_session, password_only_service, registration_request,
-        },
-        test_utils::{MockMailProvider, MockSessionService},
-    };
+    use crate::multi_user::EmailAddress;
+    use crate::multi_user::EmailChangeFinalizeResult;
+    use crate::multi_user::EmailChangeToken;
+    use crate::multi_user::EmailChangeValidationResult;
+    use crate::multi_user::HashedEmailChangeToken;
+    use crate::multi_user::service::test_utils::MockUserRepository;
+    use crate::multi_user::service::test_utils::TEST_EMAIL;
+    use crate::multi_user::service::test_utils::mail_and_password_service;
+    use crate::multi_user::service::test_utils::mail_and_password_service_with_session;
+    use crate::multi_user::service::test_utils::password_only_service;
+    use crate::multi_user::service::test_utils::registration_request;
+    use crate::multi_user::test_utils::MockMailProvider;
+    use crate::multi_user::test_utils::MockSessionService;
 
     use super::*;
 
@@ -2723,11 +2754,12 @@ mod test_user_service_update_email {
 
 #[cfg(test)]
 mod test_user_service_get_user_info {
-    use crate::multi_user::{
-        EmailAddress, UserInfo,
-        service::test_utils::{MockUserRepository, TEST_EMAIL, mail_and_password_service},
-        test_utils::MockMailProvider,
-    };
+    use crate::multi_user::EmailAddress;
+    use crate::multi_user::UserInfo;
+    use crate::multi_user::service::test_utils::MockUserRepository;
+    use crate::multi_user::service::test_utils::TEST_EMAIL;
+    use crate::multi_user::service::test_utils::mail_and_password_service;
+    use crate::multi_user::test_utils::MockMailProvider;
 
     use super::*;
 
@@ -2790,13 +2822,14 @@ mod test_user_service_get_user_info {
 
 #[cfg(test)]
 mod test_user_service_request_email_verification {
-    use crate::multi_user::{
-        EmailAddress, EmailVerificationResult, UserInfo,
-        service::test_utils::{
-            MockUserRepository, TEST_EMAIL, mail_and_password_service, password_only_service,
-        },
-        test_utils::MockMailProvider,
-    };
+    use crate::multi_user::EmailAddress;
+    use crate::multi_user::EmailVerificationResult;
+    use crate::multi_user::UserInfo;
+    use crate::multi_user::service::test_utils::MockUserRepository;
+    use crate::multi_user::service::test_utils::TEST_EMAIL;
+    use crate::multi_user::service::test_utils::mail_and_password_service;
+    use crate::multi_user::service::test_utils::password_only_service;
+    use crate::multi_user::test_utils::MockMailProvider;
 
     use super::*;
 
@@ -2921,11 +2954,12 @@ mod test_user_service_request_email_verification {
 
 #[cfg(test)]
 mod test_user_service_revoke_sessions {
-    use crate::multi_user::{
-        RevokeSessionsResult, SessionToken,
-        service::test_utils::{MockUserRepository, mail_and_password_service_with_session},
-        test_utils::{MockMailProvider, MockSessionService},
-    };
+    use crate::multi_user::RevokeSessionsResult;
+    use crate::multi_user::SessionToken;
+    use crate::multi_user::service::test_utils::MockUserRepository;
+    use crate::multi_user::service::test_utils::mail_and_password_service_with_session;
+    use crate::multi_user::test_utils::MockMailProvider;
+    use crate::multi_user::test_utils::MockSessionService;
 
     use super::*;
 

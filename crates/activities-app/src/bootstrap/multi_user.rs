@@ -2,13 +2,20 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Ok, anyhow};
 
-use activities_auth::multi_user::{
-    AuthMethods, MultiUserService, SessionService,
-    admin::AdminService,
-    service::{
-        UserRepository, spawn_expired_auth_links_cleanup, spawn_expired_email_change_tokens_cleanup,
+use activities_auth::{
+    infra::{
+        mailer::{DoNothingMailProvider, MaybeMailProvider, smtp::SMTPEmailProvider},
+        sqlite::users::SqliteUsersRepository,
     },
-    spawn_expired_sessions_cleanup,
+    multi_user::{
+        AuthMethods, MultiUserService, SessionService,
+        admin::AdminService,
+        service::{
+            UserRepository, spawn_expired_auth_links_cleanup,
+            spawn_expired_email_change_tokens_cleanup,
+        },
+        spawn_expired_sessions_cleanup,
+    },
 };
 use activities_domain::activity::services::ActivityService;
 use activities_domain::preferences::services::PreferencesService;
@@ -19,11 +26,10 @@ use activities_infra::{
     clock::Clock,
     config::{AppMode, BackupConfig, BaseConfig, EmailAuthConfig, MultiUserConfig, StdEnvironment},
     fs::FilesystemRawDataRepository,
-    mailer::{DoNothingMailProvider, MaybeMailProvider, smtp::SMTPEmailProvider},
     parser::Parser,
     sqlite::{
         activity::SqliteActivityRepository, preferences::SqlitePreferencesRepository,
-        search::SearchRepository, training::SqliteTrainingRepository, users::SqliteUsersRepository,
+        search::SearchRepository, training::SqliteTrainingRepository,
     },
 };
 
@@ -349,7 +355,7 @@ async fn build_search_service(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::inbound::auth::multi_user::EmailAddress;
+    use activities_auth::multi_user::EmailAddress;
 
     fn base_config(path: &std::path::Path) -> BaseConfig {
         BaseConfig {

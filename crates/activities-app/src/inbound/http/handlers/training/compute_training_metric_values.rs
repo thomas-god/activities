@@ -24,7 +24,6 @@ use crate::domain::training::ports::ComputeTrainingMetricValuesError;
 use crate::domain::training::ports::GetTrainingMetricValuesError;
 use crate::domain::training::ports::GetTrainingMetricValuesRequest;
 use crate::domain::training::ports::ITrainingService;
-use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::inbound::http::handlers::training::types::APIActivityMetricSource;
 use crate::inbound::http::handlers::training::types::APITimeseriesWindow;
@@ -45,6 +44,7 @@ use crate::inbound::http::handlers::training::utils::convert_metric_values_unit;
 use crate::inbound::http::handlers::training::utils::fill_missing_granules;
 use crate::inbound::http::handlers::training::utils::group_metric_values;
 use crate::inbound::parser::ParseFile;
+use activities_auth::infra::http::AuthenticatedUser;
 
 /// Request body for computing training metric values
 #[derive(Debug, Deserialize)]

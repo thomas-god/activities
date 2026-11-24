@@ -4,16 +4,13 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-activities-auth.workspace = true
 activities-domain = { workspace = true, features = ["sqlx"] }
 anyhow.workspace = true
 chrono.workspace = true
 cron.workspace = true
 derive_more.workspace = true
 fit-parser.workspace = true
-handlebars.workspace = true
 itertools.workspace = true
-lettre.workspace = true
 log.workspace = true
 mockall = { workspace = true, optional = true }
 roxmltree.workspace = true
@@ -31,7 +28,6 @@ zip.workspace = true
 
 [dev-dependencies]
 activities-domain = { workspace = true, features = ["test-utils"] }
-argon2.workspace = true
 assert_approx_eq.workspace = true
 mockall.workspace = true
 rand.workspace = true

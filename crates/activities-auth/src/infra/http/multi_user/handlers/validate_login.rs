@@ -1,0 +1,41 @@
+use axum::{
+    Json,
+    extract::State,
+    http::{HeaderMap, StatusCode, header::SET_COOKIE},
+    response::{AppendHeaders, IntoResponse},
+};
+use serde::Deserialize;
+
+use crate::infra::http::multi_user::handlers::AuthAppState;
+use crate::infra::http::multi_user::handlers::extractor::build_session_cookie;
+use crate::multi_user::AuthLinkValidationResult;
+use crate::multi_user::AuthToken;
+use crate::multi_user::IMultiUserService;
+
+#[derive(Debug, Deserialize)]
+pub struct ValidateLoginBody {
+    token: String,
+}
+
+#[tracing::instrument(skip_all)]
+pub async fn validate_login<UR: IMultiUserService>(
+    State(state): State<AuthAppState<UR>>,
+    headers: HeaderMap,
+    Json(body): Json<ValidateLoginBody>,
+) -> impl IntoResponse {
+    let token = AuthToken::from(body.token);
+
+    match state.user_service.validate_auth_link(token).await {
+        Ok(AuthLinkValidationResult::Success(session)) => {
+            let cookie_config = state.cookie_config.for_request(&headers);
+            let Some(cookie) = build_session_cookie(&cookie_config, &session) else {
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            };
+
+            let headers = AppendHeaders([(SET_COOKIE, cookie.encoded().to_string())]);
+            (headers, StatusCode::OK).into_response()
+        }
+        Ok(AuthLinkValidationResult::Invalid) => StatusCode::UNAUTHORIZED.into_response(),
+        Err(()) => StatusCode::SERVICE_UNAVAILABLE.into_response(),
+    }
+}

@@ -5,15 +5,15 @@ use axum::{
     http::StatusCode,
 };
 
-use crate::{
-    domain::{
-        activity::models::ActivityId,
-        activity::ports::{DeleteActivityError, DeleteActivityRequest, IActivityService},
-        preferences::ports::IPreferencesService,
-        training::ports::ITrainingService,
-    },
-    inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile},
-};
+use crate::domain::activity::models::ActivityId;
+use crate::domain::activity::ports::DeleteActivityError;
+use crate::domain::activity::ports::DeleteActivityRequest;
+use crate::domain::activity::ports::IActivityService;
+use crate::domain::preferences::ports::IPreferencesService;
+use crate::domain::training::ports::ITrainingService;
+use crate::inbound::http::AppState;
+use crate::inbound::parser::ParseFile;
+use activities_auth::infra::http::AuthenticatedUser;
 
 impl ApiErrorStatus for DeleteActivityError {
     fn status_code(self) -> StatusCode {

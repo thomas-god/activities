@@ -5,12 +5,12 @@ use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::inbound::http::handlers::training::types::{
     APITimeseriesWindow, APITrainingMetricFilters, APITrainingMetricScope, APITrainingMetricSource,
     APITrainingMetricSummary, APITrainingMetricTarget,
 };
+use activities_auth::infra::http::AuthenticatedUser;
 use activities_domain::activity::models::ActivityMetric;
 use activities_domain::activity::ports::IActivityService;
 use activities_domain::preferences::ports::IPreferencesService;

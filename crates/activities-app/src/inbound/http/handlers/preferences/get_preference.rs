@@ -5,10 +5,9 @@ use axum::{
     http::StatusCode,
 };
 
-use crate::{
-    domain::preferences::models::PreferenceKey,
-    inbound::{auth::AuthenticatedUser, http::AppState},
-};
+use crate::domain::preferences::models::PreferenceKey;
+use crate::inbound::http::AppState;
+use activities_auth::infra::http::AuthenticatedUser;
 use activities_domain::activity::ports::IActivityService;
 use activities_domain::preferences::ports::GetPreferenceError;
 use activities_domain::preferences::ports::IPreferencesService;

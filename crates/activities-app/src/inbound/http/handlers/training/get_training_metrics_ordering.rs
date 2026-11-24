@@ -10,10 +10,10 @@ use crate::domain::preferences::ports::IPreferencesService;
 use crate::domain::training::models::TrainingMetricId;
 use crate::domain::training::ports::GetTrainingMetricsOrderingError;
 use crate::domain::training::ports::ITrainingService;
-use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::inbound::http::handlers::training::types::APITrainingMetricScope;
 use crate::inbound::parser::ParseFile;
+use activities_auth::infra::http::AuthenticatedUser;
 
 #[derive(Debug, Deserialize)]
 pub struct GetTrainingMetricsOrderingQuery {

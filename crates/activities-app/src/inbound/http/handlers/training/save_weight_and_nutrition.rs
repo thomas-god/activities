@@ -20,10 +20,10 @@ use crate::domain::training::ports::ITrainingService;
 use crate::domain::training::ports::SaveBulkWeightAndNutritionRequest;
 use crate::domain::training::ports::SaveWeightAndNutritionRequest;
 use crate::domain::training::ports::WeightAndNutritionError;
-use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::inbound::http::handlers::training::types::APIWeightAndNutritionPatch;
 use crate::inbound::parser::ParseFile;
+use activities_auth::infra::http::AuthenticatedUser;
 
 /// Body of the `PATCH /api/training/weight-and-nutrition/{date}` request.
 ///
@@ -305,8 +305,8 @@ mod tests {
     use crate::domain::preferences::services::tests_utils::MockPreferencesService;
     use crate::domain::shared::UserId;
     use crate::domain::training::services::test_utils::MockTrainingService;
-    use crate::inbound::auth::no_auth::DefaultUserExtractor;
     use crate::inbound::parser::test_utils::MockFileParser;
+    use activities_auth::infra::http::no_auth::DefaultUserExtractor;
 
     use crate::inbound::http::shared::PatchField;
 

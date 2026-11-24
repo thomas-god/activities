@@ -12,10 +12,10 @@ use crate::domain::activity::ports::IActivityService;
 use crate::domain::preferences::ports::IPreferencesService;
 use crate::domain::training::ports::HooperIndexError;
 use crate::domain::training::ports::ITrainingService;
-use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::inbound::http::handlers::training::types::APIHooperIndex;
 use crate::inbound::parser::ParseFile;
+use activities_auth::infra::http::AuthenticatedUser;
 
 /// Returns the Hooper index for a given date.
 ///

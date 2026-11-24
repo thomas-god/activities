@@ -15,11 +15,11 @@ use crate::domain::activity::ports::CreateActivityError;
 use crate::domain::activity::ports::IActivityService;
 use crate::domain::preferences::ports::IPreferencesService;
 use crate::domain::training::ports::ITrainingService;
-use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::inbound::parser::ParseBytesError;
 use crate::inbound::parser::ParseFile;
 use crate::inbound::parser::SupportedExtension;
+use activities_auth::infra::http::AuthenticatedUser;
 
 impl ApiErrorStatus for CreateActivityError {
     fn status_code(self) -> StatusCode {
@@ -170,8 +170,8 @@ mod tests {
     use crate::domain::preferences::services::tests_utils::MockPreferencesService;
     use crate::domain::shared::UserId;
     use crate::domain::training::services::test_utils::MockTrainingService;
-    use crate::inbound::auth::no_auth::DefaultUserExtractor;
     use crate::inbound::parser::test_utils::MockFileParser;
+    use activities_auth::infra::http::no_auth::DefaultUserExtractor;
 
     use super::*;
 

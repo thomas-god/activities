@@ -20,11 +20,11 @@ use crate::domain::training::models::TrainingMetricAggregate;
 use crate::domain::training::models::TrainingMetricSource;
 use crate::domain::training::models::WeightAndNutritionSource;
 use crate::domain::training::ports::ITrainingService;
-use crate::inbound::auth::AuthenticatedUser;
-use crate::inbound::auth::multi_user::IMultiUserService;
 use crate::inbound::http::AppState;
 use crate::inbound::http::handlers::training::types::APITrainingMetricSource;
 use crate::inbound::parser::ParseFile;
+use activities_auth::infra::http::AuthenticatedUser;
+use activities_auth::multi_user::IMultiUserService;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBody(Vec<TrainingMetricTemplateBody>);

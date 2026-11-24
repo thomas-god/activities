@@ -11,13 +11,12 @@ use anyhow::Context;
 use axum::extract::DefaultBodyLimit;
 use axum::extract::Request;
 use axum::http::header::{CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_TYPE, COOKIE, SET_COOKIE};
-use axum::http::{HeaderMap, HeaderValue, Method, StatusCode};
+use axum::http::{HeaderValue, Method, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::Response;
 
 use axum::routing::{delete, get, patch};
 use axum::{Json, Router, response::IntoResponse, routing::post};
-use cookie::{Cookie, SameSite, time::OffsetDateTime};
 use serde_json::json;
 use tokio::net;
 use tower::Service;
@@ -32,10 +31,14 @@ use activities_domain::preferences::ports::IPreferencesService;
 use activities_domain::search::ports::ISearchService;
 use activities_domain::training::ports::ITrainingService;
 
-use crate::inbound::auth::multi_user::{
-    IMultiUserService, admin::IAdminService, infra::handlers::admin::admin_routes,
+use activities_auth::auth::{
+    AuthStrategy, MultiUserAuthStrategy, SinglePassword, UserRegistration,
 };
-use crate::inbound::auth::{auth_strategy_from_mode, infra::add_auth_router};
+use activities_auth::infra::http::add_auth_router;
+use activities_auth::infra::http::multi_user::handlers::admin::admin_routes;
+use activities_auth::multi_user::{AuthMethods, IMultiUserService, admin::IAdminService};
+use activities_infra::config::SingleUserConfig;
+
 use crate::inbound::http::handlers::{
     get_default_activity_metrics, get_training_metric_templates, upload_bulk_weight_and_nutrition,
 };
@@ -56,71 +59,19 @@ use handlers::{
 
 mod error_status;
 mod handlers;
-pub mod middlewares;
 mod shared;
 
-#[derive(Debug, Clone)]
-pub struct CookieConfig {
-    /// Whether cookies may be marked `Secure` at all (see [`CookieConfig::for_request`]).
-    pub secure: bool,
-    pub same_site: SameSite,
-    pub http_only: bool,
-    pub domain: Option<String>,
-}
-
-impl Default for CookieConfig {
-    fn default() -> Self {
-        Self {
-            secure: true,
-            same_site: SameSite::Strict,
-            http_only: true,
-            domain: None,
-        }
+fn auth_strategy_from_mode(value: &AppMode) -> AuthStrategy {
+    match value {
+        AppMode::MultiUser(config) => AuthStrategy::MultiUser(MultiUserAuthStrategy::new(
+            AuthMethods::new(config.email.is_some()),
+            UserRegistration::from(config.allow_registration),
+        )),
+        AppMode::SingleUser(SingleUserConfig {
+            password: Some(pwd),
+        }) => AuthStrategy::SinglePassword(SinglePassword::from(pwd.clone())),
+        AppMode::SingleUser(SingleUserConfig { password: None }) => AuthStrategy::NoAuth,
     }
-}
-
-impl CookieConfig {
-    /// Returns this configuration adjusted to the scheme the request was received on.
-    ///
-    /// A cookie is only marked `Secure` when the request reached us over HTTPS, either directly or
-    /// through a TLS-terminating reverse proxy that forwarded the original scheme in
-    /// `X-Forwarded-Proto`. Without this, plain-HTTP deployments (the single-user modes, the
-    /// multi-user modes run over a private tunnel, and local development) would have their session
-    /// cookie silently dropped by the browser, so every subsequent request would answer `401`.
-    pub fn for_request(&self, headers: &HeaderMap) -> Self {
-        Self {
-            secure: self.secure && request_is_https(headers),
-            ..self.clone()
-        }
-    }
-}
-
-/// Whether the request reached us over HTTPS, as reported by the reverse proxy in
-/// `X-Forwarded-Proto` (a comma-separated list, of which the first value is the client-facing
-/// scheme). When the header is absent we assume plain HTTP, which keeps cookie handling working in
-/// direct/local deployments while still hardening it behind a TLS-terminating proxy.
-fn request_is_https(headers: &HeaderMap) -> bool {
-    headers
-        .get("x-forwarded-proto")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.split(',').next())
-        .is_some_and(|proto| proto.trim().eq_ignore_ascii_case("https"))
-}
-
-/// Builds a cookie that instructs the browser to immediately drop `name`, for use by logout
-/// handlers. Attributes (path/domain/etc) must match the cookie that was originally set for the
-/// browser to actually overwrite it.
-pub fn build_removal_cookie(name: &'static str, cookie_config: &CookieConfig) -> Cookie<'static> {
-    let mut builder = Cookie::build((name, ""))
-        .expires(OffsetDateTime::UNIX_EPOCH)
-        .secure(cookie_config.secure)
-        .http_only(cookie_config.http_only)
-        .same_site(cookie_config.same_site)
-        .path("/");
-    if let Some(domain) = cookie_config.domain.clone() {
-        builder = builder.domain(domain);
-    }
-    builder.build()
 }
 
 #[derive(Debug, Clone)]
@@ -524,55 +475,19 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use activities_domain::shared::UserId;
     use axum_test::TestServer;
 
-    use crate::inbound::{
-        auth::{AuthStrategy, SinglePassword, multi_user::test_utils::MockUserService},
-        parser::test_utils::MockFileParser,
-    };
+    use crate::inbound::parser::test_utils::MockFileParser;
+    use activities_auth::auth::AuthStrategy;
+    use activities_auth::auth::SinglePassword;
+    use activities_auth::multi_user::test_utils::MockUserService;
     use activities_domain::activity::models::ActivityId;
     use activities_domain::activity::services::test_utils::MockActivityService;
     use activities_domain::preferences::services::tests_utils::MockPreferencesService;
     use activities_domain::search::ports::SearchResult;
     use activities_domain::search::ports::search_test_utils::MockSearchService;
-    use activities_domain::shared::UserId;
     use activities_domain::training::services::test_utils::MockTrainingService;
-
-    #[test]
-    fn cookie_config_is_secure_only_when_request_is_https() {
-        let config = CookieConfig::default();
-
-        assert!(!config.for_request(&HeaderMap::new()).secure);
-
-        let mut headers = HeaderMap::new();
-        for proto in ["https", "HTTPS", " https ", "https, http"] {
-            headers.insert("x-forwarded-proto", HeaderValue::from_static(proto));
-            assert!(
-                config.for_request(&headers).secure,
-                "`{proto}` should be treated as HTTPS"
-            );
-        }
-
-        for proto in ["http", "http, https", ""] {
-            headers.insert("x-forwarded-proto", HeaderValue::from_static(proto));
-            assert!(
-                !config.for_request(&headers).secure,
-                "`{proto}` should not be treated as HTTPS"
-            );
-        }
-    }
-
-    #[test]
-    fn cookie_config_never_marks_cookies_secure_when_disabled() {
-        let config = CookieConfig {
-            secure: false,
-            ..CookieConfig::default()
-        };
-        let mut headers = HeaderMap::new();
-        headers.insert("x-forwarded-proto", HeaderValue::from_static("https"));
-
-        assert!(!config.for_request(&headers).secure);
-    }
 
     #[tokio::test]
     async fn health_returns_ok() {

@@ -6,15 +6,14 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::{
-    domain::{
-        training::models::{
-            TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
-        },
-        training::ports::{ITrainingService, UpdateTrainingNoteError},
-    },
-    inbound::{auth::AuthenticatedUser, http::AppState},
-};
+use crate::domain::training::models::TrainingNoteContent;
+use crate::domain::training::models::TrainingNoteDate;
+use crate::domain::training::models::TrainingNoteId;
+use crate::domain::training::models::TrainingNoteTitle;
+use crate::domain::training::ports::ITrainingService;
+use crate::domain::training::ports::UpdateTrainingNoteError;
+use crate::inbound::http::AppState;
+use activities_auth::infra::http::AuthenticatedUser;
 use activities_domain::activity::ports::IActivityService;
 use activities_domain::preferences::ports::IPreferencesService;
 use activities_infra::parser::ParseFile;

@@ -9,18 +9,20 @@ use std::{ffi::OsStr, ffi::OsString, path::PathBuf};
 use anyhow::anyhow;
 use clap::{Args, Parser, Subcommand};
 
-use activities_auth::multi_user::{
-    EmailAddress, Password,
-    admin::{
-        AdminActor, AdminService, BootstrapAdminMode, BootstrapAdminOutcome, PromoteAdminOutcome,
-        RevokeAdminOutcome,
+use activities_auth::{
+    infra::sqlite::users::SqliteUsersRepository,
+    multi_user::{
+        EmailAddress, Password,
+        admin::{
+            AdminActor, AdminService, BootstrapAdminMode, BootstrapAdminOutcome,
+            PromoteAdminOutcome, RevokeAdminOutcome,
+        },
     },
 };
 use activities_infra::{
     backup::BackupService,
     clock::Clock,
     config::{BackupConfig, StdEnvironment, data_path_from_env},
-    sqlite::users::SqliteUsersRepository,
 };
 
 #[derive(Debug, Parser)]

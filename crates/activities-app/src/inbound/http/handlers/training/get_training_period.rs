@@ -24,7 +24,6 @@ use crate::domain::training::models::TrainingPeriod;
 use crate::domain::training::models::TrainingPeriodId;
 use crate::domain::training::models::TrainingPeriodSports;
 use crate::domain::training::ports::ITrainingService;
-use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::inbound::parser::ParseFile;
 use crate::{
@@ -33,6 +32,7 @@ use crate::{
         activities::activity_schema::PublicActivity, training::types::SportsResponse,
     },
 };
+use activities_auth::infra::http::AuthenticatedUser;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBody {

@@ -15,10 +15,10 @@ use crate::domain::training::models::HooperIndexPatch;
 use crate::domain::training::ports::HooperIndexError;
 use crate::domain::training::ports::ITrainingService;
 use crate::domain::training::ports::SaveHooperIndexRequest;
-use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::inbound::http::handlers::training::types::APIHooperIndexPatch;
 use crate::inbound::parser::ParseFile;
+use activities_auth::infra::http::AuthenticatedUser;
 
 /// Body of the `PATCH /api/training/hooper-index/{date}` request.
 ///

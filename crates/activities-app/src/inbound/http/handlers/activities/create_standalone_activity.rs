@@ -2,7 +2,6 @@ use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
 
-use crate::inbound::auth::AuthenticatedUser;
 use crate::{
     domain::activity::ports::IActivityService,
     inbound::{
@@ -10,6 +9,7 @@ use crate::{
         parser::{ParseBytesError, ParseFile, ParsedFileContent, json::StandaloneActivity},
     },
 };
+use activities_auth::infra::http::AuthenticatedUser;
 use activities_domain::activity::ports::CreateActivityError;
 use activities_domain::preferences::ports::IPreferencesService;
 use activities_domain::training::ports::ITrainingService;
@@ -69,8 +69,8 @@ mod tests {
     use crate::domain::preferences::services::tests_utils::MockPreferencesService;
     use crate::domain::shared::UserId;
     use crate::domain::training::services::test_utils::MockTrainingService;
-    use crate::inbound::auth::no_auth::DefaultUserExtractor;
     use crate::inbound::parser::test_utils::MockFileParser;
+    use activities_auth::infra::http::no_auth::DefaultUserExtractor;
     use activities_domain::activity::models::Activity;
 
     use super::*;

@@ -3,13 +3,14 @@ use std::sync::Arc;
 use chrono::{DateTime, TimeDelta, Utc};
 use derive_more::Constructor;
 
-use crate::{
-    domain::shared::UserId,
-    multi_user::{
-        CheckSessionResult, GenerateSessionTokenResult, HashedSession, HashedSessionToken,
-        ISessionService, Session, SessionToken,
-    },
-};
+use crate::domain::shared::UserId;
+use crate::multi_user::CheckSessionResult;
+use crate::multi_user::GenerateSessionTokenResult;
+use crate::multi_user::HashedSession;
+use crate::multi_user::HashedSessionToken;
+use crate::multi_user::ISessionService;
+use crate::multi_user::Session;
+use crate::multi_user::SessionToken;
 
 const SESSION_DURATION: i64 = 30;
 const SESSION_REFRESH_WINDOW: i64 = 7;

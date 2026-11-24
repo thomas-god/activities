@@ -4,8 +4,8 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 
-use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
+use activities_auth::infra::http::AuthenticatedUser;
 use activities_domain::activity::ports::IActivityService;
 use activities_domain::preferences::ports::IPreferencesService;
 use activities_domain::training::models::{TrainingMetricId, TrainingMetricName, TrainingPeriodId};
