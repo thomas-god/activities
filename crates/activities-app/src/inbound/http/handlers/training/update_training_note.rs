@@ -8,14 +8,15 @@ use serde::Deserialize;
 
 use crate::{
     domain::{
-        models::training::{
+        training::models::{
             TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
         },
-        ports::training::{ITrainingService, UpdateTrainingNoteError},
+        training::ports::{ITrainingService, UpdateTrainingNoteError},
     },
     inbound::{auth::AuthenticatedUser, http::AppState},
 };
-use activities_domain::ports::{activity::IActivityService, preferences::IPreferencesService};
+use activities_domain::activity::ports::IActivityService;
+use activities_domain::preferences::ports::IPreferencesService;
 use activities_infra::parser::ParseFile;
 
 #[derive(Debug, Deserialize)]

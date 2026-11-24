@@ -2,15 +2,16 @@ use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    domain::{
-        models::{UserId, training::TrainingNoteContent},
-        ports::training::{CreateTrainingNoteError, CreateTrainingNoteRequest, ITrainingService},
-    },
-    inbound::{auth::AuthenticatedUser, http::AppState},
-};
-use activities_domain::models::training::{TrainingNoteDate, TrainingNoteTitle};
-use activities_domain::ports::{activity::IActivityService, preferences::IPreferencesService};
+use crate::domain::shared::UserId;
+use crate::domain::training::models::TrainingNoteContent;
+use crate::domain::training::ports::CreateTrainingNoteError;
+use crate::domain::training::ports::CreateTrainingNoteRequest;
+use crate::domain::training::ports::ITrainingService;
+use crate::inbound::auth::AuthenticatedUser;
+use crate::inbound::http::AppState;
+use activities_domain::activity::ports::IActivityService;
+use activities_domain::preferences::ports::IPreferencesService;
+use activities_domain::training::models::{TrainingNoteDate, TrainingNoteTitle};
 use activities_infra::parser::ParseFile;
 
 #[derive(Debug, Deserialize)]

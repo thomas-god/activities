@@ -9,7 +9,7 @@ use fit_parser::{
 };
 
 use crate::{
-    activities_domain::models::activity::{
+    activities_domain::activity::models::{
         ActiveTime, ActivityDuration, ActivityStartTime, ActivityStatistic, ActivityStatistics,
         ActivityTimeseries, Lap, Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric,
         TimeseriesTime, TimeseriesValue,
@@ -618,7 +618,7 @@ mod tests_fit_parser {
     use chrono::{DateTime, FixedOffset, Utc};
     use fit_parser::{ActivityField, DataMessageField};
 
-    use activities_domain::models::activity::{TimeseriesMetric, TimeseriesValue};
+    use activities_domain::activity::models::{TimeseriesMetric, TimeseriesValue};
 
     use super::*;
 

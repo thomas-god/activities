@@ -2,7 +2,7 @@
 use derive_more::Constructor;
 
 #[cfg(any(test, feature = "test-utils"))]
-use crate::ports::IClock;
+use crate::shared::IClock;
 
 #[cfg(any(test, feature = "test-utils"))]
 #[derive(Debug, Clone, Constructor)]

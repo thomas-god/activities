@@ -3,27 +3,21 @@ use axum::{Extension, Json, extract::State, http::StatusCode, response::IntoResp
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    domain::{
-        models::{UserId, training::TrainingMetricActivityFilters},
-        ports::{
-            activity::IActivityService,
-            preferences::IPreferencesService,
-            training::{CreateTrainingPeriodError, CreateTrainingPeriodRequest, ITrainingService},
-        },
-    },
-    inbound::{
-        auth::AuthenticatedUser,
-        http::{
-            AppState,
-            handlers::training::types::{
-                APIActivityMetricSource, APITrainingMetricAggregate, APITrainingMetricFilters,
-                APITrainingMetricGranularity, APITrainingPeriodSports,
-            },
-        },
-        parser::ParseFile,
-    },
-};
+use crate::domain::activity::ports::IActivityService;
+use crate::domain::preferences::ports::IPreferencesService;
+use crate::domain::shared::UserId;
+use crate::domain::training::models::TrainingMetricActivityFilters;
+use crate::domain::training::ports::CreateTrainingPeriodError;
+use crate::domain::training::ports::CreateTrainingPeriodRequest;
+use crate::domain::training::ports::ITrainingService;
+use crate::inbound::auth::AuthenticatedUser;
+use crate::inbound::http::AppState;
+use crate::inbound::http::handlers::training::types::APIActivityMetricSource;
+use crate::inbound::http::handlers::training::types::APITrainingMetricAggregate;
+use crate::inbound::http::handlers::training::types::APITrainingMetricFilters;
+use crate::inbound::http::handlers::training::types::APITrainingMetricGranularity;
+use crate::inbound::http::handlers::training::types::APITrainingPeriodSports;
+use crate::inbound::parser::ParseFile;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateTrainingPeriodBody {

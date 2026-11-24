@@ -9,27 +9,42 @@ use axum::http::StatusCode;
 use derive_more::Constructor;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    domain::{
-        models::{
-            activity::{
-                ActivityMetric, ActivityMetricSource, ActivityRpe, ActivityStatistic, BonkStatus,
-                Sport, TimeseriesAggregate, TimeseriesMetric, Unit, WorkoutType,
-            },
-            training::{
-                ActivitySource, DurationCurveSource, HooperIndex, HooperIndexPatch,
-                HooperIndexSource, SportFilter, SubjectiveScale, TrainingMetricActivityFilters,
-                TrainingMetricActivityGroupBy, TrainingMetricAggregate, TrainingMetricGranularity,
-                TrainingMetricScope, TrainingMetricSource, TrainingMetricSummary,
-                TrainingMetricSummaryAverage, TrainingMetricTarget, TrainingMetricWindow,
-                TrainingPeriodId, TrainingPeriodSports, WeightAndNutrition,
-                WeightAndNutritionPatch, WeightAndNutritionSource,
-            },
-        },
-        ports::training::{HooperIndexError, WeightAndNutritionError},
-    },
-    inbound::http::{handlers::training::utils::GranuleValues, shared::PatchField},
-};
+use crate::domain::activity::models::ActivityMetric;
+use crate::domain::activity::models::ActivityMetricSource;
+use crate::domain::activity::models::ActivityRpe;
+use crate::domain::activity::models::ActivityStatistic;
+use crate::domain::activity::models::BonkStatus;
+use crate::domain::activity::models::Sport;
+use crate::domain::activity::models::TimeseriesAggregate;
+use crate::domain::activity::models::TimeseriesMetric;
+use crate::domain::activity::models::Unit;
+use crate::domain::activity::models::WorkoutType;
+use crate::domain::training::models::ActivitySource;
+use crate::domain::training::models::DurationCurveSource;
+use crate::domain::training::models::HooperIndex;
+use crate::domain::training::models::HooperIndexPatch;
+use crate::domain::training::models::HooperIndexSource;
+use crate::domain::training::models::SportFilter;
+use crate::domain::training::models::SubjectiveScale;
+use crate::domain::training::models::TrainingMetricActivityFilters;
+use crate::domain::training::models::TrainingMetricActivityGroupBy;
+use crate::domain::training::models::TrainingMetricAggregate;
+use crate::domain::training::models::TrainingMetricGranularity;
+use crate::domain::training::models::TrainingMetricScope;
+use crate::domain::training::models::TrainingMetricSource;
+use crate::domain::training::models::TrainingMetricSummary;
+use crate::domain::training::models::TrainingMetricSummaryAverage;
+use crate::domain::training::models::TrainingMetricTarget;
+use crate::domain::training::models::TrainingMetricWindow;
+use crate::domain::training::models::TrainingPeriodId;
+use crate::domain::training::models::TrainingPeriodSports;
+use crate::domain::training::models::WeightAndNutrition;
+use crate::domain::training::models::WeightAndNutritionPatch;
+use crate::domain::training::models::WeightAndNutritionSource;
+use crate::domain::training::ports::HooperIndexError;
+use crate::domain::training::ports::WeightAndNutritionError;
+use crate::inbound::http::handlers::training::utils::GranuleValues;
+use crate::inbound::http::shared::PatchField;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 pub enum APIActivityStatistic {
@@ -817,8 +832,8 @@ impl ApiErrorStatus for WeightAndNutritionError {
 mod tests {
     use super::*;
 
-    use activities_domain::models::activity::{Sport, SportCategory, Unit};
-    use activities_domain::models::training::{
+    use activities_domain::activity::models::{Sport, SportCategory, Unit};
+    use activities_domain::training::models::{
         HooperIndex, HooperIndexPatch, SportFilter, SubjectiveScale, TrainingMetricTarget,
         TrainingPeriodSports, WeightAndNutrition, WeightAndNutritionPatch,
     };

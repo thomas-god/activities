@@ -7,42 +7,64 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
 };
 
-use crate::{
-    activities_domain::sqlite::RepositoryTrainingMetricSource,
-    activities_domain::{
-        models::{
-            UserId,
-            activity::{
-                ActivityDurationCurve, ActivityId, ActivityMetric, ActivityMetricSource,
-                DurationCurveType,
-            },
-            search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
-            training::{
-                ActivitySource, BestDurationCurve, HooperIndex, SubjectiveScale, TrainingMetric,
-                TrainingMetricActivityFilters, TrainingMetricActivityGroupBy,
-                TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity,
-                TrainingMetricId, TrainingMetricName, TrainingMetricScope, TrainingMetricSource,
-                TrainingMetricSummary, TrainingMetricTarget, TrainingMetricWindow,
-                TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
-                TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodId,
-                TrainingPeriodSports, WeightAndNutrition,
-            },
-        },
-        ports::{
-            DateRange, IClock,
-            search::RemainingDocuments,
-            training::{
-                DeleteTrainingMetricError, DeleteTrainingNoteError, DeleteTrainingPeriodError,
-                GetTrainingMetricError, GetTrainingMetricsDefinitionsError,
-                GetTrainingMetricsOrderingError, GetTrainingNoteError, HooperIndexError,
-                SaveTrainingMetricError, SaveTrainingNoteError, SaveTrainingPeriodError,
-                SetTrainingMetricsOrderingError, TrainingRepository, UpdateTrainingMetricNameError,
-                UpdateTrainingPeriodDatesError, UpdateTrainingPeriodNameError,
-                UpdateTrainingPeriodNoteError, WeightAndNutritionError,
-            },
-        },
-    },
-};
+use crate::activities_domain::activity::models::ActivityDurationCurve;
+use crate::activities_domain::activity::models::ActivityId;
+use crate::activities_domain::activity::models::ActivityMetric;
+use crate::activities_domain::activity::models::ActivityMetricSource;
+use crate::activities_domain::activity::models::DurationCurveType;
+use crate::activities_domain::search::models::SearchDocument;
+use crate::activities_domain::search::models::SearchDocumentEvent;
+use crate::activities_domain::search::models::SearchDocumentType;
+use crate::activities_domain::search::ports::RemainingDocuments;
+use crate::activities_domain::shared::DateRange;
+use crate::activities_domain::shared::IClock;
+use crate::activities_domain::shared::UserId;
+use crate::activities_domain::sqlite::RepositoryTrainingMetricSource;
+use crate::activities_domain::training::models::ActivitySource;
+use crate::activities_domain::training::models::BestDurationCurve;
+use crate::activities_domain::training::models::HooperIndex;
+use crate::activities_domain::training::models::SubjectiveScale;
+use crate::activities_domain::training::models::TrainingMetric;
+use crate::activities_domain::training::models::TrainingMetricActivityFilters;
+use crate::activities_domain::training::models::TrainingMetricActivityGroupBy;
+use crate::activities_domain::training::models::TrainingMetricAggregate;
+use crate::activities_domain::training::models::TrainingMetricDefinition;
+use crate::activities_domain::training::models::TrainingMetricGranularity;
+use crate::activities_domain::training::models::TrainingMetricId;
+use crate::activities_domain::training::models::TrainingMetricName;
+use crate::activities_domain::training::models::TrainingMetricScope;
+use crate::activities_domain::training::models::TrainingMetricSource;
+use crate::activities_domain::training::models::TrainingMetricSummary;
+use crate::activities_domain::training::models::TrainingMetricTarget;
+use crate::activities_domain::training::models::TrainingMetricWindow;
+use crate::activities_domain::training::models::TrainingMetricsOrdering;
+use crate::activities_domain::training::models::TrainingNote;
+use crate::activities_domain::training::models::TrainingNoteContent;
+use crate::activities_domain::training::models::TrainingNoteDate;
+use crate::activities_domain::training::models::TrainingNoteId;
+use crate::activities_domain::training::models::TrainingNoteTitle;
+use crate::activities_domain::training::models::TrainingPeriod;
+use crate::activities_domain::training::models::TrainingPeriodId;
+use crate::activities_domain::training::models::TrainingPeriodSports;
+use crate::activities_domain::training::models::WeightAndNutrition;
+use crate::activities_domain::training::ports::DeleteTrainingMetricError;
+use crate::activities_domain::training::ports::DeleteTrainingNoteError;
+use crate::activities_domain::training::ports::DeleteTrainingPeriodError;
+use crate::activities_domain::training::ports::GetTrainingMetricError;
+use crate::activities_domain::training::ports::GetTrainingMetricsDefinitionsError;
+use crate::activities_domain::training::ports::GetTrainingMetricsOrderingError;
+use crate::activities_domain::training::ports::GetTrainingNoteError;
+use crate::activities_domain::training::ports::HooperIndexError;
+use crate::activities_domain::training::ports::SaveTrainingMetricError;
+use crate::activities_domain::training::ports::SaveTrainingNoteError;
+use crate::activities_domain::training::ports::SaveTrainingPeriodError;
+use crate::activities_domain::training::ports::SetTrainingMetricsOrderingError;
+use crate::activities_domain::training::ports::TrainingRepository;
+use crate::activities_domain::training::ports::UpdateTrainingMetricNameError;
+use crate::activities_domain::training::ports::UpdateTrainingPeriodDatesError;
+use crate::activities_domain::training::ports::UpdateTrainingPeriodNameError;
+use crate::activities_domain::training::ports::UpdateTrainingPeriodNoteError;
+use crate::activities_domain::training::ports::WeightAndNutritionError;
 
 type DefinitionRow = (
     TrainingMetricId,
@@ -499,8 +521,8 @@ where
     #[tracing::instrument(skip_all, err)]
     async fn save_training_period(
         &self,
-        period: activities_domain::models::training::TrainingPeriod,
-    ) -> Result<(), activities_domain::ports::training::SaveTrainingPeriodError> {
+        period: activities_domain::training::models::TrainingPeriod,
+    ) -> Result<(), activities_domain::training::ports::SaveTrainingPeriodError> {
         sqlx::query("INSERT INTO t_training_periods VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);")
             .bind(period.id())
             .bind(period.user())
@@ -544,7 +566,7 @@ where
     async fn get_training_periods(
         &self,
         user: &UserId,
-    ) -> Vec<activities_domain::models::training::TrainingPeriod> {
+    ) -> Vec<activities_domain::training::models::TrainingPeriod> {
         sqlx::query_as::<_, TrainingPeriodRow>(
             "SELECT id, user_id, start, end, name, sports, note
             FROM t_training_periods
@@ -568,7 +590,7 @@ where
         &self,
         user: &UserId,
         ref_date: &NaiveDate,
-    ) -> Vec<activities_domain::models::training::TrainingPeriod> {
+    ) -> Vec<activities_domain::training::models::TrainingPeriod> {
         sqlx::query_as::<_, TrainingPeriodRow>(
             "SELECT id, user_id, start, end, name, sports, note
             FROM t_training_periods
@@ -1524,22 +1546,30 @@ mod test_sqlite_training_repository {
     use chrono::{Days, NaiveDate, Utc};
     use tempfile::NamedTempFile;
 
-    use crate::{
-        activities_domain::models::{
-            activity::{
-                ActivityMetricSource, DurationCurveType, Sport, TimeseriesAggregate,
-                TimeseriesMetric, Unit,
-            },
-            training::{
-                HooperIndexSource, SportFilter, TrainingMetricActivityFilters,
-                TrainingMetricAggregate, TrainingMetricDefinitionPatch, TrainingMetricGranularity,
-                TrainingMetricPatch, TrainingMetricSummaryAverage, TrainingMetricTarget,
-                TrainingNote, TrainingNoteContent, TrainingNoteId, TrainingNoteTitle,
-                TrainingPeriod, TrainingPeriodId, TrainingPeriodSports, WeightAndNutritionSource,
-            },
-        },
-        clock::Clock,
-    };
+    use crate::activities_domain::activity::models::ActivityMetricSource;
+    use crate::activities_domain::activity::models::DurationCurveType;
+    use crate::activities_domain::activity::models::Sport;
+    use crate::activities_domain::activity::models::TimeseriesAggregate;
+    use crate::activities_domain::activity::models::TimeseriesMetric;
+    use crate::activities_domain::activity::models::Unit;
+    use crate::activities_domain::training::models::HooperIndexSource;
+    use crate::activities_domain::training::models::SportFilter;
+    use crate::activities_domain::training::models::TrainingMetricActivityFilters;
+    use crate::activities_domain::training::models::TrainingMetricAggregate;
+    use crate::activities_domain::training::models::TrainingMetricDefinitionPatch;
+    use crate::activities_domain::training::models::TrainingMetricGranularity;
+    use crate::activities_domain::training::models::TrainingMetricPatch;
+    use crate::activities_domain::training::models::TrainingMetricSummaryAverage;
+    use crate::activities_domain::training::models::TrainingMetricTarget;
+    use crate::activities_domain::training::models::TrainingNote;
+    use crate::activities_domain::training::models::TrainingNoteContent;
+    use crate::activities_domain::training::models::TrainingNoteId;
+    use crate::activities_domain::training::models::TrainingNoteTitle;
+    use crate::activities_domain::training::models::TrainingPeriod;
+    use crate::activities_domain::training::models::TrainingPeriodId;
+    use crate::activities_domain::training::models::TrainingPeriodSports;
+    use crate::activities_domain::training::models::WeightAndNutritionSource;
+    use crate::clock::Clock;
 
     use super::*;
 
@@ -3362,7 +3392,7 @@ mod test_sqlite_training_repository {
     }
 
     fn build_training_note() -> TrainingNote {
-        use activities_domain::models::training::{
+        use activities_domain::training::models::{
             TrainingNoteContent, TrainingNoteDate, TrainingNoteId,
         };
         use chrono::Utc;
@@ -3601,7 +3631,7 @@ mod test_sqlite_training_repository {
 
     #[tokio::test]
     async fn test_get_training_notes_filters_by_date_range() {
-        use activities_domain::ports::DateRange;
+        use activities_domain::shared::DateRange;
 
         let db_file = NamedTempFile::new().unwrap();
         let repository =
@@ -3684,7 +3714,7 @@ mod test_sqlite_training_repository {
 
     #[tokio::test]
     async fn test_get_training_notes_date_range_end_is_exclusive() {
-        use activities_domain::ports::DateRange;
+        use activities_domain::shared::DateRange;
 
         let db_file = NamedTempFile::new().unwrap();
         let repository =
@@ -5201,7 +5231,7 @@ mod test_sqlite_training_repository {
 
         use crate::{
             activities_domain::clock::FakeClock,
-            activities_domain::models::search::{SearchDocumentEvent, SearchDocumentType},
+            activities_domain::search::models::{SearchDocumentEvent, SearchDocumentType},
         };
 
         use super::*;

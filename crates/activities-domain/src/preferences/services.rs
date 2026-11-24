@@ -1,13 +1,11 @@
-use crate::{
-    models::{
-        UserId,
-        preferences::{Preference, PreferenceKey},
-    },
-    ports::preferences::{
-        DeletePreferenceError, GetPreferenceError, IPreferencesService, PreferencesRepository,
-        SetPreferenceError,
-    },
-};
+use crate::preferences::models::Preference;
+use crate::preferences::models::PreferenceKey;
+use crate::preferences::ports::DeletePreferenceError;
+use crate::preferences::ports::GetPreferenceError;
+use crate::preferences::ports::IPreferencesService;
+use crate::preferences::ports::PreferencesRepository;
+use crate::preferences::ports::SetPreferenceError;
+use crate::shared::UserId;
 
 #[derive(Debug, Clone)]
 pub struct PreferencesService<PR>
@@ -86,7 +84,7 @@ where
 pub mod tests_utils {
     use mockall::mock;
 
-    use crate::ports::preferences::SavePreferenceError;
+    use crate::preferences::ports::SavePreferenceError;
 
     use super::*;
 
@@ -162,10 +160,9 @@ mod tests {
     use mockall::predicate::eq;
 
     use super::*;
-    use crate::{
-        models::{preferences::ActivityListSummary, training::TrainingMetricScope},
-        services::preferences::tests_utils::MockPreferencesRepository,
-    };
+    use crate::preferences::models::ActivityListSummary;
+    use crate::preferences::services::tests_utils::MockPreferencesRepository;
+    use crate::training::models::TrainingMetricScope;
 
     #[tokio::test]
     async fn test_get_preference_returns_none_when_not_exists() {

@@ -15,7 +15,7 @@ use serde::Serialize;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    activities_domain::ports::IClock,
+    activities_domain::shared::IClock,
     config::BackupConfig,
     sqlite::backup::{sqlite_version, vacuum_into},
 };

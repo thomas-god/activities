@@ -6,12 +6,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
-use activities_domain::models::training::{TrainingMetricId, TrainingMetricName, TrainingPeriodId};
-use activities_domain::ports::{
-    activity::IActivityService,
-    preferences::IPreferencesService,
-    training::{CopyTrainingMetricError, CopyTrainingMetricRequest, ITrainingService},
-};
+use activities_domain::activity::ports::IActivityService;
+use activities_domain::preferences::ports::IPreferencesService;
+use activities_domain::training::models::{TrainingMetricId, TrainingMetricName, TrainingPeriodId};
+use activities_domain::training::ports::CopyTrainingMetricError;
+use activities_domain::training::ports::CopyTrainingMetricRequest;
+use activities_domain::training::ports::ITrainingService;
 use activities_infra::parser::ParseFile;
 
 #[derive(Serialize)]

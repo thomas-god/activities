@@ -1,9 +1,8 @@
-use crate::models::{
-    UserId,
-    activity::ActivityId,
-    search::{SearchDocument, SearchDocumentType},
-    training::TrainingNoteId,
-};
+use crate::activity::models::ActivityId;
+use crate::search::models::SearchDocument;
+use crate::search::models::SearchDocumentType;
+use crate::shared::UserId;
+use crate::training::models::TrainingNoteId;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RemainingDocuments(bool);

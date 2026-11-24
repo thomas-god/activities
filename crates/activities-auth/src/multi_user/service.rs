@@ -4,7 +4,7 @@ use chrono::TimeDelta;
 use derive_more::Constructor;
 
 use crate::{
-    domain::models::UserId,
+    domain::shared::UserId,
     multi_user::{
         AuthLink, AuthLinkValidationResult, AuthMethods, AuthToken, CheckSessionResult,
         EmailAddress, EmailChangeFinalizeResult, EmailChangeToken, EmailChangeValidationResult,
@@ -394,7 +394,7 @@ where
     async fn validate_auth_token(
         &self,
         token: &AuthToken,
-    ) -> Result<Option<activities_domain::models::UserId>, ()> {
+    ) -> Result<Option<activities_domain::shared::UserId>, ()> {
         let links = self.user_repository.get_all_auth_links().await;
 
         let mut found = None;
@@ -844,7 +844,7 @@ mod test_user_service_register_new_user {
     use anyhow::anyhow;
 
     use crate::{
-        domain::models::UserId,
+        domain::shared::UserId,
         multi_user::{
             UserRegistrationResult,
             service::test_utils::{
@@ -1126,7 +1126,7 @@ mod test_user_service_login_user {
     use chrono::{TimeDelta, Utc};
 
     use crate::{
-        domain::models::UserId,
+        domain::shared::UserId,
         multi_user::{
             GenerateSessionTokenResult, HashedPassword, Password, SessionToken,
             service::test_utils::{

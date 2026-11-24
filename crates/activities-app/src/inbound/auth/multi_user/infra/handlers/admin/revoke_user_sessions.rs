@@ -6,7 +6,7 @@ use axum::{
 use serde::Serialize;
 
 use crate::{
-    domain::models::UserId,
+    domain::shared::UserId,
     inbound::auth::multi_user::admin::{AdminActor, IAdminService},
 };
 

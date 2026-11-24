@@ -7,10 +7,10 @@ use axum::{
 
 use crate::{
     domain::{
-        models::activity::ActivityId,
-        ports::activity::{DeleteActivityError, DeleteActivityRequest, IActivityService},
-        ports::preferences::IPreferencesService,
-        ports::training::ITrainingService,
+        activity::models::ActivityId,
+        activity::ports::{DeleteActivityError, DeleteActivityRequest, IActivityService},
+        preferences::ports::IPreferencesService,
+        training::ports::ITrainingService,
     },
     inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile},
 };

@@ -27,10 +27,10 @@ use tower_http::cors::CorsLayer;
 use tower_http::services::{ServeDir, ServeFile};
 
 use crate::config::{AppMode, BaseConfig};
-use activities_domain::ports::{
-    activity::IActivityService, preferences::IPreferencesService, search::ISearchService,
-    training::ITrainingService,
-};
+use activities_domain::activity::ports::IActivityService;
+use activities_domain::preferences::ports::IPreferencesService;
+use activities_domain::search::ports::ISearchService;
+use activities_domain::training::ports::ITrainingService;
 
 use crate::inbound::auth::multi_user::{
     IMultiUserService, admin::IAdminService, infra::handlers::admin::admin_routes,
@@ -530,15 +530,13 @@ mod tests {
         auth::{AuthStrategy, SinglePassword, multi_user::test_utils::MockUserService},
         parser::test_utils::MockFileParser,
     };
-    use activities_domain::{
-        models::{UserId, activity::ActivityId},
-        ports::search::{SearchResult, search_test_utils::MockSearchService},
-        services::{
-            activity::test_utils::MockActivityService,
-            preferences::tests_utils::MockPreferencesService,
-            training::test_utils::MockTrainingService,
-        },
-    };
+    use activities_domain::activity::models::ActivityId;
+    use activities_domain::activity::services::test_utils::MockActivityService;
+    use activities_domain::preferences::services::tests_utils::MockPreferencesService;
+    use activities_domain::search::ports::SearchResult;
+    use activities_domain::search::ports::search_test_utils::MockSearchService;
+    use activities_domain::shared::UserId;
+    use activities_domain::training::services::test_utils::MockTrainingService;
 
     #[test]
     fn cookie_config_is_secure_only_when_request_is_https() {
@@ -701,7 +699,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_hooper_index_route_calls_service() {
-        use activities_domain::models::training::SubjectiveScale;
+        use activities_domain::training::models::SubjectiveScale;
 
         let mut training_service = MockTrainingService::new();
         training_service
@@ -805,7 +803,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_hooper_index_route_returns_values() {
-        use activities_domain::models::training::{HooperIndex, SubjectiveScale};
+        use activities_domain::training::models::{HooperIndex, SubjectiveScale};
 
         let mut training_service = MockTrainingService::new();
         training_service
@@ -952,7 +950,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_weight_and_nutrition_route_returns_values() {
-        use activities_domain::models::training::WeightAndNutrition;
+        use activities_domain::training::models::WeightAndNutrition;
 
         let mut training_service = MockTrainingService::new();
         training_service

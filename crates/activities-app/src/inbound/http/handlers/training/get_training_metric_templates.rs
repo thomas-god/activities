@@ -9,26 +9,22 @@ use axum::{
 };
 use serde::Serialize;
 
-use crate::{
-    domain::{
-        models::{
-            activity::{ActivityMetric, ToUnit, Unit},
-            training::{
-                DurationCurveSource, HooperIndexSource, TrainingMetricAggregate,
-                TrainingMetricSource, WeightAndNutritionSource,
-            },
-        },
-        ports::{
-            activity::IActivityService, preferences::IPreferencesService,
-            training::ITrainingService,
-        },
-    },
-    inbound::{
-        auth::{AuthenticatedUser, multi_user::IMultiUserService},
-        http::{AppState, handlers::training::types::APITrainingMetricSource},
-        parser::ParseFile,
-    },
-};
+use crate::domain::activity::models::ActivityMetric;
+use crate::domain::activity::models::ToUnit;
+use crate::domain::activity::models::Unit;
+use crate::domain::activity::ports::IActivityService;
+use crate::domain::preferences::ports::IPreferencesService;
+use crate::domain::training::models::DurationCurveSource;
+use crate::domain::training::models::HooperIndexSource;
+use crate::domain::training::models::TrainingMetricAggregate;
+use crate::domain::training::models::TrainingMetricSource;
+use crate::domain::training::models::WeightAndNutritionSource;
+use crate::domain::training::ports::ITrainingService;
+use crate::inbound::auth::AuthenticatedUser;
+use crate::inbound::auth::multi_user::IMultiUserService;
+use crate::inbound::http::AppState;
+use crate::inbound::http::handlers::training::types::APITrainingMetricSource;
+use crate::inbound::parser::ParseFile;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBody(Vec<TrainingMetricTemplateBody>);

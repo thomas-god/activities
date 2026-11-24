@@ -7,31 +7,43 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
 };
 
-use crate::{
-    activities_domain::{
-        models::{
-            UserId,
-            activity::{
-                Activity, ActivityDuration, ActivityDurationCurve, ActivityDurationCurves,
-                ActivityFeedback, ActivityId, ActivityMetric, ActivityMetrics, ActivityName,
-                ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime,
-                ActivityWithParsedData, DurationCurveType, Sport, WorkoutType,
-            },
-            search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
-        },
-        ports::{
-            DateTimeRange, IClock,
-            activity::{
-                ActivityRepository, DurationCurveEvent, DurationCurveNotification,
-                GetActivityError, GetRawActivityError, ListActivitiesError, ListActivitiesFilters,
-                RawActivity, RawDataRepository, SaveActivityError, SimilarActivityError,
-                UpdateActivityMetricError,
-            },
-            search::RemainingDocuments,
-        },
-    },
-    parser::ParseFile,
-};
+use crate::activities_domain::activity::models::Activity;
+use crate::activities_domain::activity::models::ActivityDuration;
+use crate::activities_domain::activity::models::ActivityDurationCurve;
+use crate::activities_domain::activity::models::ActivityDurationCurves;
+use crate::activities_domain::activity::models::ActivityFeedback;
+use crate::activities_domain::activity::models::ActivityId;
+use crate::activities_domain::activity::models::ActivityMetric;
+use crate::activities_domain::activity::models::ActivityMetrics;
+use crate::activities_domain::activity::models::ActivityName;
+use crate::activities_domain::activity::models::ActivityNaturalKey;
+use crate::activities_domain::activity::models::ActivityNutrition;
+use crate::activities_domain::activity::models::ActivityRpe;
+use crate::activities_domain::activity::models::ActivityStartTime;
+use crate::activities_domain::activity::models::ActivityWithParsedData;
+use crate::activities_domain::activity::models::DurationCurveType;
+use crate::activities_domain::activity::models::Sport;
+use crate::activities_domain::activity::models::WorkoutType;
+use crate::activities_domain::activity::ports::ActivityRepository;
+use crate::activities_domain::activity::ports::DurationCurveEvent;
+use crate::activities_domain::activity::ports::DurationCurveNotification;
+use crate::activities_domain::activity::ports::GetActivityError;
+use crate::activities_domain::activity::ports::GetRawActivityError;
+use crate::activities_domain::activity::ports::ListActivitiesError;
+use crate::activities_domain::activity::ports::ListActivitiesFilters;
+use crate::activities_domain::activity::ports::RawActivity;
+use crate::activities_domain::activity::ports::RawDataRepository;
+use crate::activities_domain::activity::ports::SaveActivityError;
+use crate::activities_domain::activity::ports::SimilarActivityError;
+use crate::activities_domain::activity::ports::UpdateActivityMetricError;
+use crate::activities_domain::search::models::SearchDocument;
+use crate::activities_domain::search::models::SearchDocumentEvent;
+use crate::activities_domain::search::models::SearchDocumentType;
+use crate::activities_domain::search::ports::RemainingDocuments;
+use crate::activities_domain::shared::DateTimeRange;
+use crate::activities_domain::shared::IClock;
+use crate::activities_domain::shared::UserId;
+use crate::parser::ParseFile;
 
 type ActivityRow = (
     ActivityId,
@@ -1073,7 +1085,7 @@ where
     async fn get_user_history_date_range(
         &self,
         user: &UserId,
-    ) -> Result<Option<activities_domain::ports::DateTimeRange>, anyhow::Error> {
+    ) -> Result<Option<activities_domain::shared::DateTimeRange>, anyhow::Error> {
         // Option<DateTime<FixedOffset>> because MIN/MAX(...) return NULL if the set is empty
         match sqlx::query_as::<_, (Option<DateTime<FixedOffset>>, Option<DateTime<FixedOffset>>)>(
             "
@@ -1241,26 +1253,32 @@ mod test_sqlite_activity_repository {
     use rand::random_range;
     use tempfile::NamedTempFile;
 
-    use crate::{
-        activities_domain::{
-            clock::FakeClock,
-            models::{
-                UserId,
-                activity::{
-                    ActiveTime, ActivityDuration, ActivityDurationCurve, ActivityDurationCurves,
-                    ActivityPatch, ActivityStartTime, ActivityStatistics, ActivityTimeseries,
-                    BonkStatus, DurationCurveType, Sport, Timeseries, TimeseriesActiveTime,
-                    TimeseriesMetric, TimeseriesTime, TimeseriesValue,
-                },
-            },
-            ports::{
-                DateRange,
-                activity::{GetRawDataError, RawContent, test_utils::MockRawDataRepository},
-            },
-        },
-        clock::Clock,
-        parser::{ParseBytesError, ParsedFileContent, test_utils::MockFileParser},
-    };
+    use crate::activities_domain::activity::models::ActiveTime;
+    use crate::activities_domain::activity::models::ActivityDuration;
+    use crate::activities_domain::activity::models::ActivityDurationCurve;
+    use crate::activities_domain::activity::models::ActivityDurationCurves;
+    use crate::activities_domain::activity::models::ActivityPatch;
+    use crate::activities_domain::activity::models::ActivityStartTime;
+    use crate::activities_domain::activity::models::ActivityStatistics;
+    use crate::activities_domain::activity::models::ActivityTimeseries;
+    use crate::activities_domain::activity::models::BonkStatus;
+    use crate::activities_domain::activity::models::DurationCurveType;
+    use crate::activities_domain::activity::models::Sport;
+    use crate::activities_domain::activity::models::Timeseries;
+    use crate::activities_domain::activity::models::TimeseriesActiveTime;
+    use crate::activities_domain::activity::models::TimeseriesMetric;
+    use crate::activities_domain::activity::models::TimeseriesTime;
+    use crate::activities_domain::activity::models::TimeseriesValue;
+    use crate::activities_domain::activity::ports::GetRawDataError;
+    use crate::activities_domain::activity::ports::RawContent;
+    use crate::activities_domain::activity::ports::test_utils::MockRawDataRepository;
+    use crate::activities_domain::clock::FakeClock;
+    use crate::activities_domain::shared::DateRange;
+    use crate::activities_domain::shared::UserId;
+    use crate::clock::Clock;
+    use crate::parser::ParseBytesError;
+    use crate::parser::ParsedFileContent;
+    use crate::parser::test_utils::MockFileParser;
 
     use super::*;
 
@@ -1361,7 +1379,7 @@ mod test_sqlite_activity_repository {
 
     async fn test_repository() -> (
         SqliteActivityRepository<
-            activities_domain::ports::activity::test_utils::MockRawDataRepository,
+            activities_domain::activity::ports::test_utils::MockRawDataRepository,
             crate::parser::test_utils::MockFileParser,
             Clock,
         >,
@@ -1536,7 +1554,7 @@ mod test_sqlite_activity_repository {
     }
 
     type TestRepository = SqliteActivityRepository<
-        activities_domain::ports::activity::test_utils::MockRawDataRepository,
+        activities_domain::activity::ports::test_utils::MockRawDataRepository,
         crate::parser::test_utils::MockFileParser,
         Clock,
     >;
@@ -3797,7 +3815,7 @@ mod test_sqlite_activity_repository {
     mod test_t_outbox_activity_search {
         use chrono::Utc;
 
-        use activities_domain::models::search::{SearchDocumentEvent, SearchDocumentType};
+        use activities_domain::search::models::{SearchDocumentEvent, SearchDocumentType};
 
         use super::*;
 
@@ -3983,7 +4001,7 @@ mod test_sqlite_activity_repository {
             now: DateTime<Utc>,
         ) -> (
             SqliteActivityRepository<
-                activities_domain::ports::activity::test_utils::MockRawDataRepository,
+                activities_domain::activity::ports::test_utils::MockRawDataRepository,
                 crate::parser::test_utils::MockFileParser,
                 FakeClock,
             >,

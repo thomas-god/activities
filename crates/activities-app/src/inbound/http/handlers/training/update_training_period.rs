@@ -6,13 +6,13 @@ use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use activities_domain::models::training::TrainingPeriodId;
+use activities_domain::training::models::TrainingPeriodId;
 
 use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
-use activities_domain::ports::activity::IActivityService;
-use activities_domain::ports::preferences::IPreferencesService;
-use activities_domain::ports::training::{
+use activities_domain::activity::ports::IActivityService;
+use activities_domain::preferences::ports::IPreferencesService;
+use activities_domain::training::ports::{
     ITrainingService, UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
     UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest, UpdateTrainingPeriodNoteError,
     UpdateTrainingPeriodNoteRequest,

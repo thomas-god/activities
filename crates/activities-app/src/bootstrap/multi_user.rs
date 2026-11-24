@@ -10,10 +10,10 @@ use activities_auth::multi_user::{
     },
     spawn_expired_sessions_cleanup,
 };
-use activities_domain::services::{
-    activity::ActivityService, preferences::PreferencesService, search::SearchService,
-    training::TrainingService,
-};
+use activities_domain::activity::services::ActivityService;
+use activities_domain::preferences::services::PreferencesService;
+use activities_domain::search::services::SearchService;
+use activities_domain::training::services::TrainingService;
 use activities_infra::{
     backup::BackupService,
     clock::Clock,

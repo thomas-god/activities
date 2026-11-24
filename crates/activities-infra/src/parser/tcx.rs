@@ -5,7 +5,7 @@ use itertools::Itertools;
 use roxmltree::Document;
 
 use crate::{
-    activities_domain::models::activity::{
+    activities_domain::activity::models::{
         ActiveTime, ActivityDuration, ActivityStartTime, ActivityStatistic, ActivityStatistics,
         ActivityTimeseries, Lap, Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric,
         TimeseriesTime, TimeseriesValue,
@@ -295,7 +295,7 @@ mod test_tcx_parser {
     use chrono::{DateTime, FixedOffset};
 
     use crate::{
-        activities_domain::models::activity::{
+        activities_domain::activity::models::{
             ActivityDuration, ActivityStartTime, ActivityStatistic, Lap,
         },
         parser::ParseBytesError,

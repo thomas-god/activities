@@ -3,26 +3,36 @@ use std::{sync::Arc, time::Instant};
 use anyhow::anyhow;
 use log::warn;
 
-use crate::{
-    models::{
-        UserId,
-        activity::{
-            Activity, ActivityDurationCurves, ActivityId, ActivityMetric, ActivityMetrics,
-            ActivityWithParsedData, DEFAULT_METRICS,
-        },
-        search::{SearchDocument, SearchDocumentType},
-    },
-    ports::{
-        activity::{
-            ActivityRepository, CreateActivityError, CreateActivityRequest, DeleteActivityError,
-            DeleteActivityRequest, DurationCurveNotification, GetActivityError,
-            GetAllActivitiesError, GetAllActivitiesRequest, GetRawActivityError,
-            GetRawActivityRequest, IActivityService, ListActivitiesError, ListActivitiesFilters,
-            PatchActivityError, PatchActivityRequest, RawActivity, RawDataRepository,
-        },
-        search::{IDocumentsForSearch, RemainingDocuments},
-    },
-};
+use crate::activity::models::Activity;
+use crate::activity::models::ActivityDurationCurves;
+use crate::activity::models::ActivityId;
+use crate::activity::models::ActivityMetric;
+use crate::activity::models::ActivityMetrics;
+use crate::activity::models::ActivityWithParsedData;
+use crate::activity::models::DEFAULT_METRICS;
+use crate::activity::ports::ActivityRepository;
+use crate::activity::ports::CreateActivityError;
+use crate::activity::ports::CreateActivityRequest;
+use crate::activity::ports::DeleteActivityError;
+use crate::activity::ports::DeleteActivityRequest;
+use crate::activity::ports::DurationCurveNotification;
+use crate::activity::ports::GetActivityError;
+use crate::activity::ports::GetAllActivitiesError;
+use crate::activity::ports::GetAllActivitiesRequest;
+use crate::activity::ports::GetRawActivityError;
+use crate::activity::ports::GetRawActivityRequest;
+use crate::activity::ports::IActivityService;
+use crate::activity::ports::ListActivitiesError;
+use crate::activity::ports::ListActivitiesFilters;
+use crate::activity::ports::PatchActivityError;
+use crate::activity::ports::PatchActivityRequest;
+use crate::activity::ports::RawActivity;
+use crate::activity::ports::RawDataRepository;
+use crate::search::models::SearchDocument;
+use crate::search::models::SearchDocumentType;
+use crate::search::ports::IDocumentsForSearch;
+use crate::search::ports::RemainingDocuments;
+use crate::shared::UserId;
 
 const BATCH_SIZE: u32 = 50;
 
@@ -449,15 +459,15 @@ pub mod test_utils {
 
     use super::*;
 
-    use crate::models::activity::{ActivityDuration, ActivityNaturalKey, ActivityStartTime, Sport};
-    use crate::models::search::SearchDocument;
-    use crate::ports::activity::{
+    use crate::activity::models::{ActivityDuration, ActivityNaturalKey, ActivityStartTime, Sport};
+    use crate::activity::ports::{
         DeleteActivityError, DurationCurveNotification, GetAllActivitiesError,
         GetAllActivitiesRequest, GetRawActivityError, GetRawActivityRequest, ListActivitiesError,
         PatchActivityError, PatchActivityRequest, RawActivity, SaveActivityError,
         SimilarActivityError, UpdateActivityMetricError,
     };
-    use crate::ports::search::RemainingDocuments;
+    use crate::search::models::SearchDocument;
+    use crate::search::ports::RemainingDocuments;
 
     mock! {
         pub ActivityService {}
@@ -634,7 +644,7 @@ pub mod test_utils {
             async fn get_user_history_date_range(
                 &self,
                 user: &UserId,
-            ) -> Result<Option<crate::ports::DateTimeRange>, anyhow::Error>;
+            ) -> Result<Option<crate::shared::DateTimeRange>, anyhow::Error>;
 
             async fn get_outbox_documents_to_process(
                 &self,
@@ -675,21 +685,26 @@ mod tests_activity_service {
     use anyhow::anyhow;
     use mockall::mock;
 
-    use crate::{
-        models::{
-            UserId,
-            activity::{
-                ActiveTime, ActivityDuration, ActivityName, ActivityStartTime, ActivityStatistics,
-                ActivityTimeseries, Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric,
-                TimeseriesTime, TimeseriesValue,
-            },
-        },
-        ports::activity::{
-            DeleteActivityError, DeleteActivityRequest, GetRawDataError, RawContent,
-            SaveActivityError, SaveRawDataError,
-        },
-        services::activity::test_utils::MockActivityRepository,
-    };
+    use crate::activity::models::ActiveTime;
+    use crate::activity::models::ActivityDuration;
+    use crate::activity::models::ActivityName;
+    use crate::activity::models::ActivityStartTime;
+    use crate::activity::models::ActivityStatistics;
+    use crate::activity::models::ActivityTimeseries;
+    use crate::activity::models::Sport;
+    use crate::activity::models::Timeseries;
+    use crate::activity::models::TimeseriesActiveTime;
+    use crate::activity::models::TimeseriesMetric;
+    use crate::activity::models::TimeseriesTime;
+    use crate::activity::models::TimeseriesValue;
+    use crate::activity::ports::DeleteActivityError;
+    use crate::activity::ports::DeleteActivityRequest;
+    use crate::activity::ports::GetRawDataError;
+    use crate::activity::ports::RawContent;
+    use crate::activity::ports::SaveActivityError;
+    use crate::activity::ports::SaveRawDataError;
+    use crate::activity::services::test_utils::MockActivityRepository;
+    use crate::shared::UserId;
 
     use super::*;
 
@@ -1074,7 +1089,7 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_activity_service_patch_activity_ok() {
-        use crate::models::activity::{ActivityFeedback, ActivityPatch, ActivityRpe};
+        use crate::activity::models::{ActivityFeedback, ActivityPatch, ActivityRpe};
 
         let mut activity_repository = MockActivityRepository::new();
         activity_repository.expect_get_activity().returning(|_, _| {
@@ -1129,7 +1144,7 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_activity_service_patch_activity_not_found() {
-        use crate::models::activity::ActivityPatch;
+        use crate::activity::models::ActivityPatch;
 
         let mut activity_repository = MockActivityRepository::new();
         activity_repository
@@ -1160,7 +1175,7 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_activity_service_patch_activity_triggers_notify() {
-        use crate::models::activity::ActivityPatch;
+        use crate::activity::models::ActivityPatch;
 
         let mut activity_repository = MockActivityRepository::new();
         activity_repository.expect_get_activity().returning(|_, _| {
@@ -1201,7 +1216,7 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_activity_service_patch_activity_not_found_does_not_trigger_notify() {
-        use crate::models::activity::ActivityPatch;
+        use crate::activity::models::ActivityPatch;
 
         let mut activity_repository = MockActivityRepository::new();
         activity_repository
@@ -1232,7 +1247,7 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_activity_service_patch_activity_not_owned_by_user() {
-        use crate::models::activity::ActivityPatch;
+        use crate::activity::models::ActivityPatch;
 
         let mut activity_repository = MockActivityRepository::new();
         activity_repository.expect_get_activity().returning(|_, _| {
@@ -1270,7 +1285,7 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_activity_service_patch_activity_save_error() {
-        use crate::models::activity::ActivityPatch;
+        use crate::activity::models::ActivityPatch;
 
         let mut activity_repository = MockActivityRepository::new();
         activity_repository.expect_get_activity().returning(|_, _| {
@@ -1586,7 +1601,7 @@ mod tests_activity_service {
     mod test_activity_service_list_activities_with_metrics_v2 {
         use mockall::predicate::eq;
 
-        use crate::models::activity::{
+        use crate::activity::models::{
             ActiveTime, ActivityId, ActivityStatistic, Timeseries, TimeseriesActiveTime,
             TimeseriesMetric, TimeseriesTime, TimeseriesValue,
         };
@@ -1966,7 +1981,7 @@ mod tests_activity_service {
 
     use mockall::predicate::eq;
 
-    use crate::models::activity::DurationCurveType;
+    use crate::activity::models::DurationCurveType;
 
     fn running_activity(id: &ActivityId) -> Activity {
         Activity::new_empty(

@@ -12,10 +12,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::models::{
-    UserId,
-    search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
-};
+use crate::search::models::SearchDocument;
+use crate::search::models::SearchDocumentEvent;
+use crate::search::models::SearchDocumentType;
+use crate::shared::UserId;
 
 pub const DEFAULT_METRICS: [ActivityMetric; 11] = [
     ActivityMetric::Calories,

@@ -7,11 +7,11 @@ use uuid::Uuid;
 
 use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
-use activities_domain::models::training::TrainingPeriodId;
-use activities_domain::ports::training::{DeleteTrainingPeriodError, DeleteTrainingPeriodRequest};
-use activities_domain::ports::{
-    activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
-};
+use activities_domain::activity::ports::IActivityService;
+use activities_domain::preferences::ports::IPreferencesService;
+use activities_domain::training::models::TrainingPeriodId;
+use activities_domain::training::ports::ITrainingService;
+use activities_domain::training::ports::{DeleteTrainingPeriodError, DeleteTrainingPeriodRequest};
 use activities_infra::parser::ParseFile;
 
 #[derive(Serialize)]

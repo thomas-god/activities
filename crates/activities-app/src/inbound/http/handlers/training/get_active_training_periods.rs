@@ -8,20 +8,16 @@ use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::{
-    domain::{
-        models::training::{SportFilter, TrainingPeriod, TrainingPeriodSports},
-        ports::{
-            activity::IActivityService, preferences::IPreferencesService,
-            training::ITrainingService,
-        },
-    },
-    inbound::{
-        auth::AuthenticatedUser,
-        http::{AppState, handlers::training::types::SportsResponse},
-        parser::ParseFile,
-    },
-};
+use crate::domain::activity::ports::IActivityService;
+use crate::domain::preferences::ports::IPreferencesService;
+use crate::domain::training::models::SportFilter;
+use crate::domain::training::models::TrainingPeriod;
+use crate::domain::training::models::TrainingPeriodSports;
+use crate::domain::training::ports::ITrainingService;
+use crate::inbound::auth::AuthenticatedUser;
+use crate::inbound::http::AppState;
+use crate::inbound::http::handlers::training::types::SportsResponse;
+use crate::inbound::parser::ParseFile;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct QueryParams {
@@ -93,10 +89,9 @@ mod tests {
 
     #[test]
     fn test_response_body_item_serialize() {
-        use activities_domain::models::{
-            UserId,
-            training::{TrainingPeriodId, TrainingPeriodSports},
-        };
+        use activities_domain::shared::UserId;
+        use activities_domain::training::models::TrainingPeriodId;
+        use activities_domain::training::models::TrainingPeriodSports;
 
         let period = TrainingPeriod::new(
             TrainingPeriodId::new(),

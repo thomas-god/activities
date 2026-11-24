@@ -4,14 +4,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::inbound::auth::AuthenticatedUser;
 use crate::{
-    domain::ports::activity::IActivityService,
+    domain::activity::ports::IActivityService,
     inbound::{
         http::AppState,
         parser::{ParseBytesError, ParseFile, ParsedFileContent, json::StandaloneActivity},
     },
 };
-use activities_domain::ports::activity::CreateActivityError;
-use activities_domain::ports::{preferences::IPreferencesService, training::ITrainingService};
+use activities_domain::activity::ports::CreateActivityError;
+use activities_domain::preferences::ports::IPreferencesService;
+use activities_domain::training::ports::ITrainingService;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateStandaloneActivityResponse {
@@ -60,21 +61,17 @@ mod tests {
     use axum::{Router, middleware::from_extractor, routing::post};
     use axum_test::TestServer;
 
-    use crate::{
-        domain::{
-            models::{
-                UserId,
-                activity::{ActivityDuration, ActivityId, ActivityStartTime, Sport},
-            },
-            services::{
-                activity::test_utils::MockActivityService,
-                preferences::tests_utils::MockPreferencesService,
-                training::test_utils::MockTrainingService,
-            },
-        },
-        inbound::{auth::no_auth::DefaultUserExtractor, parser::test_utils::MockFileParser},
-    };
-    use activities_domain::models::activity::Activity;
+    use crate::domain::activity::models::ActivityDuration;
+    use crate::domain::activity::models::ActivityId;
+    use crate::domain::activity::models::ActivityStartTime;
+    use crate::domain::activity::models::Sport;
+    use crate::domain::activity::services::test_utils::MockActivityService;
+    use crate::domain::preferences::services::tests_utils::MockPreferencesService;
+    use crate::domain::shared::UserId;
+    use crate::domain::training::services::test_utils::MockTrainingService;
+    use crate::inbound::auth::no_auth::DefaultUserExtractor;
+    use crate::inbound::parser::test_utils::MockFileParser;
+    use activities_domain::activity::models::Activity;
 
     use super::*;
 

@@ -116,7 +116,7 @@ mod test {
     use serde_json::json;
 
     use crate::{
-        domain::models::UserId,
+        domain::shared::UserId,
         inbound::auth::multi_user::{
             GenerateSessionTokenResult, Password, RegisterPasswordResult, SessionToken,
             UpdatePasswordResult, test_utils::MockUserService,

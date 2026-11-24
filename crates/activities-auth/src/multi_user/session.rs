@@ -4,7 +4,7 @@ use chrono::{DateTime, TimeDelta, Utc};
 use derive_more::Constructor;
 
 use crate::{
-    domain::models::UserId,
+    domain::shared::UserId,
     multi_user::{
         CheckSessionResult, GenerateSessionTokenResult, HashedSession, HashedSessionToken,
         ISessionService, Session, SessionToken,

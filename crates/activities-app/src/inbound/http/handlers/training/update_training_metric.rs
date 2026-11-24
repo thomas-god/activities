@@ -11,18 +11,18 @@ use crate::inbound::http::handlers::training::types::{
     APITimeseriesWindow, APITrainingMetricFilters, APITrainingMetricScope, APITrainingMetricSource,
     APITrainingMetricSummary, APITrainingMetricTarget,
 };
-use activities_domain::models::UserId;
-use activities_domain::models::activity::ActivityMetric;
-use activities_domain::models::training::{
+use activities_domain::activity::models::ActivityMetric;
+use activities_domain::activity::ports::IActivityService;
+use activities_domain::preferences::ports::IPreferencesService;
+use activities_domain::shared::UserId;
+use activities_domain::training::models::{
     TrainingMetricActivityFilters, TrainingMetricId, TrainingMetricName, TrainingMetricScope,
     TrainingMetricSource, TrainingMetricTarget, TrainingMetricWindow, TrainingPeriodId,
 };
-use activities_domain::ports::training::{UpdateTrainingMetricError, UpdateTrainingMetricRequest};
-use activities_domain::ports::{
-    activity::IActivityService,
-    preferences::IPreferencesService,
-    training::{ITrainingService, UpdateTrainingMetricNameError, UpdateTrainingMetricNameRequest},
-};
+use activities_domain::training::ports::ITrainingService;
+use activities_domain::training::ports::UpdateTrainingMetricNameError;
+use activities_domain::training::ports::UpdateTrainingMetricNameRequest;
+use activities_domain::training::ports::{UpdateTrainingMetricError, UpdateTrainingMetricRequest};
 use activities_infra::parser::ParseFile;
 
 #[derive(Deserialize)]
@@ -101,7 +101,7 @@ mod tests {
     use super::*;
 
     use crate::{
-        domain::models::activity::Unit,
+        domain::activity::models::Unit,
         inbound::http::handlers::training::types::{
             APIActivitySource, APITrainingMetricActivityGroupBy,
         },

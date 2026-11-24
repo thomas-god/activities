@@ -8,7 +8,7 @@
 use derive_more::Constructor;
 
 use super::{EmailAddress, HashedPassword, Password};
-use activities_domain::{models::UserId, ports::IClock};
+use activities_domain::{shared::IClock, shared::UserId};
 
 pub use super::admin_audit::{AdminAction, AdminActor, AdminAuditContext, AdminAuditEntry};
 

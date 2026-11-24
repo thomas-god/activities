@@ -5,17 +5,15 @@ use axum::{
     http::StatusCode,
 };
 
-use crate::{
-    domain::{
-        models::training::TrainingMetricId,
-        ports::{
-            activity::IActivityService,
-            preferences::IPreferencesService,
-            training::{DeleteTrainingMetricError, DeleteTrainingMetricRequest, ITrainingService},
-        },
-    },
-    inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile},
-};
+use crate::domain::activity::ports::IActivityService;
+use crate::domain::preferences::ports::IPreferencesService;
+use crate::domain::training::models::TrainingMetricId;
+use crate::domain::training::ports::DeleteTrainingMetricError;
+use crate::domain::training::ports::DeleteTrainingMetricRequest;
+use crate::domain::training::ports::ITrainingService;
+use crate::inbound::auth::AuthenticatedUser;
+use crate::inbound::http::AppState;
+use crate::inbound::parser::ParseFile;
 
 impl ApiErrorStatus for DeleteTrainingMetricError {
     fn status_code(self) -> StatusCode {

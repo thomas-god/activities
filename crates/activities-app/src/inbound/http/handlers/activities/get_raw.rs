@@ -10,16 +10,15 @@ use axum::{
 use std::io::Write;
 use zip::result::ZipError;
 
-use crate::{
-    domain::ports::{
-        activity::{GetAllActivitiesRequest, IActivityService},
-        preferences::IPreferencesService,
-        training::ITrainingService,
-    },
-    inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile},
-};
-use activities_domain::models::activity::ActivityId;
-use activities_domain::ports::activity::{
+use crate::domain::activity::ports::GetAllActivitiesRequest;
+use crate::domain::activity::ports::IActivityService;
+use crate::domain::preferences::ports::IPreferencesService;
+use crate::domain::training::ports::ITrainingService;
+use crate::inbound::auth::AuthenticatedUser;
+use crate::inbound::http::AppState;
+use crate::inbound::parser::ParseFile;
+use activities_domain::activity::models::ActivityId;
+use activities_domain::activity::ports::{
     GetAllActivitiesError, GetRawActivityError, GetRawActivityRequest, RawActivity,
 };
 
@@ -153,10 +152,9 @@ pub async fn get_raw_activity<
 mod tests {
     use super::*;
     use activities_domain::{
-        models::UserId, ports::activity::RawActivity,
-        services::activity::test_utils::MockActivityService,
-        services::preferences::tests_utils::MockPreferencesService,
-        services::training::test_utils::MockTrainingService,
+        activity::ports::RawActivity, activity::services::test_utils::MockActivityService,
+        preferences::services::tests_utils::MockPreferencesService, shared::UserId,
+        training::services::test_utils::MockTrainingService,
     };
     use activities_infra::parser::test_utils::MockFileParser;
     use std::sync::Arc;
@@ -207,7 +205,7 @@ mod tests {
             .expect_get_all_raw_activities()
             .returning(|_| {
                 Err(
-                    activities_domain::ports::activity::GetAllActivitiesError::Unknown(
+                    activities_domain::activity::ports::GetAllActivitiesError::Unknown(
                         anyhow::anyhow!("error"),
                     ),
                 )

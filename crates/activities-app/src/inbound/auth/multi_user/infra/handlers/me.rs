@@ -50,7 +50,7 @@ mod test {
     use serde_json::json;
 
     use crate::{
-        domain::models::UserId,
+        domain::shared::UserId,
         inbound::auth::multi_user::{UserInfo, UserInfoResult, test_utils::MockUserService},
         inbound::http::CookieConfig,
     };

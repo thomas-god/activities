@@ -8,24 +8,23 @@ use axum::{
 use derive_more::Display;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    domain::{
-        models::activity::{
-            ActivityFeedback, ActivityId, ActivityName, ActivityNutrition, ActivityPatch,
-            ActivityRpe, BonkStatus, WorkoutType,
-        },
-        ports::{
-            activity::{IActivityService, PatchActivityError, PatchActivityRequest},
-            preferences::IPreferencesService,
-            training::ITrainingService,
-        },
-    },
-    inbound::{
-        auth::AuthenticatedUser,
-        http::{AppState, shared::PatchField},
-        parser::ParseFile,
-    },
-};
+use crate::domain::activity::models::ActivityFeedback;
+use crate::domain::activity::models::ActivityId;
+use crate::domain::activity::models::ActivityName;
+use crate::domain::activity::models::ActivityNutrition;
+use crate::domain::activity::models::ActivityPatch;
+use crate::domain::activity::models::ActivityRpe;
+use crate::domain::activity::models::BonkStatus;
+use crate::domain::activity::models::WorkoutType;
+use crate::domain::activity::ports::IActivityService;
+use crate::domain::activity::ports::PatchActivityError;
+use crate::domain::activity::ports::PatchActivityRequest;
+use crate::domain::preferences::ports::IPreferencesService;
+use crate::domain::training::ports::ITrainingService;
+use crate::inbound::auth::AuthenticatedUser;
+use crate::inbound::http::AppState;
+use crate::inbound::http::shared::PatchField;
+use crate::inbound::parser::ParseFile;
 
 impl ApiErrorStatus for PatchActivityError {
     fn status_code(self) -> StatusCode {
@@ -196,20 +195,15 @@ mod tests {
 
     use super::*;
 
-    use crate::{
-        domain::{
-            models::{
-                UserId,
-                activity::{Activity, ActivityDuration, ActivityStartTime, Sport},
-            },
-            services::{
-                activity::test_utils::MockActivityService,
-                preferences::tests_utils::MockPreferencesService,
-                training::test_utils::MockTrainingService,
-            },
-        },
-        inbound::parser::test_utils::MockFileParser,
-    };
+    use crate::domain::activity::models::Activity;
+    use crate::domain::activity::models::ActivityDuration;
+    use crate::domain::activity::models::ActivityStartTime;
+    use crate::domain::activity::models::Sport;
+    use crate::domain::activity::services::test_utils::MockActivityService;
+    use crate::domain::preferences::services::tests_utils::MockPreferencesService;
+    use crate::domain::shared::UserId;
+    use crate::domain::training::services::test_utils::MockTrainingService;
+    use crate::inbound::parser::test_utils::MockFileParser;
 
     const USER_ID: &str = "test_user";
     const ACTIVITY_ID: &str = "test_activity_id";

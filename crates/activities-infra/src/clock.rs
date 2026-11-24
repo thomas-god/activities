@@ -1,6 +1,6 @@
 use derive_more::Constructor;
 
-use activities_domain::ports::IClock;
+use activities_domain::shared::IClock;
 
 #[derive(Debug, Clone, Constructor)]
 pub struct Clock;

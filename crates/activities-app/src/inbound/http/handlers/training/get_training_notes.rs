@@ -7,17 +7,15 @@ use axum::{
 use chrono::{DateTime, FixedOffset, Local};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    domain::{
-        models::training::{TrainingNote, TrainingPeriodId},
-        ports::{
-            activity::IActivityService, preferences::IPreferencesService,
-            training::ITrainingService,
-        },
-    },
-    inbound::{auth::AuthenticatedUser, http::AppState},
-};
-use activities_domain::ports::{DateRange, training::GetTrainingNoteError};
+use crate::domain::activity::ports::IActivityService;
+use crate::domain::preferences::ports::IPreferencesService;
+use crate::domain::training::models::TrainingNote;
+use crate::domain::training::models::TrainingPeriodId;
+use crate::domain::training::ports::ITrainingService;
+use crate::inbound::auth::AuthenticatedUser;
+use crate::inbound::http::AppState;
+use activities_domain::shared::DateRange;
+use activities_domain::training::ports::GetTrainingNoteError;
 use activities_infra::parser::ParseFile;
 
 #[derive(Debug, Deserialize)]

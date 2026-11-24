@@ -18,7 +18,7 @@ use axum::{
 };
 
 use crate::{
-    domain::models::UserId,
+    domain::shared::UserId,
     inbound::{
         auth::{
             AuthenticatedUser,

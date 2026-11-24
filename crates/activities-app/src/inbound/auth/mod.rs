@@ -4,7 +4,7 @@ use activities_auth::{
     auth::MultiUserAuthStrategy,
     multi_user::{AuthMethods, HashedSessionToken},
 };
-use activities_domain::models::UserId;
+use activities_domain::shared::UserId;
 use activities_infra::config::{AppMode, SingleUserConfig};
 use derive_more::Constructor;
 

@@ -1,12 +1,11 @@
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////
+use crate::preferences::models::Preference;
+use crate::preferences::models::PreferenceKey;
 /// PREFERENCES SERVICE
 ///////////////////////////////////////////////////////////////////
-use crate::models::{
-    UserId,
-    preferences::{Preference, PreferenceKey},
-};
+use crate::shared::UserId;
 
 #[derive(Debug, Error)]
 pub enum GetPreferenceError {

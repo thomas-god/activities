@@ -8,18 +8,14 @@ use axum::{
 };
 use chrono::NaiveDate;
 
-use crate::{
-    domain::ports::{
-        activity::IActivityService,
-        preferences::IPreferencesService,
-        training::{ITrainingService, WeightAndNutritionError},
-    },
-    inbound::{
-        auth::AuthenticatedUser,
-        http::{AppState, handlers::training::types::APIWeightAndNutrition},
-        parser::ParseFile,
-    },
-};
+use crate::domain::activity::ports::IActivityService;
+use crate::domain::preferences::ports::IPreferencesService;
+use crate::domain::training::ports::ITrainingService;
+use crate::domain::training::ports::WeightAndNutritionError;
+use crate::inbound::auth::AuthenticatedUser;
+use crate::inbound::http::AppState;
+use crate::inbound::http::handlers::training::types::APIWeightAndNutrition;
+use crate::inbound::parser::ParseFile;
 
 /// Returns the weight and nutrition values for a given date.
 ///

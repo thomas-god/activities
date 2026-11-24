@@ -19,7 +19,7 @@ use activities_auth::multi_user::{
     session::SessionRepository,
 };
 
-use activities_domain::models::UserId;
+use activities_domain::shared::UserId;
 
 /// SQLite repository backed by the user database (`user.db`).
 ///
@@ -1737,7 +1737,7 @@ mod test_sqlite_users_repository {
         session::SessionRepository,
     };
 
-    use activities_domain::models::UserId;
+    use activities_domain::shared::UserId;
 
     use super::*;
 

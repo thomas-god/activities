@@ -2,26 +2,43 @@ use chrono::NaiveDate;
 use derive_more::Constructor;
 use thiserror::Error;
 
-use crate::{
-    models::{
-        UserId,
-        activity::{
-            Activity, ActivityDurationCurve, ActivityId, ActivityMetric, ActivityWithParsedData,
-        },
-        search::SearchDocument,
-        training::{
-            ActivityWithTrainingContext, BestDurationCurve, HooperIndex, HooperIndexPatch,
-            TrainingMetric, TrainingMetricDefinitionPatch, TrainingMetricId, TrainingMetricName,
-            TrainingMetricPatch, TrainingMetricScope, TrainingMetricSource, TrainingMetricSummary,
-            TrainingMetricTarget, TrainingMetricValues, TrainingMetricWindow,
-            TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
-            TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError,
-            TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
-            WeightAndNutrition, WeightAndNutritionPatch,
-        },
-    },
-    ports::{DateRange, search::RemainingDocuments},
-};
+use crate::activity::models::Activity;
+use crate::activity::models::ActivityDurationCurve;
+use crate::activity::models::ActivityId;
+use crate::activity::models::ActivityMetric;
+use crate::activity::models::ActivityWithParsedData;
+use crate::search::models::SearchDocument;
+use crate::search::ports::RemainingDocuments;
+use crate::shared::DateRange;
+use crate::shared::UserId;
+use crate::training::models::ActivityWithTrainingContext;
+use crate::training::models::BestDurationCurve;
+use crate::training::models::HooperIndex;
+use crate::training::models::HooperIndexPatch;
+use crate::training::models::TrainingMetric;
+use crate::training::models::TrainingMetricDefinitionPatch;
+use crate::training::models::TrainingMetricId;
+use crate::training::models::TrainingMetricName;
+use crate::training::models::TrainingMetricPatch;
+use crate::training::models::TrainingMetricScope;
+use crate::training::models::TrainingMetricSource;
+use crate::training::models::TrainingMetricSummary;
+use crate::training::models::TrainingMetricTarget;
+use crate::training::models::TrainingMetricValues;
+use crate::training::models::TrainingMetricWindow;
+use crate::training::models::TrainingMetricsOrdering;
+use crate::training::models::TrainingNote;
+use crate::training::models::TrainingNoteContent;
+use crate::training::models::TrainingNoteDate;
+use crate::training::models::TrainingNoteId;
+use crate::training::models::TrainingNoteTitle;
+use crate::training::models::TrainingPeriod;
+use crate::training::models::TrainingPeriodCreationError;
+use crate::training::models::TrainingPeriodId;
+use crate::training::models::TrainingPeriodSports;
+use crate::training::models::TrainingPeriodWithActivities;
+use crate::training::models::WeightAndNutrition;
+use crate::training::models::WeightAndNutritionPatch;
 
 #[allow(clippy::too_many_arguments)]
 #[derive(Debug, Clone, PartialEq, Constructor)]
@@ -1132,8 +1149,8 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
 mod tests {
     use super::*;
 
-    use crate::models::activity::Unit;
-    use crate::models::training::{
+    use crate::activity::models::Unit;
+    use crate::training::models::{
         ActivitySource, TrainingMetricActivityFilters, TrainingMetricActivityGroupBy,
         TrainingMetricTarget,
     };

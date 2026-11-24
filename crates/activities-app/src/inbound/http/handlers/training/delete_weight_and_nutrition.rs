@@ -8,14 +8,14 @@ use axum::{
 };
 use chrono::NaiveDate;
 
-use crate::{
-    domain::ports::{
-        activity::IActivityService,
-        preferences::IPreferencesService,
-        training::{DeleteWeightAndNutritionRequest, ITrainingService, WeightAndNutritionError},
-    },
-    inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile},
-};
+use crate::domain::activity::ports::IActivityService;
+use crate::domain::preferences::ports::IPreferencesService;
+use crate::domain::training::ports::DeleteWeightAndNutritionRequest;
+use crate::domain::training::ports::ITrainingService;
+use crate::domain::training::ports::WeightAndNutritionError;
+use crate::inbound::auth::AuthenticatedUser;
+use crate::inbound::http::AppState;
+use crate::inbound::parser::ParseFile;
 
 #[tracing::instrument(skip_all, err)]
 pub async fn delete_weight_and_nutrition<

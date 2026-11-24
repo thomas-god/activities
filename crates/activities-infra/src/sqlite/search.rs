@@ -8,18 +8,15 @@ use sqlx::{
 use unicode_categories::UnicodeCategories;
 use unicode_normalization::UnicodeNormalization;
 
-use activities_domain::{
-    models::{
-        UserId,
-        activity::ActivityId,
-        search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
-        training::TrainingNoteId,
-    },
-    ports::{
-        IClock,
-        search::{ISearchRepository, SearchResult},
-    },
-};
+use activities_domain::activity::models::ActivityId;
+use activities_domain::search::models::SearchDocument;
+use activities_domain::search::models::SearchDocumentEvent;
+use activities_domain::search::models::SearchDocumentType;
+use activities_domain::search::ports::ISearchRepository;
+use activities_domain::search::ports::SearchResult;
+use activities_domain::shared::IClock;
+use activities_domain::shared::UserId;
+use activities_domain::training::models::TrainingNoteId;
 
 const KEY_LAST_IMPORT_DATE: &str = "last_import_date";
 
@@ -410,18 +407,14 @@ mod tests_sqlite_search_repository {
     use tempfile::NamedTempFile;
 
     use super::*;
-    use crate::{
-        activities_domain::clock::FakeClock,
-        activities_domain::{
-            models::{
-                UserId,
-                activity::ActivityId,
-                search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
-                training::TrainingNoteId,
-            },
-            ports::search::SearchResult,
-        },
-    };
+    use crate::activities_domain::activity::models::ActivityId;
+    use crate::activities_domain::clock::FakeClock;
+    use crate::activities_domain::search::models::SearchDocument;
+    use crate::activities_domain::search::models::SearchDocumentEvent;
+    use crate::activities_domain::search::models::SearchDocumentType;
+    use crate::activities_domain::search::ports::SearchResult;
+    use crate::activities_domain::shared::UserId;
+    use crate::activities_domain::training::models::TrainingNoteId;
 
     const DOCUMENT_ID: &str = "activity-1";
 

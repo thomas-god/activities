@@ -4,7 +4,7 @@ use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    activities_domain::models::activity::{
+    activities_domain::activity::models::{
         ActivityDuration, ActivityStartTime, ActivityStatistic, ActivityStatistics,
         ActivityTimeseries, Sport,
     },
@@ -69,7 +69,7 @@ pub fn try_custom_json_bytes_into_domain(
 mod tests {
     use chrono::DateTime;
 
-    use activities_domain::models::activity::ActivityStatistic;
+    use activities_domain::activity::models::ActivityStatistic;
 
     use super::*;
 

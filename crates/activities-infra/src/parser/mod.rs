@@ -1,21 +1,17 @@
 use derive_more::Constructor;
 use thiserror::Error;
 
-use crate::{
-    activities_domain::{
-        models::{
-            UserId,
-            activity::{
-                ActivityDuration, ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport,
-            },
-        },
-        ports::activity::{CreateActivityRequest, RawContent},
-    },
-    parser::{
-        fit::try_fit_bytes_into_domain, json::try_custom_json_bytes_into_domain,
-        tcx::try_tcx_bytes_into_domain,
-    },
-};
+use crate::activities_domain::activity::models::ActivityDuration;
+use crate::activities_domain::activity::models::ActivityStartTime;
+use crate::activities_domain::activity::models::ActivityStatistics;
+use crate::activities_domain::activity::models::ActivityTimeseries;
+use crate::activities_domain::activity::models::Sport;
+use crate::activities_domain::activity::ports::CreateActivityRequest;
+use crate::activities_domain::activity::ports::RawContent;
+use crate::activities_domain::shared::UserId;
+use crate::parser::fit::try_fit_bytes_into_domain;
+use crate::parser::json::try_custom_json_bytes_into_domain;
+use crate::parser::tcx::try_tcx_bytes_into_domain;
 
 pub mod fit;
 pub mod json;

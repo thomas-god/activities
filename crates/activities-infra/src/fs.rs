@@ -5,8 +5,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::{
     activities_domain::{
-        models::activity::ActivityId,
-        ports::activity::{GetRawDataError, RawContent, RawDataRepository, SaveRawDataError},
+        activity::models::ActivityId,
+        activity::ports::{GetRawDataError, RawContent, RawDataRepository, SaveRawDataError},
     },
     parser::SupportedExtension,
 };

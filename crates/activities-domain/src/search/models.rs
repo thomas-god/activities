@@ -1,6 +1,6 @@
 use derive_more::Constructor;
 
-use crate::models::UserId;
+use crate::shared::UserId;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SearchDocumentEvent {

@@ -1,15 +1,10 @@
-use std::ops::Add;
+use std::{fmt, ops::Add};
 
 use chrono::{DateTime, Days, FixedOffset, NaiveDate};
 use derive_more::Constructor;
 use serde::Deserialize;
 
-use crate::models::training::TrainingMetricGranularity;
-
-pub mod activity;
-pub mod preferences;
-pub mod search;
-pub mod training;
+use crate::training::models::TrainingMetricGranularity;
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct DateTimeRange {
@@ -73,7 +68,7 @@ pub trait IClock: Clone + Send + Sync + 'static {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::training::TrainingMetricGranularity;
+    use crate::training::models::TrainingMetricGranularity;
 
     #[test]
     fn test_align_to_daily_granularity() {
@@ -255,5 +250,58 @@ mod tests {
                 NaiveDate::from_ymd_opt(2024, 3, 1).unwrap(),
             )
         );
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct User {
+    id: UserId,
+}
+
+impl User {
+    pub fn id(&self) -> &UserId {
+        &self.id
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct UserId(String);
+
+impl UserId {
+    pub fn new() -> Self {
+        Self(uuid::Uuid::new_v4().to_string())
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+
+    #[cfg(any(test, feature = "test-utils"))]
+    pub fn test_default() -> Self {
+        Self("test_user".to_string())
+    }
+}
+
+impl Default for UserId {
+    fn default() -> Self {
+        Self("default_user".to_string())
+    }
+}
+
+impl From<String> for UserId {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+impl From<&str> for UserId {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+
+impl fmt::Display for UserId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }

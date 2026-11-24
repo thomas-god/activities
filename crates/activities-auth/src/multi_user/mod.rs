@@ -20,7 +20,7 @@ pub mod session;
 pub use service::{DisabledUserService, MultiUserService};
 pub use session::{SessionService, spawn_expired_sessions_cleanup};
 
-use activities_domain::models::UserId;
+use activities_domain::shared::UserId;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Display)]
 pub struct EmailAddress(String);

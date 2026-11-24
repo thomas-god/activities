@@ -11,17 +11,23 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{
-    models::{
-        UserId,
-        activity::{
-            Activity, ActivityMetric, ActivityMetrics, ActivityRpe, ActivityWithParsedData,
-            BonkStatus, DurationCurveType, Sport, SportCategory, Unit, WorkoutType,
-        },
-        search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
-    },
-    ports::{DateRange, DateTimeRange},
-};
+use crate::activity::models::Activity;
+use crate::activity::models::ActivityMetric;
+use crate::activity::models::ActivityMetrics;
+use crate::activity::models::ActivityRpe;
+use crate::activity::models::ActivityWithParsedData;
+use crate::activity::models::BonkStatus;
+use crate::activity::models::DurationCurveType;
+use crate::activity::models::Sport;
+use crate::activity::models::SportCategory;
+use crate::activity::models::Unit;
+use crate::activity::models::WorkoutType;
+use crate::search::models::SearchDocument;
+use crate::search::models::SearchDocumentEvent;
+use crate::search::models::SearchDocumentType;
+use crate::shared::DateRange;
+use crate::shared::DateTimeRange;
+use crate::shared::UserId;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, AsRef, Hash)]
 pub struct TrainingMetricId(String);
@@ -454,7 +460,7 @@ mod unit_as_display {
 
     use serde::{Deserialize, Deserializer, Serializer};
 
-    use crate::models::activity::Unit;
+    use crate::activity::models::Unit;
 
     pub fn serialize<S>(unit: &Unit, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -2405,7 +2411,7 @@ mod test_training_metric_aggregate_values {
 
 #[cfg(test)]
 mod test_granularity_bins {
-    use crate::ports::DateRange;
+    use crate::shared::DateRange;
 
     use super::*;
 
@@ -2688,7 +2694,7 @@ mod test_granularity_key {
 
 #[cfg(test)]
 mod test_training_metric_filters {
-    use crate::models::activity::{
+    use crate::activity::models::{
         ActivityDuration, ActivityFeedback, ActivityId, ActivityName, ActivityNutrition,
         ActivityStartTime,
     };
@@ -3212,7 +3218,7 @@ mod test_training_metric_filters {
 
 #[cfg(test)]
 mod test_activity_source_extract_values {
-    use crate::models::activity::{Activity, ActivityDuration, ActivityId, ActivityStartTime};
+    use crate::activity::models::{Activity, ActivityDuration, ActivityId, ActivityStartTime};
 
     use super::*;
 
@@ -4045,7 +4051,7 @@ mod test_weight_and_nutrition_source_extract_values {
 #[cfg(test)]
 mod test_training_period {
 
-    use crate::models::activity::{ActivityDuration, ActivityId, ActivityStartTime};
+    use crate::activity::models::{ActivityDuration, ActivityId, ActivityStartTime};
 
     use super::*;
 
@@ -4323,7 +4329,7 @@ mod test_training_period {
 
 #[cfg(test)]
 mod test_training_metric_group_by {
-    use crate::models::activity::{
+    use crate::activity::models::{
         ActivityDuration, ActivityFeedback, ActivityId, ActivityName, ActivityNutrition,
         ActivityRpe, ActivityStartTime, BonkStatus, WorkoutType,
     };

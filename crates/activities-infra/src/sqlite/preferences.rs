@@ -6,16 +6,13 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
 };
 
-use crate::{
-    activities_domain::sqlite::{deserialize_preference, serialize_preference_value},
-    activities_domain::{
-        models::{
-            UserId,
-            preferences::{Preference, PreferenceKey},
-        },
-        ports::preferences::{PreferencesRepository, SavePreferenceError},
-    },
-};
+use crate::activities_domain::preferences::models::Preference;
+use crate::activities_domain::preferences::models::PreferenceKey;
+use crate::activities_domain::preferences::ports::PreferencesRepository;
+use crate::activities_domain::preferences::ports::SavePreferenceError;
+use crate::activities_domain::shared::UserId;
+use crate::activities_domain::sqlite::deserialize_preference;
+use crate::activities_domain::sqlite::serialize_preference_value;
 
 type PreferenceRow = (UserId, PreferenceKey, String);
 type RawPreferenceRow = (UserId, String, String);
@@ -165,10 +162,9 @@ impl PreferencesRepository for SqlitePreferencesRepository {
 mod tests {
     use tempfile::NamedTempFile;
 
-    use activities_domain::models::{
-        preferences::{ActivityListSummary, ActivityListSummaryItem},
-        training::TrainingMetricScope,
-    };
+    use activities_domain::preferences::models::ActivityListSummary;
+    use activities_domain::preferences::models::ActivityListSummaryItem;
+    use activities_domain::training::models::TrainingMetricScope;
 
     use super::*;
 

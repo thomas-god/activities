@@ -32,7 +32,7 @@ mod test {
     use axum_test::TestServer;
 
     use crate::{
-        domain::models::UserId,
+        domain::shared::UserId,
         inbound::auth::multi_user::{EmailVerificationResult, test_utils::MockUserService},
         inbound::http::CookieConfig,
     };

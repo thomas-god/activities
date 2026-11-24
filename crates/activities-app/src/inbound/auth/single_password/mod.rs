@@ -16,7 +16,7 @@ use serde::Deserialize;
 use sha2::Sha256;
 
 use crate::{
-    domain::models::UserId,
+    domain::shared::UserId,
     inbound::{
         auth::SinglePassword,
         http::{

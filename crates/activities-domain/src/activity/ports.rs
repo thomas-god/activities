@@ -2,20 +2,26 @@ use derive_more::Constructor;
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////
+use crate::activity::models::Activity;
+use crate::activity::models::ActivityDuration;
+use crate::activity::models::ActivityDurationCurve;
+use crate::activity::models::ActivityId;
+use crate::activity::models::ActivityMetric;
+use crate::activity::models::ActivityMetrics;
+use crate::activity::models::ActivityNaturalKey;
+use crate::activity::models::ActivityPatch;
+use crate::activity::models::ActivityStartTime;
+use crate::activity::models::ActivityStatistics;
+use crate::activity::models::ActivityTimeseries;
+use crate::activity::models::ActivityWithParsedData;
+use crate::activity::models::Sport;
+use crate::search::models::SearchDocument;
+use crate::search::ports::RemainingDocuments;
+use crate::shared::DateRange;
+use crate::shared::DateTimeRange;
 /// ACTIVITY SERVICE
 ///////////////////////////////////////////////////////////////////
-use crate::{
-    models::{
-        UserId,
-        activity::{
-            Activity, ActivityDuration, ActivityDurationCurve, ActivityId, ActivityMetric,
-            ActivityMetrics, ActivityNaturalKey, ActivityPatch, ActivityStartTime,
-            ActivityStatistics, ActivityTimeseries, ActivityWithParsedData, Sport,
-        },
-        search::SearchDocument,
-    },
-    ports::{DateRange, DateTimeRange, search::RemainingDocuments},
-};
+use crate::shared::UserId;
 
 pub trait IActivityService: Clone + Send + Sync + 'static {
     fn create_activity(

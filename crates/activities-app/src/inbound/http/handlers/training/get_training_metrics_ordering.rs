@@ -5,21 +5,15 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    domain::{
-        models::training::TrainingMetricId,
-        ports::{
-            activity::IActivityService,
-            preferences::IPreferencesService,
-            training::{GetTrainingMetricsOrderingError, ITrainingService},
-        },
-    },
-    inbound::{
-        auth::AuthenticatedUser,
-        http::{AppState, handlers::training::types::APITrainingMetricScope},
-        parser::ParseFile,
-    },
-};
+use crate::domain::activity::ports::IActivityService;
+use crate::domain::preferences::ports::IPreferencesService;
+use crate::domain::training::models::TrainingMetricId;
+use crate::domain::training::ports::GetTrainingMetricsOrderingError;
+use crate::domain::training::ports::ITrainingService;
+use crate::inbound::auth::AuthenticatedUser;
+use crate::inbound::http::AppState;
+use crate::inbound::http::handlers::training::types::APITrainingMetricScope;
+use crate::inbound::parser::ParseFile;
 
 #[derive(Debug, Deserialize)]
 pub struct GetTrainingMetricsOrderingQuery {

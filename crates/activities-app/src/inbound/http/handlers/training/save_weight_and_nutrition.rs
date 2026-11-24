@@ -12,25 +12,18 @@ use chrono::NaiveDate;
 use flate2::read::GzDecoder;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    domain::{
-        models::training::WeightAndNutritionPatch,
-        ports::{
-            DateRange,
-            activity::IActivityService,
-            preferences::IPreferencesService,
-            training::{
-                ITrainingService, SaveBulkWeightAndNutritionRequest, SaveWeightAndNutritionRequest,
-                WeightAndNutritionError,
-            },
-        },
-    },
-    inbound::{
-        auth::AuthenticatedUser,
-        http::{AppState, handlers::training::types::APIWeightAndNutritionPatch},
-        parser::ParseFile,
-    },
-};
+use crate::domain::activity::ports::IActivityService;
+use crate::domain::preferences::ports::IPreferencesService;
+use crate::domain::shared::DateRange;
+use crate::domain::training::models::WeightAndNutritionPatch;
+use crate::domain::training::ports::ITrainingService;
+use crate::domain::training::ports::SaveBulkWeightAndNutritionRequest;
+use crate::domain::training::ports::SaveWeightAndNutritionRequest;
+use crate::domain::training::ports::WeightAndNutritionError;
+use crate::inbound::auth::AuthenticatedUser;
+use crate::inbound::http::AppState;
+use crate::inbound::http::handlers::training::types::APIWeightAndNutritionPatch;
+use crate::inbound::parser::ParseFile;
 
 /// Body of the `PATCH /api/training/weight-and-nutrition/{date}` request.
 ///
@@ -309,16 +302,11 @@ mod tests {
     use axum_test::TestServer;
     use chrono::NaiveDate;
 
-    use crate::{
-        domain::{
-            models::UserId,
-            services::{
-                preferences::tests_utils::MockPreferencesService,
-                training::test_utils::MockTrainingService,
-            },
-        },
-        inbound::{auth::no_auth::DefaultUserExtractor, parser::test_utils::MockFileParser},
-    };
+    use crate::domain::preferences::services::tests_utils::MockPreferencesService;
+    use crate::domain::shared::UserId;
+    use crate::domain::training::services::test_utils::MockTrainingService;
+    use crate::inbound::auth::no_auth::DefaultUserExtractor;
+    use crate::inbound::parser::test_utils::MockFileParser;
 
     use crate::inbound::http::shared::PatchField;
 
@@ -571,7 +559,7 @@ not-a-date,71.0\n\
     fn test_server(metrics: MockTrainingService) -> TestServer {
         let state = AppState {
             activity_service: Arc::new(
-                activities_domain::services::activity::test_utils::MockActivityService::new(),
+                activities_domain::activity::services::test_utils::MockActivityService::new(),
             ),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(MockFileParser::new()),

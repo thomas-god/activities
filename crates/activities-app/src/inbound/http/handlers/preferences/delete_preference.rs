@@ -5,15 +5,12 @@ use axum::{
     http::StatusCode,
 };
 
-use crate::{domain::models::preferences::PreferenceKey, inbound::http::AppState};
-use crate::{
-    domain::ports::{
-        activity::IActivityService,
-        preferences::{DeletePreferenceError, IPreferencesService},
-        training::ITrainingService,
-    },
-    inbound::auth::AuthenticatedUser,
-};
+use crate::domain::activity::ports::IActivityService;
+use crate::domain::preferences::ports::DeletePreferenceError;
+use crate::domain::preferences::ports::IPreferencesService;
+use crate::domain::training::ports::ITrainingService;
+use crate::inbound::auth::AuthenticatedUser;
+use crate::{domain::preferences::models::PreferenceKey, inbound::http::AppState};
 use activities_infra::parser::ParseFile;
 
 #[tracing::instrument(skip_all, err)]

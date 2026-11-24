@@ -7,16 +7,18 @@ use chrono::{DateTime, FixedOffset, Local};
 use derive_more::Constructor;
 use serde::{Deserialize, Serialize};
 
-use activities_domain::{
-    models::{
-        activity::{ActivityMetricSource, ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
-        training::{
-            TrainingMetricAggregate, TrainingMetricBin, TrainingMetricGranularity,
-            TrainingMetricTarget, TrainingMetricValues, TrainingMetricWindow,
-        },
-    },
-    ports::DateRange,
-};
+use activities_domain::activity::models::ActivityMetricSource;
+use activities_domain::activity::models::ActivityStatistic;
+use activities_domain::activity::models::TimeseriesMetric;
+use activities_domain::activity::models::ToUnit;
+use activities_domain::activity::models::Unit;
+use activities_domain::shared::DateRange;
+use activities_domain::training::models::TrainingMetricAggregate;
+use activities_domain::training::models::TrainingMetricBin;
+use activities_domain::training::models::TrainingMetricGranularity;
+use activities_domain::training::models::TrainingMetricTarget;
+use activities_domain::training::models::TrainingMetricValues;
+use activities_domain::training::models::TrainingMetricWindow;
 
 /// Constant for representing the "no group" case (when TrainingMetricBin has group = None)
 pub const NO_GROUP: &str = "Other";
@@ -249,8 +251,8 @@ mod tests {
 
     use chrono::DateTime;
 
-    use activities_domain::models::activity::{TimeseriesAggregate, Unit};
-    use activities_domain::models::training::{
+    use activities_domain::activity::models::{TimeseriesAggregate, Unit};
+    use activities_domain::training::models::{
         TrainingMetricAggregate, TrainingMetricBin, TrainingMetricGranularity,
         TrainingMetricTarget, TrainingMetricValue, TrainingMetricValues,
     };
@@ -259,7 +261,7 @@ mod tests {
 
     #[test]
     fn test_convert_metric_values_distance_statistic_converts_to_kilometers() {
-        use activities_domain::models::training::TrainingMetricAggregate;
+        use activities_domain::training::models::TrainingMetricAggregate;
 
         // Distance statistic should be converted from meters to kilometers
         let values = GroupedMetricValues::new(
@@ -374,7 +376,7 @@ mod tests {
 
     #[test]
     fn test_convert_metric_values_duration_statistic_no_conversion() {
-        use activities_domain::models::training::TrainingMetricAggregate;
+        use activities_domain::training::models::TrainingMetricAggregate;
 
         // Duration should keep its unit (seconds) and values unchanged
         let values = GroupedMetricValues::new(
@@ -445,7 +447,7 @@ mod tests {
 
     #[test]
     fn test_convert_metric_values_with_multiple_groups() {
-        use activities_domain::models::training::TrainingMetricAggregate;
+        use activities_domain::training::models::TrainingMetricAggregate;
 
         // Test that conversion works correctly with multiple groups
         let values = GroupedMetricValues::new(
@@ -527,7 +529,7 @@ mod tests {
 
     #[test]
     fn test_convert_metric_values_pace_with_multiple_groups() {
-        use activities_domain::models::training::TrainingMetricAggregate;
+        use activities_domain::training::models::TrainingMetricAggregate;
 
         // Test pace conversion with multiple sports
         let values = GroupedMetricValues::new(
@@ -602,7 +604,7 @@ mod tests {
 
 #[cfg(test)]
 mod test_grouping_metric_values {
-    use activities_domain::models::training::{TrainingMetricSummaryValues, TrainingMetricValue};
+    use activities_domain::training::models::{TrainingMetricSummaryValues, TrainingMetricValue};
 
     use super::*;
 
@@ -754,7 +756,7 @@ mod test_grouping_metric_values {
 mod test_fill_grouped_metric_values {
     use chrono::NaiveDate;
 
-    use activities_domain::models::training::TrainingMetricActivityGroupBy;
+    use activities_domain::training::models::TrainingMetricActivityGroupBy;
 
     use super::*;
 

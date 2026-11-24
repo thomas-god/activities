@@ -3,16 +3,13 @@ use std::sync::Arc;
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 
-use crate::{
-    models::UserId,
-    ports::{
-        IClock,
-        search::{
-            IDocumentsForSearch, ISearchRepository, ISearchService, RemainingDocuments,
-            SearchResult,
-        },
-    },
-};
+use crate::search::ports::IDocumentsForSearch;
+use crate::search::ports::ISearchRepository;
+use crate::search::ports::ISearchService;
+use crate::search::ports::RemainingDocuments;
+use crate::search::ports::SearchResult;
+use crate::shared::IClock;
+use crate::shared::UserId;
 
 const BATCH_SIZE: i64 = 100;
 
@@ -214,20 +211,17 @@ mod tests_search_service {
     use anyhow::anyhow;
 
     use super::{BATCH_SIZE, SearchService};
-    use crate::{
-        clock::FakeClock,
-        {
-            models::{
-                UserId,
-                activity::ActivityId,
-                search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
-            },
-            ports::search::{
-                ISearchService, RemainingDocuments, SearchResult,
-                search_test_utils::{MockDocumentsForSearch, MockSearchRepository},
-            },
-        },
-    };
+    use crate::activity::models::ActivityId;
+    use crate::clock::FakeClock;
+    use crate::search::models::SearchDocument;
+    use crate::search::models::SearchDocumentEvent;
+    use crate::search::models::SearchDocumentType;
+    use crate::search::ports::ISearchService;
+    use crate::search::ports::RemainingDocuments;
+    use crate::search::ports::SearchResult;
+    use crate::search::ports::search_test_utils::MockDocumentsForSearch;
+    use crate::search::ports::search_test_utils::MockSearchRepository;
+    use crate::shared::UserId;
 
     fn document(id: &str) -> SearchDocument {
         SearchDocument::new(

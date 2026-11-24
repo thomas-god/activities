@@ -5,48 +5,88 @@ use chrono::{Days, NaiveDate};
 use derive_more::Constructor;
 use tokio_util::sync::CancellationToken;
 
-use crate::{
-    models::{
-        UserId,
-        activity::{
-            ActivityId, ActivityMetric, ActivityStartTime, DURATION_CURVE_DURATIONS_SECOND,
-        },
-        search::{SearchDocument, SearchDocumentType},
-        training::{
-            ActivitySource, ActivityWithTrainingContext, DurationCurveSource, HooperIndex,
-            HooperIndexSource, ReferenceBestDurationCurve, ReferenceDurationCurveKind,
-            TrainingContext, TrainingMetric, TrainingMetricBin, TrainingMetricDefinition,
-            TrainingMetricId, TrainingMetricScope, TrainingMetricSource,
-            TrainingMetricSummaryValues, TrainingMetricValue, TrainingMetricValues,
-            TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote, TrainingNoteContent,
-            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
-            WeightAndNutrition, WeightAndNutritionSource,
-        },
-    },
-    ports::{
-        DateRange, IClock,
-        activity::{DurationCurveEvent, GetActivityError, IActivityService, ListActivitiesFilters},
-        search::{IDocumentsForSearch, RemainingDocuments},
-        training::{
-            ActivityWithTrainingContextError, ComputeTrainingMetricValuesError,
-            CopyTrainingMetricError, CopyTrainingMetricRequest, CreateTrainingMetricError,
-            CreateTrainingMetricRequest, CreateTrainingNoteError, CreateTrainingNoteRequest,
-            CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteHooperIndexRequest,
-            DeleteTrainingMetricError, DeleteTrainingMetricRequest, DeleteTrainingNoteError,
-            DeleteTrainingPeriodError, DeleteTrainingPeriodRequest,
-            DeleteWeightAndNutritionRequest, GetTrainingMetricValuesError,
-            GetTrainingMetricValuesRequest, GetTrainingMetricsOrderingError, GetTrainingNoteError,
-            HooperIndexError, ITrainingService, SaveBulkWeightAndNutritionRequest,
-            SaveHooperIndexRequest, SaveWeightAndNutritionRequest, SetTrainingMetricsOrderingError,
-            TrainingRepository, UpdateTrainingMetricError, UpdateTrainingMetricNameError,
-            UpdateTrainingMetricNameRequest, UpdateTrainingMetricRequest, UpdateTrainingNoteError,
-            UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
-            UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
-            UpdateTrainingPeriodNoteError, UpdateTrainingPeriodNoteRequest,
-            WeightAndNutritionError,
-        },
-    },
-};
+use crate::activity::models::ActivityId;
+use crate::activity::models::ActivityMetric;
+use crate::activity::models::ActivityStartTime;
+use crate::activity::models::DURATION_CURVE_DURATIONS_SECOND;
+use crate::activity::ports::DurationCurveEvent;
+use crate::activity::ports::GetActivityError;
+use crate::activity::ports::IActivityService;
+use crate::activity::ports::ListActivitiesFilters;
+use crate::search::models::SearchDocument;
+use crate::search::models::SearchDocumentType;
+use crate::search::ports::IDocumentsForSearch;
+use crate::search::ports::RemainingDocuments;
+use crate::shared::DateRange;
+use crate::shared::IClock;
+use crate::shared::UserId;
+use crate::training::models::ActivitySource;
+use crate::training::models::ActivityWithTrainingContext;
+use crate::training::models::DurationCurveSource;
+use crate::training::models::HooperIndex;
+use crate::training::models::HooperIndexSource;
+use crate::training::models::ReferenceBestDurationCurve;
+use crate::training::models::ReferenceDurationCurveKind;
+use crate::training::models::TrainingContext;
+use crate::training::models::TrainingMetric;
+use crate::training::models::TrainingMetricBin;
+use crate::training::models::TrainingMetricDefinition;
+use crate::training::models::TrainingMetricId;
+use crate::training::models::TrainingMetricScope;
+use crate::training::models::TrainingMetricSource;
+use crate::training::models::TrainingMetricSummaryValues;
+use crate::training::models::TrainingMetricValue;
+use crate::training::models::TrainingMetricValues;
+use crate::training::models::TrainingMetricWindow;
+use crate::training::models::TrainingMetricsOrdering;
+use crate::training::models::TrainingNote;
+use crate::training::models::TrainingNoteContent;
+use crate::training::models::TrainingNoteDate;
+use crate::training::models::TrainingNoteId;
+use crate::training::models::TrainingNoteTitle;
+use crate::training::models::TrainingPeriodId;
+use crate::training::models::WeightAndNutrition;
+use crate::training::models::WeightAndNutritionSource;
+use crate::training::ports::ActivityWithTrainingContextError;
+use crate::training::ports::ComputeTrainingMetricValuesError;
+use crate::training::ports::CopyTrainingMetricError;
+use crate::training::ports::CopyTrainingMetricRequest;
+use crate::training::ports::CreateTrainingMetricError;
+use crate::training::ports::CreateTrainingMetricRequest;
+use crate::training::ports::CreateTrainingNoteError;
+use crate::training::ports::CreateTrainingNoteRequest;
+use crate::training::ports::CreateTrainingPeriodError;
+use crate::training::ports::CreateTrainingPeriodRequest;
+use crate::training::ports::DeleteHooperIndexRequest;
+use crate::training::ports::DeleteTrainingMetricError;
+use crate::training::ports::DeleteTrainingMetricRequest;
+use crate::training::ports::DeleteTrainingNoteError;
+use crate::training::ports::DeleteTrainingPeriodError;
+use crate::training::ports::DeleteTrainingPeriodRequest;
+use crate::training::ports::DeleteWeightAndNutritionRequest;
+use crate::training::ports::GetTrainingMetricValuesError;
+use crate::training::ports::GetTrainingMetricValuesRequest;
+use crate::training::ports::GetTrainingMetricsOrderingError;
+use crate::training::ports::GetTrainingNoteError;
+use crate::training::ports::HooperIndexError;
+use crate::training::ports::ITrainingService;
+use crate::training::ports::SaveBulkWeightAndNutritionRequest;
+use crate::training::ports::SaveHooperIndexRequest;
+use crate::training::ports::SaveWeightAndNutritionRequest;
+use crate::training::ports::SetTrainingMetricsOrderingError;
+use crate::training::ports::TrainingRepository;
+use crate::training::ports::UpdateTrainingMetricError;
+use crate::training::ports::UpdateTrainingMetricNameError;
+use crate::training::ports::UpdateTrainingMetricNameRequest;
+use crate::training::ports::UpdateTrainingMetricRequest;
+use crate::training::ports::UpdateTrainingNoteError;
+use crate::training::ports::UpdateTrainingPeriodDatesError;
+use crate::training::ports::UpdateTrainingPeriodDatesRequest;
+use crate::training::ports::UpdateTrainingPeriodNameError;
+use crate::training::ports::UpdateTrainingPeriodNameRequest;
+use crate::training::ports::UpdateTrainingPeriodNoteError;
+use crate::training::ports::UpdateTrainingPeriodNoteRequest;
+use crate::training::ports::WeightAndNutritionError;
 
 ///////////////////////////////////////////////////////////////////
 // TRAINING SERVICE
@@ -599,7 +639,7 @@ where
         &self,
         user: &UserId,
         period: &TrainingPeriodId,
-    ) -> Option<crate::models::training::TrainingPeriod> {
+    ) -> Option<crate::training::models::TrainingPeriod> {
         self.training_repository
             .get_training_period(user, period)
             .await
@@ -609,7 +649,7 @@ where
     async fn get_training_periods(
         &self,
         user: &UserId,
-    ) -> Vec<crate::models::training::TrainingPeriod> {
+    ) -> Vec<crate::training::models::TrainingPeriod> {
         self.training_repository.get_training_periods(user).await
     }
 
@@ -618,7 +658,7 @@ where
         &self,
         user: &UserId,
         ref_date: &NaiveDate,
-    ) -> Vec<crate::models::training::TrainingPeriod> {
+    ) -> Vec<crate::training::models::TrainingPeriod> {
         self.training_repository
             .get_active_training_periods(user, ref_date)
             .await
@@ -630,8 +670,8 @@ where
         user: &UserId,
         period_id: &TrainingPeriodId,
         metrics: &[ActivityMetric],
-    ) -> Option<crate::models::training::TrainingPeriodWithActivities> {
-        use crate::models::training::TrainingPeriodWithActivities;
+    ) -> Option<crate::training::models::TrainingPeriodWithActivities> {
+        use crate::training::models::TrainingPeriodWithActivities;
 
         let period = self
             .training_repository
@@ -715,7 +755,7 @@ where
         &self,
         req: CreateTrainingNoteRequest,
     ) -> Result<TrainingNoteId, CreateTrainingNoteError> {
-        use crate::models::training::{TrainingNote, TrainingNoteId};
+        use crate::training::models::{TrainingNote, TrainingNoteId};
 
         // Create the note
         let note_id = TrainingNoteId::new();
@@ -1081,7 +1121,7 @@ where
     #[tracing::instrument(skip_all, err)]
     async fn get_pending_documents_to_process(
         &self,
-    ) -> Result<Vec<crate::models::search::SearchDocument>, anyhow::Error> {
+    ) -> Result<Vec<crate::search::models::SearchDocument>, anyhow::Error> {
         self.training_repository
             .get_outbox_documents_to_process()
             .await
@@ -1090,7 +1130,7 @@ where
     #[tracing::instrument(skip_all, err)]
     async fn mark_document_as_processed(
         &self,
-        document: &crate::models::search::SearchDocument,
+        document: &crate::search::models::SearchDocument,
         processed_at: chrono::DateTime<chrono::Utc>,
     ) -> Result<(), anyhow::Error> {
         self.training_repository
@@ -1128,26 +1168,37 @@ pub mod test_utils {
     use chrono::NaiveDate;
     use mockall::mock;
 
-    use crate::{
-        models::{
-            activity::{ActivityDurationCurve, ActivityId},
-            search::SearchDocument,
-            training::{
-                BestDurationCurve, HooperIndex, TrainingMetricName, TrainingNote,
-                TrainingNoteContent, TrainingPeriod, TrainingPeriodWithActivities,
-            },
-        },
-        ports::training::{
-            CopyTrainingMetricError, CopyTrainingMetricRequest, CreateTrainingPeriodError,
-            CreateTrainingPeriodRequest, DeleteHooperIndexRequest, DeleteTrainingNoteError,
-            DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetTrainingMetricError,
-            GetTrainingMetricValuesRequest, GetTrainingMetricsDefinitionsError,
-            GetTrainingNoteError, HooperIndexError, SaveBulkWeightAndNutritionRequest,
-            SaveHooperIndexRequest, SaveTrainingMetricError, SaveTrainingNoteError,
-            SaveTrainingPeriodError, UpdateTrainingMetricError, UpdateTrainingMetricRequest,
-            UpdateTrainingNoteError,
-        },
-    };
+    use crate::activity::models::ActivityDurationCurve;
+    use crate::activity::models::ActivityId;
+    use crate::search::models::SearchDocument;
+    use crate::training::models::BestDurationCurve;
+    use crate::training::models::HooperIndex;
+    use crate::training::models::TrainingMetricName;
+    use crate::training::models::TrainingNote;
+    use crate::training::models::TrainingNoteContent;
+    use crate::training::models::TrainingPeriod;
+    use crate::training::models::TrainingPeriodWithActivities;
+    use crate::training::ports::CopyTrainingMetricError;
+    use crate::training::ports::CopyTrainingMetricRequest;
+    use crate::training::ports::CreateTrainingPeriodError;
+    use crate::training::ports::CreateTrainingPeriodRequest;
+    use crate::training::ports::DeleteHooperIndexRequest;
+    use crate::training::ports::DeleteTrainingNoteError;
+    use crate::training::ports::DeleteTrainingPeriodError;
+    use crate::training::ports::DeleteTrainingPeriodRequest;
+    use crate::training::ports::GetTrainingMetricError;
+    use crate::training::ports::GetTrainingMetricValuesRequest;
+    use crate::training::ports::GetTrainingMetricsDefinitionsError;
+    use crate::training::ports::GetTrainingNoteError;
+    use crate::training::ports::HooperIndexError;
+    use crate::training::ports::SaveBulkWeightAndNutritionRequest;
+    use crate::training::ports::SaveHooperIndexRequest;
+    use crate::training::ports::SaveTrainingMetricError;
+    use crate::training::ports::SaveTrainingNoteError;
+    use crate::training::ports::SaveTrainingPeriodError;
+    use crate::training::ports::UpdateTrainingMetricError;
+    use crate::training::ports::UpdateTrainingMetricRequest;
+    use crate::training::ports::UpdateTrainingNoteError;
 
     use super::*;
 
@@ -1605,26 +1656,26 @@ mod tests_training_metrics_service {
     use anyhow::anyhow;
 
     use super::*;
-    use crate::clock::FakeClock;
-    use crate::models::activity::{
+    use crate::activity::models::{
         Activity, ActivityDuration, ActivityId, ActivityMetric, ActivityMetrics, ActivityStartTime,
         Sport, Unit,
     };
+    use crate::clock::FakeClock;
 
-    use crate::models::training::{
+    use crate::activity::services::test_utils::MockActivityService;
+    use crate::shared::DateRange;
+    use crate::training::models::{
         SportFilter, TrainingMetricBin, TrainingMetricSummary, TrainingMetricTarget,
         TrainingMetricWindow, TrainingPeriod, TrainingPeriodSports,
     };
-    use crate::ports::DateRange;
-    use crate::services::activity::test_utils::MockActivityService;
     use crate::{
-        models::training::{
+        training::models::{
             TrainingMetricActivityFilters, TrainingMetricActivityGroupBy, TrainingMetricAggregate,
             TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricId,
             TrainingMetricName,
         },
-        ports::training::{GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
-        services::training::test_utils::MockTrainingRepository,
+        training::ports::{GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
+        training::services::test_utils::MockTrainingRepository,
     };
     use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 
@@ -3067,7 +3118,7 @@ mod tests_training_metrics_service {
     async fn test_update_training_metric_get_error() {
         let mut repository = MockTrainingRepository::new();
         repository.expect_get_metric().times(1).returning(|_, _| {
-            Err(crate::ports::training::GetTrainingMetricError::Unknown(
+            Err(crate::training::ports::GetTrainingMetricError::Unknown(
                 anyhow!("db error"),
             ))
         });
@@ -3112,23 +3163,16 @@ mod test_training_service_period {
     use anyhow::anyhow;
     use chrono::NaiveDate;
 
-    use crate::{
-        clock::FakeClock,
-        {
-            models::{
-                activity::{ActivityDuration, ActivityMetrics},
-                training::{TrainingPeriod, TrainingPeriodSports},
-            },
-            ports::{
-                activity::ListActivitiesError,
-                training::{CreateTrainingPeriodRequest, SaveTrainingPeriodError},
-            },
-            services::{
-                activity::test_utils::MockActivityService,
-                training::test_utils::MockTrainingRepository,
-            },
-        },
-    };
+    use crate::activity::models::ActivityDuration;
+    use crate::activity::models::ActivityMetrics;
+    use crate::activity::ports::ListActivitiesError;
+    use crate::activity::services::test_utils::MockActivityService;
+    use crate::clock::FakeClock;
+    use crate::training::models::TrainingPeriod;
+    use crate::training::models::TrainingPeriodSports;
+    use crate::training::ports::CreateTrainingPeriodRequest;
+    use crate::training::ports::SaveTrainingPeriodError;
+    use crate::training::services::test_utils::MockTrainingRepository;
 
     use super::*;
 
@@ -3224,7 +3268,7 @@ mod test_training_service_period {
 
     #[tokio::test]
     async fn test_get_training_period_with_activities_no_sport_filter() {
-        use crate::models::activity::{Activity, ActivityId, ActivityStartTime, Sport};
+        use crate::activity::models::{Activity, ActivityId, ActivityStartTime, Sport};
 
         // Create test activities with different sports and dates
         let activities = vec![
@@ -3332,8 +3376,8 @@ mod test_training_service_period {
 
     #[tokio::test]
     async fn test_get_training_period_with_activities_with_sport_filter() {
-        use crate::models::activity::{Activity, ActivityId, ActivityStartTime, Sport};
-        use crate::models::training::SportFilter;
+        use crate::activity::models::{Activity, ActivityId, ActivityStartTime, Sport};
+        use crate::training::models::SportFilter;
 
         // Create test activities with different sports
         let activities = vec![
@@ -3447,10 +3491,10 @@ mod test_training_service_period {
 
     #[tokio::test]
     async fn test_get_training_period_with_activities_with_category_filter() {
-        use crate::models::activity::{
+        use crate::activity::models::{
             Activity, ActivityId, ActivityStartTime, Sport, SportCategory,
         };
-        use crate::models::training::SportFilter;
+        use crate::training::models::SportFilter;
 
         // Create test activities with different sports in the Running category
         let activities = vec![
@@ -3574,7 +3618,7 @@ mod test_training_service_period {
 
     #[tokio::test]
     async fn test_get_training_period_with_activities_date_filtering() {
-        use crate::models::activity::{Activity, ActivityId, ActivityStartTime, Sport};
+        use crate::activity::models::{Activity, ActivityId, ActivityStartTime, Sport};
 
         // Create activities with dates both inside and outside the period
         let activities = vec![
@@ -3686,7 +3730,7 @@ mod test_training_service_period {
 
     #[tokio::test]
     async fn test_get_training_period_with_activities_open_ended_includes_today() {
-        use crate::models::activity::{Activity, ActivityId, ActivityStartTime, Sport};
+        use crate::activity::models::{Activity, ActivityId, ActivityStartTime, Sport};
         use chrono::{Days, Utc};
 
         let today = Utc::now().date_naive();
@@ -4388,13 +4432,13 @@ mod test_training_service_training_note {
     use std::sync::atomic::{AtomicBool, Ordering};
 
     use super::*;
+    use crate::activity::services::test_utils::MockActivityService;
     use crate::clock::FakeClock;
-    use crate::models::training::TrainingNoteContent;
-    use crate::ports::training::{
+    use crate::training::models::TrainingNoteContent;
+    use crate::training::ports::{
         CreateTrainingNoteError, CreateTrainingNoteRequest, SaveTrainingNoteError,
     };
-    use crate::services::activity::test_utils::MockActivityService;
-    use crate::services::training::test_utils::MockTrainingRepository;
+    use crate::training::services::test_utils::MockTrainingRepository;
     use anyhow::anyhow;
 
     ///////////////////////////////////////////////////////////////////
@@ -4823,7 +4867,7 @@ mod test_training_service_training_note {
             .expect_get_training_period()
             .times(1)
             .returning(move |_, _| {
-                use crate::models::training::{TrainingPeriod, TrainingPeriodSports};
+                use crate::training::models::{TrainingPeriod, TrainingPeriodSports};
                 Some(
                     TrainingPeriod::new(
                         period_id_clone.clone(),
@@ -4918,7 +4962,7 @@ mod test_training_service_training_note {
             .expect_get_training_period()
             .times(2)
             .returning(move |_, _| {
-                use crate::models::training::{TrainingPeriod, TrainingPeriodSports};
+                use crate::training::models::{TrainingPeriod, TrainingPeriodSports};
                 Some(
                     TrainingPeriod::new(
                         period_id_clone.clone(),
@@ -5003,21 +5047,21 @@ mod test_training_service_metric_values {
     use chrono::NaiveDate;
 
     use super::*;
-    use crate::clock::FakeClock;
-    use crate::models::activity::{
+    use crate::activity::models::{
         Activity, ActivityDuration, ActivityId, ActivityMetric, ActivityMetrics, ActivityStartTime,
         DurationCurveType, Sport, Unit,
     };
-    use crate::models::training::BestDurationCurve;
-    use crate::models::training::{
+    use crate::activity::services::test_utils::MockActivityService;
+    use crate::clock::FakeClock;
+    use crate::training::models::BestDurationCurve;
+    use crate::training::models::{
         HooperIndexSource, SubjectiveScale, TrainingMetricActivityFilters,
         TrainingMetricActivityGroupBy, TrainingMetricAggregate, TrainingMetricBin,
         TrainingMetricGranularity, TrainingMetricSummary, TrainingMetricValue,
         TrainingMetricWindow, WeightAndNutrition, WeightAndNutritionSource,
     };
-    use crate::ports::training::GetTrainingMetricValuesError;
-    use crate::services::activity::test_utils::MockActivityService;
-    use crate::services::training::test_utils::MockTrainingRepository;
+    use crate::training::ports::GetTrainingMetricValuesError;
+    use crate::training::services::test_utils::MockTrainingRepository;
     use std::collections::HashMap;
     use std::sync::Arc;
 
@@ -5594,15 +5638,15 @@ mod test_training_service_metrics_ordering {
     use std::sync::Arc;
 
     use super::*;
+    use crate::activity::services::test_utils::MockActivityService;
     use crate::clock::FakeClock;
-    use crate::models::training::{
+    use crate::training::models::{
         TrainingMetricId, TrainingMetricsOrdering, TrainingPeriod, TrainingPeriodSports,
     };
-    use crate::ports::training::{
+    use crate::training::ports::{
         GetTrainingMetricsOrderingError, SetTrainingMetricsOrderingError,
     };
-    use crate::services::activity::test_utils::MockActivityService;
-    use crate::services::training::test_utils::MockTrainingRepository;
+    use crate::training::services::test_utils::MockTrainingRepository;
     use anyhow::anyhow;
     use chrono::NaiveDate;
 
@@ -5925,16 +5969,16 @@ mod test_training_service_copy_metric {
     use std::sync::Arc;
 
     use super::*;
+    use crate::activity::models::ActivityMetric;
+    use crate::activity::services::test_utils::MockActivityService;
     use crate::clock::FakeClock;
-    use crate::models::activity::ActivityMetric;
-    use crate::models::training::{
+    use crate::training::models::{
         TrainingMetricActivityFilters, TrainingMetricActivityGroupBy, TrainingMetricAggregate,
         TrainingMetricGranularity, TrainingMetricName, TrainingMetricSummary, TrainingMetricWindow,
         TrainingPeriod, TrainingPeriodSports,
     };
-    use crate::ports::training::{GetTrainingMetricError, SaveTrainingMetricError};
-    use crate::services::activity::test_utils::MockActivityService;
-    use crate::services::training::test_utils::MockTrainingRepository;
+    use crate::training::ports::{GetTrainingMetricError, SaveTrainingMetricError};
+    use crate::training::services::test_utils::MockTrainingRepository;
     use anyhow::anyhow;
 
     fn make_metric() -> TrainingMetric {
@@ -6147,13 +6191,13 @@ mod test_training_service_copy_metric {
             .times(1)
             .returning(|_, _| {
                 Some(
-                    crate::models::training::TrainingPeriod::new(
+                    crate::training::models::TrainingPeriod::new(
                         TrainingPeriodId::new(),
                         UserId::test_default(),
                         "2025-01-01".parse().unwrap(),
                         None,
                         "Test".to_string(),
-                        crate::models::training::TrainingPeriodSports::new(None),
+                        crate::training::models::TrainingPeriodSports::new(None),
                         None,
                     )
                     .unwrap(),
@@ -6194,10 +6238,10 @@ mod test_training_service_hooper_index {
     use anyhow::anyhow;
 
     use super::*;
+    use crate::activity::services::test_utils::MockActivityService;
     use crate::clock::FakeClock;
-    use crate::models::training::{HooperIndex, HooperIndexPatch, SubjectiveScale};
-    use crate::services::activity::test_utils::MockActivityService;
-    use crate::services::training::test_utils::MockTrainingRepository;
+    use crate::training::models::{HooperIndex, HooperIndexPatch, SubjectiveScale};
+    use crate::training::services::test_utils::MockTrainingRepository;
     use chrono::NaiveDate;
 
     fn test_date() -> NaiveDate {
@@ -6438,10 +6482,10 @@ mod test_training_service_weight_and_nutrition {
     use anyhow::anyhow;
 
     use super::*;
+    use crate::activity::services::test_utils::MockActivityService;
     use crate::clock::FakeClock;
-    use crate::models::training::{WeightAndNutrition, WeightAndNutritionPatch};
-    use crate::services::activity::test_utils::MockActivityService;
-    use crate::services::training::test_utils::MockTrainingRepository;
+    use crate::training::models::{WeightAndNutrition, WeightAndNutritionPatch};
+    use crate::training::services::test_utils::MockTrainingRepository;
     use chrono::NaiveDate;
 
     fn test_date() -> NaiveDate {
@@ -6850,7 +6894,7 @@ mod test_training_service_weight_and_nutrition {
 
 #[cfg(test)]
 mod test_align_date_range {
-    use crate::models::training::{TrainingMetricAggregate, TrainingMetricGranularity};
+    use crate::training::models::{TrainingMetricAggregate, TrainingMetricGranularity};
 
     use super::*;
 
@@ -6972,17 +7016,17 @@ mod test_training_service_activity_with_training_context {
     use chrono::{DateTime, FixedOffset};
 
     use super::*;
-    use crate::clock::FakeClock;
-    use crate::models::activity::{
+    use crate::activity::models::{
         Activity, ActivityDuration, ActivityDurationCurve, ActivityDurationCurves, ActivityId,
         ActivityMetrics, ActivityStartTime, ActivityStatistics, ActivityTimeseries,
         ActivityWithParsedData, DurationCurveType, Sport,
     };
-    use crate::models::training::{
+    use crate::activity::services::test_utils::MockActivityService;
+    use crate::clock::FakeClock;
+    use crate::training::models::{
         BestDurationCurve, HooperIndex, SubjectiveScale, TrainingPeriod, TrainingPeriodSports,
     };
-    use crate::services::activity::test_utils::MockActivityService;
-    use crate::services::training::test_utils::MockTrainingRepository;
+    use crate::training::services::test_utils::MockTrainingRepository;
 
     fn scale(value: u8) -> SubjectiveScale {
         SubjectiveScale::try_from(value).unwrap()
@@ -7805,14 +7849,12 @@ mod tests_duration_curve_outbox {
     use anyhow::anyhow;
 
     use super::*;
+    use crate::activity::models::ActivityDurationCurve;
+    use crate::activity::models::DurationCurveType;
+    use crate::activity::ports::DurationCurveNotification;
+    use crate::activity::services::test_utils::MockActivityService;
     use crate::clock::FakeClock;
-    use crate::{
-        models::activity::{ActivityDurationCurve, DurationCurveType},
-        ports::activity::DurationCurveNotification,
-        services::{
-            activity::test_utils::MockActivityService, training::test_utils::MockTrainingRepository,
-        },
-    };
+    use crate::training::services::test_utils::MockTrainingRepository;
 
     fn processed_at() -> chrono::DateTime<chrono::Utc> {
         chrono::DateTime::<chrono::Utc>::from_timestamp(1_700_000_000, 0).unwrap()

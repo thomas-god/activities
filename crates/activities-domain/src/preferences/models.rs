@@ -1,7 +1,8 @@
 use derive_more::Constructor;
 use serde::{Deserialize, Serialize};
 
-use crate::models::{activity::ActivityMetric, training::TrainingMetricScope};
+use crate::activity::models::ActivityMetric;
+use crate::training::models::TrainingMetricScope;
 
 ///////////////////////////////////////////////////////////////////
 /// PREFERENCE ENUM AND KEY

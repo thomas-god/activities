@@ -138,7 +138,7 @@ mod test {
     use chrono::{TimeDelta, Utc};
 
     use crate::{
-        domain::models::UserId,
+        domain::shared::UserId,
         inbound::{
             auth::multi_user::{
                 CheckSessionResult, GenerateSessionTokenResult, SessionToken,

@@ -6,14 +6,13 @@ use axum::{
 };
 
 use crate::{
-    domain::models::training::TrainingNoteId,
+    domain::training::models::TrainingNoteId,
     inbound::{auth::AuthenticatedUser, http::AppState},
 };
-use activities_domain::ports::{
-    activity::IActivityService,
-    preferences::IPreferencesService,
-    training::{GetTrainingNoteError, ITrainingService},
-};
+use activities_domain::activity::ports::IActivityService;
+use activities_domain::preferences::ports::IPreferencesService;
+use activities_domain::training::ports::GetTrainingNoteError;
+use activities_domain::training::ports::ITrainingService;
 use activities_infra::parser::ParseFile;
 
 use super::get_training_notes::TrainingNoteResponse;

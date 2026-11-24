@@ -5,46 +5,46 @@ use axum::{Extension, Json, extract::State, http::StatusCode, response::IntoResp
 use chrono::{DateTime, FixedOffset, Local};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    domain::{
-        models::{
-            activity::{ActivityMetric, ActivityMetricSource, Unit},
-            training::{
-                TrainingMetricActivityFilters, TrainingMetricAggregate, TrainingMetricDefinition,
-                TrainingMetricGranularity, TrainingMetricSource, TrainingMetricSummary,
-                TrainingMetricSummaryAverage, TrainingMetricTarget, TrainingMetricWindow,
-            },
-        },
-        ports::{
-            DateRange,
-            activity::IActivityService,
-            preferences::IPreferencesService,
-            training::{
-                ComputeTrainingMetricValuesError, GetTrainingMetricValuesError,
-                GetTrainingMetricValuesRequest, ITrainingService,
-            },
-        },
-    },
-    inbound::{
-        auth::AuthenticatedUser,
-        http::{
-            AppState,
-            handlers::training::{
-                types::{
-                    APIActivityMetricSource, APITimeseriesWindow, APITrainingMetricAggregate,
-                    APITrainingMetricFilters, APITrainingMetricGranularity, APITrainingMetricScope,
-                    APITrainingMetricSource, APITrainingMetricSummary, APITrainingMetricTarget,
-                    SportsResponse, TrainingMetricBody, format_source_metric,
-                },
-                utils::{
-                    GranuleValues, MetricsDateRange, convert_metric_target_unit,
-                    convert_metric_values_unit, fill_missing_granules, group_metric_values,
-                },
-            },
-        },
-        parser::ParseFile,
-    },
-};
+use crate::domain::activity::models::ActivityMetric;
+use crate::domain::activity::models::ActivityMetricSource;
+use crate::domain::activity::models::Unit;
+use crate::domain::activity::ports::IActivityService;
+use crate::domain::preferences::ports::IPreferencesService;
+use crate::domain::shared::DateRange;
+use crate::domain::training::models::TrainingMetricActivityFilters;
+use crate::domain::training::models::TrainingMetricAggregate;
+use crate::domain::training::models::TrainingMetricDefinition;
+use crate::domain::training::models::TrainingMetricGranularity;
+use crate::domain::training::models::TrainingMetricSource;
+use crate::domain::training::models::TrainingMetricSummary;
+use crate::domain::training::models::TrainingMetricSummaryAverage;
+use crate::domain::training::models::TrainingMetricTarget;
+use crate::domain::training::models::TrainingMetricWindow;
+use crate::domain::training::ports::ComputeTrainingMetricValuesError;
+use crate::domain::training::ports::GetTrainingMetricValuesError;
+use crate::domain::training::ports::GetTrainingMetricValuesRequest;
+use crate::domain::training::ports::ITrainingService;
+use crate::inbound::auth::AuthenticatedUser;
+use crate::inbound::http::AppState;
+use crate::inbound::http::handlers::training::types::APIActivityMetricSource;
+use crate::inbound::http::handlers::training::types::APITimeseriesWindow;
+use crate::inbound::http::handlers::training::types::APITrainingMetricAggregate;
+use crate::inbound::http::handlers::training::types::APITrainingMetricFilters;
+use crate::inbound::http::handlers::training::types::APITrainingMetricGranularity;
+use crate::inbound::http::handlers::training::types::APITrainingMetricScope;
+use crate::inbound::http::handlers::training::types::APITrainingMetricSource;
+use crate::inbound::http::handlers::training::types::APITrainingMetricSummary;
+use crate::inbound::http::handlers::training::types::APITrainingMetricTarget;
+use crate::inbound::http::handlers::training::types::SportsResponse;
+use crate::inbound::http::handlers::training::types::TrainingMetricBody;
+use crate::inbound::http::handlers::training::types::format_source_metric;
+use crate::inbound::http::handlers::training::utils::GranuleValues;
+use crate::inbound::http::handlers::training::utils::MetricsDateRange;
+use crate::inbound::http::handlers::training::utils::convert_metric_target_unit;
+use crate::inbound::http::handlers::training::utils::convert_metric_values_unit;
+use crate::inbound::http::handlers::training::utils::fill_missing_granules;
+use crate::inbound::http::handlers::training::utils::group_metric_values;
+use crate::inbound::parser::ParseFile;
 
 /// Request body for computing training metric values
 #[derive(Debug, Deserialize)]
@@ -180,10 +180,10 @@ mod tests {
     use crate::inbound::http::handlers::training::types::{
         APIActivitySource, APITrainingMetricActivityGroupBy, APITrainingMetricSummaryAverage,
     };
-    use activities_domain::models::activity::{
+    use activities_domain::activity::models::{
         ActivityRpe, BonkStatus, Sport, SportCategory, Unit, WorkoutType,
     };
-    use activities_domain::models::training::{
+    use activities_domain::training::models::{
         ActivitySource, HooperIndexSource, SportFilter, TrainingMetricSummaryAverage,
         TrainingMetricTarget, WeightAndNutritionSource,
     };

@@ -2,17 +2,16 @@ use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    domain::{
-        models::{
-            activity::ActivityMetric,
-            preferences::{ActivityListSummary, ActivityListSummaryItem, Preference},
-            training::{TrainingMetricId, TrainingMetricScope},
-        },
-        ports::preferences::{DeletePreferenceError, GetPreferenceError, SetPreferenceError},
-    },
-    inbound::http::handlers::training::types::APITrainingMetricScope,
-};
+use crate::domain::activity::models::ActivityMetric;
+use crate::domain::preferences::models::ActivityListSummary;
+use crate::domain::preferences::models::ActivityListSummaryItem;
+use crate::domain::preferences::models::Preference;
+use crate::domain::preferences::ports::DeletePreferenceError;
+use crate::domain::preferences::ports::GetPreferenceError;
+use crate::domain::preferences::ports::SetPreferenceError;
+use crate::domain::training::models::TrainingMetricId;
+use crate::domain::training::models::TrainingMetricScope;
+use crate::inbound::http::handlers::training::types::APITrainingMetricScope;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "key", content = "value")]

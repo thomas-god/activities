@@ -2,14 +2,13 @@ use crate::inbound::http::error_status::ApiErrorStatus;
 use axum::{Extension, Json, extract::State, http::StatusCode};
 
 use crate::{
-    domain::models::preferences::Preference,
+    domain::preferences::models::Preference,
     inbound::{auth::AuthenticatedUser, http::AppState},
 };
-use activities_domain::ports::{
-    activity::IActivityService,
-    preferences::{IPreferencesService, SetPreferenceError},
-    training::ITrainingService,
-};
+use activities_domain::activity::ports::IActivityService;
+use activities_domain::preferences::ports::IPreferencesService;
+use activities_domain::preferences::ports::SetPreferenceError;
+use activities_domain::training::ports::ITrainingService;
 use activities_infra::parser::ParseFile;
 
 use super::types::PreferencePayload;

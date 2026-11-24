@@ -3,28 +3,49 @@ use std::collections::HashMap;
 use chrono::{DateTime, NaiveDate};
 use sqlx::{Database, encode::IsNull, error::BoxDynError};
 
-use crate::{
-    models::{
-        UserId,
-        activity::{
-            ActivityDuration, ActivityFeedback, ActivityId, ActivityMetric, ActivityMetricSource,
-            ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime,
-            ActivityStatistic, ActivityStatistics, DurationCurveType, Sport, TimeseriesAggregate,
-            TimeseriesMetric, WorkoutType,
-        },
-        preferences::{ActivityListSummary, Preference, PreferenceKey},
-        search::SearchDocumentEvent,
-        training::{
-            DurationCurveSource, HooperIndexSource, SubjectiveScale, TrainingMetricActivityFilters,
-            TrainingMetricActivityGroupBy, TrainingMetricAggregate, TrainingMetricGranularity,
-            TrainingMetricId, TrainingMetricName, TrainingMetricSource, TrainingMetricSummary,
-            TrainingMetricTarget, TrainingMetricValue, TrainingNoteContent, TrainingNoteDate,
-            TrainingNoteId, TrainingNoteTitle, TrainingPeriodId, TrainingPeriodSports,
-            WeightAndNutritionSource,
-        },
-    },
-    ports::activity::DurationCurveEvent,
-};
+use crate::activity::models::ActivityDuration;
+use crate::activity::models::ActivityFeedback;
+use crate::activity::models::ActivityId;
+use crate::activity::models::ActivityMetric;
+use crate::activity::models::ActivityMetricSource;
+use crate::activity::models::ActivityName;
+use crate::activity::models::ActivityNaturalKey;
+use crate::activity::models::ActivityNutrition;
+use crate::activity::models::ActivityRpe;
+use crate::activity::models::ActivityStartTime;
+use crate::activity::models::ActivityStatistic;
+use crate::activity::models::ActivityStatistics;
+use crate::activity::models::DurationCurveType;
+use crate::activity::models::Sport;
+use crate::activity::models::TimeseriesAggregate;
+use crate::activity::models::TimeseriesMetric;
+use crate::activity::models::WorkoutType;
+use crate::activity::ports::DurationCurveEvent;
+use crate::preferences::models::ActivityListSummary;
+use crate::preferences::models::Preference;
+use crate::preferences::models::PreferenceKey;
+use crate::search::models::SearchDocumentEvent;
+use crate::shared::UserId;
+use crate::training::models::DurationCurveSource;
+use crate::training::models::HooperIndexSource;
+use crate::training::models::SubjectiveScale;
+use crate::training::models::TrainingMetricActivityFilters;
+use crate::training::models::TrainingMetricActivityGroupBy;
+use crate::training::models::TrainingMetricAggregate;
+use crate::training::models::TrainingMetricGranularity;
+use crate::training::models::TrainingMetricId;
+use crate::training::models::TrainingMetricName;
+use crate::training::models::TrainingMetricSource;
+use crate::training::models::TrainingMetricSummary;
+use crate::training::models::TrainingMetricTarget;
+use crate::training::models::TrainingMetricValue;
+use crate::training::models::TrainingNoteContent;
+use crate::training::models::TrainingNoteDate;
+use crate::training::models::TrainingNoteId;
+use crate::training::models::TrainingNoteTitle;
+use crate::training::models::TrainingPeriodId;
+use crate::training::models::TrainingPeriodSports;
+use crate::training::models::WeightAndNutritionSource;
 
 impl sqlx::Type<sqlx::Sqlite> for ActivityId {
     fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
