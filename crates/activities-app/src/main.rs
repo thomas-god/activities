@@ -1,6 +1,10 @@
-use activities_app::config::{StdEnvironment, TelemetryConfig};
+use activities_app::config::{
+    StdEnvironment, TelemetryConfig, warn_single_user_mode_selected_legacy,
+};
 
 async fn run() -> anyhow::Result<()> {
+    warn_single_user_mode_selected_legacy(&StdEnvironment {});
+
     let (server, search_service, training_service, activity_service, backup_service) =
         activities_app::bootstrap::bootstrap_app().await?;
     let _ = tokio::join!(
