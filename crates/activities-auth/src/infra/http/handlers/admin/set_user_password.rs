@@ -6,12 +6,11 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::{
-    domain::shared::UserId,
-    multi_user::{
-        Password,
-        admin::{AdminActor, IAdminService, SetUserPasswordOutcome},
-    },
+use activities_core::domain::shared::UserId;
+
+use crate::domain::{
+    Password,
+    admin::{AdminActor, IAdminService, SetUserPasswordOutcome},
 };
 
 use super::{AdminGuard, AdminServiceHandle, admin_error_status};

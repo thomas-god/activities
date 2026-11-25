@@ -5,10 +5,9 @@ use axum::{
 };
 use serde::Serialize;
 
-use crate::{
-    domain::shared::UserId,
-    multi_user::admin::{AdminActor, IAdminService},
-};
+use activities_core::domain::shared::UserId;
+
+use crate::domain::admin::{AdminActor, IAdminService};
 
 use super::{AdminGuard, AdminServiceHandle, admin_error_status};
 

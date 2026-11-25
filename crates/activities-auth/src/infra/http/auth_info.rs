@@ -3,8 +3,8 @@ use serde::Serialize;
 
 use crate::{
     auth::MultiUserAuthStrategy,
-    infra::http::multi_user::handlers::multi_user_login_routes,
-    multi_user::{AuthMethods, IMultiUserService},
+    domain::{AuthMethods, IMultiUserService},
+    infra::http::handlers::multi_user_login_routes,
 };
 
 /// Public information about the configured authentication strategy, exposed at `/api/auth_info`.
@@ -64,7 +64,7 @@ mod tests {
 
     use crate::{
         auth::{MultiUserAuthStrategy, UserRegistration},
-        multi_user::{AuthMethods, test_utils::MockUserService},
+        domain::{AuthMethods, test_utils::MockUserService},
     };
 
     use super::*;

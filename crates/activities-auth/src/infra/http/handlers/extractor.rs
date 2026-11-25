@@ -9,8 +9,8 @@ use cookie::{Cookie, time::OffsetDateTime};
 use std::{marker::PhantomData, sync::Arc};
 
 use crate::{
+    domain::{GenerateSessionTokenResult, IMultiUserService, SessionToken},
     infra::http::{AuthenticatedSession, AuthenticatedUser, CookieConfig, SessionRevoked},
-    multi_user::{GenerateSessionTokenResult, IMultiUserService, SessionToken},
 };
 
 /// Extractor that tries to extract user information from the request's session cookie.
@@ -131,18 +131,19 @@ mod test {
     use axum_test::TestServer;
     use chrono::{TimeDelta, Utc};
 
+    use activities_core::domain::shared::UserId;
+
     use crate::{
-        domain::shared::UserId,
+        domain::{
+            CheckSessionResult, GenerateSessionTokenResult, SessionToken,
+            test_utils::MockUserService,
+        },
         infra::http::{
             CookieConfig,
-            multi_user::handlers::{
+            handlers::{
                 AuthAppState, UserRegistration,
                 extractor::{CookieUserExtractor, cookie_auth_middleware},
             },
-        },
-        multi_user::{
-            CheckSessionResult, GenerateSessionTokenResult, SessionToken,
-            test_utils::MockUserService,
         },
     };
 

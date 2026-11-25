@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use activities_core::infra::config::MultiUserConfig;
 
-use crate::multi_user::AuthMethods;
+use crate::domain::AuthMethods;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UserRegistration {

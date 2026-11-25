@@ -3,11 +3,7 @@ use std::{path::PathBuf, sync::Arc};
 use anyhow::{Ok, anyhow};
 
 use activities_auth::{
-    infra::{
-        mailer::{DoNothingMailProvider, MaybeMailProvider, smtp::SMTPEmailProvider},
-        sqlite::users::SqliteUsersRepository,
-    },
-    multi_user::{
+    domain::{
         AuthMethods, MultiUserService, SessionService,
         admin::AdminService,
         service::{
@@ -15,6 +11,10 @@ use activities_auth::{
             spawn_expired_email_change_tokens_cleanup,
         },
         spawn_expired_sessions_cleanup,
+    },
+    infra::{
+        mailer::{DoNothingMailProvider, MaybeMailProvider, smtp::SMTPEmailProvider},
+        sqlite::users::SqliteUsersRepository,
     },
 };
 use activities_core::{
@@ -356,7 +356,7 @@ async fn build_search_service(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use activities_auth::multi_user::EmailAddress;
+    use activities_auth::domain::EmailAddress;
 
     fn base_config(path: &std::path::Path) -> BaseConfig {
         BaseConfig {

@@ -27,7 +27,7 @@ use crate::{
     http::{AppState, handlers::training::types::APITrainingMetricSource},
     parser::ParseFile,
 };
-use activities_auth::{infra::http::AuthenticatedUser, multi_user::IMultiUserService};
+use activities_auth::{infra::http::AuthenticatedUser, domain::IMultiUserService};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBody(Vec<TrainingMetricTemplateBody>);

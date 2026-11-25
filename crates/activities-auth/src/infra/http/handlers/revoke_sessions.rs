@@ -6,11 +6,11 @@ use axum::{
 };
 
 use crate::{
+    domain::{IMultiUserService, RevokeSessionsResult},
     infra::http::{
         AuthenticatedSession, AuthenticatedUser, SessionRevoked, build_removal_cookie,
-        multi_user::handlers::AuthAppState,
+        handlers::AuthAppState,
     },
-    multi_user::{IMultiUserService, RevokeSessionsResult},
 };
 
 #[tracing::instrument(skip_all)]
@@ -60,12 +60,13 @@ mod test {
     };
     use axum_test::TestServer;
 
+    use activities_core::domain::shared::UserId;
+
     use crate::{
-        domain::shared::UserId,
-        infra::http::CookieConfig,
-        multi_user::{
+        domain::{
             HashedSessionToken, RevokeSessionsResult, SessionToken, test_utils::MockUserService,
         },
+        infra::http::CookieConfig,
     };
 
     use super::*;
@@ -93,7 +94,7 @@ mod test {
         let state = AuthAppState {
             user_service: Arc::new(user_service),
             cookie_config: Arc::new(CookieConfig::default()),
-            registration_mode: crate::infra::http::multi_user::handlers::UserRegistration::Allowed,
+            registration_mode: crate::infra::http::handlers::UserRegistration::Allowed,
         };
 
         let app = Router::new()

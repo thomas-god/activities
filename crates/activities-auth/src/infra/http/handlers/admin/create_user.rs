@@ -1,7 +1,7 @@
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use serde::{Deserialize, Serialize};
 
-use crate::multi_user::{
+use crate::domain::{
     EmailAddress, Password,
     admin::{AdminActor, CreateUserOutcome, IAdminService},
 };

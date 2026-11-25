@@ -3,11 +3,11 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
-    infra::http::{AuthenticatedUser, multi_user::handlers::AuthAppState},
-    multi_user::{
+    domain::{
         AuthToken, EmailAddress, EmailChangeValidationResult, IMultiUserService,
         UpdateEmailRequest, UpdateEmailResult,
     },
+    infra::http::{AuthenticatedUser, handlers::AuthAppState},
 };
 
 #[derive(Debug, Deserialize)]

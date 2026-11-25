@@ -3,18 +3,17 @@ use std::sync::Arc;
 use chrono::TimeDelta;
 use derive_more::Constructor;
 
-use crate::{
-    domain::shared::UserId,
-    multi_user::{
-        AuthLink, AuthLinkValidationResult, AuthMethods, AuthToken, CheckSessionResult,
-        EmailAddress, EmailChangeFinalizeResult, EmailChangeToken, EmailChangeValidationResult,
-        EmailVerificationResult, GenerateAuthLinkRequest, GenerateAuthLinkResult, HashedAuthLink,
-        HashedAuthToken, HashedEmailChangeToken, HashedPassword, HashedSessionToken,
-        IMultiUserService, ISessionService, MailProvider, Password, RegisterPasswordRequest,
-        RegisterPasswordResult, RevokeSessionsResult, SessionToken, UpdateEmailRequest,
-        UpdateEmailResult, UpdatePasswordRequest, UpdatePasswordResult, UserInfo, UserInfoResult,
-        UserLoginResult, UserRegistrationRequest, UserRegistrationResult,
-    },
+use activities_core::domain::shared::UserId;
+
+use crate::domain::{
+    AuthLink, AuthLinkValidationResult, AuthMethods, AuthToken, CheckSessionResult, EmailAddress,
+    EmailChangeFinalizeResult, EmailChangeToken, EmailChangeValidationResult,
+    EmailVerificationResult, GenerateAuthLinkRequest, GenerateAuthLinkResult, HashedAuthLink,
+    HashedAuthToken, HashedEmailChangeToken, HashedPassword, HashedSessionToken, IMultiUserService,
+    ISessionService, MailProvider, Password, RegisterPasswordRequest, RegisterPasswordResult,
+    RevokeSessionsResult, SessionToken, UpdateEmailRequest, UpdateEmailResult,
+    UpdatePasswordRequest, UpdatePasswordResult, UserInfo, UserInfoResult, UserLoginResult,
+    UserRegistrationRequest, UserRegistrationResult,
 };
 
 #[derive(Debug, Clone, Constructor)]
@@ -685,7 +684,7 @@ pub fn spawn_expired_email_change_tokens_cleanup<UR: UserRepository>(
 mod test_utils {
     use mockall::mock;
 
-    use crate::multi_user::test_utils::MockMailProvider;
+    use crate::domain::test_utils::MockMailProvider;
 
     use super::{super::test_utils::MockSessionService, *};
 
@@ -842,16 +841,15 @@ mod test_utils {
 mod test_user_service_register_new_user {
     use anyhow::anyhow;
 
-    use crate::{
-        domain::shared::UserId,
-        multi_user::{
-            UserRegistrationResult,
-            service::test_utils::{
-                MockUserRepository, TEST_EMAIL, mail_and_password_service, password_only_service,
-                registration_request,
-            },
-            test_utils::MockMailProvider,
+    use activities_core::domain::shared::UserId;
+
+    use crate::domain::{
+        UserRegistrationResult,
+        service::test_utils::{
+            MockUserRepository, TEST_EMAIL, mail_and_password_service, password_only_service,
+            registration_request,
         },
+        test_utils::MockMailProvider,
     };
 
     use super::*;
@@ -1124,16 +1122,15 @@ mod test_user_service_login_user {
     use anyhow::anyhow;
     use chrono::{TimeDelta, Utc};
 
-    use crate::{
-        domain::shared::UserId,
-        multi_user::{
-            GenerateSessionTokenResult, HashedPassword, Password, SessionToken,
-            service::test_utils::{
-                MockUserRepository, TEST_EMAIL, mail_and_password_service,
-                mail_and_password_service_with_session, password_only_service_with_session,
-            },
-            test_utils::{MockMailProvider, MockSessionService},
+    use activities_core::domain::shared::UserId;
+
+    use crate::domain::{
+        GenerateSessionTokenResult, HashedPassword, Password, SessionToken,
+        service::test_utils::{
+            MockUserRepository, TEST_EMAIL, mail_and_password_service,
+            mail_and_password_service_with_session, password_only_service_with_session,
         },
+        test_utils::{MockMailProvider, MockSessionService},
     };
 
     use super::*;
@@ -1458,7 +1455,7 @@ mod test_user_service_login_user {
 mod test_user_service_password_management {
     use chrono::{TimeDelta, Utc};
 
-    use crate::multi_user::{
+    use crate::domain::{
         GenerateSessionTokenResult, HashedPassword, Password, RegisterPasswordRequest,
         RegisterPasswordResult, SessionToken, UpdatePasswordRequest, UpdatePasswordResult,
         service::test_utils::{
@@ -1816,7 +1813,7 @@ impl IMultiUserService for DisabledUserService {
         &self,
         _email: EmailAddress,
         _password: Option<Password>,
-    ) -> crate::multi_user::UserLoginResult {
+    ) -> crate::domain::UserLoginResult {
         panic!("User service is disabled")
     }
 
@@ -1827,7 +1824,7 @@ impl IMultiUserService for DisabledUserService {
     async fn validate_auth_link(
         &self,
         _token: AuthToken,
-    ) -> Result<crate::multi_user::AuthLinkValidationResult, ()> {
+    ) -> Result<crate::domain::AuthLinkValidationResult, ()> {
         panic!("User service is disabled")
     }
 
@@ -1839,11 +1836,11 @@ impl IMultiUserService for DisabledUserService {
         &self,
         _user: &UserId,
         _current: &HashedSessionToken,
-    ) -> crate::multi_user::RevokeSessionsResult {
+    ) -> crate::domain::RevokeSessionsResult {
         panic!("User service is disabled")
     }
 
-    async fn revoke_all_sessions(&self, _user: &UserId) -> crate::multi_user::RevokeSessionsResult {
+    async fn revoke_all_sessions(&self, _user: &UserId) -> crate::domain::RevokeSessionsResult {
         panic!("User service is disabled")
     }
 
@@ -1862,7 +1859,7 @@ impl IMultiUserService for DisabledUserService {
     async fn request_email_verification(
         &self,
         _user: &UserId,
-    ) -> crate::multi_user::EmailVerificationResult {
+    ) -> crate::domain::EmailVerificationResult {
         panic!("User service is disabled")
     }
 
@@ -1882,7 +1879,7 @@ impl IMultiUserService for DisabledUserService {
 mod test_user_service_validate_auth_link {
     use chrono::{TimeDelta, Utc};
 
-    use crate::multi_user::{
+    use crate::domain::{
         AuthLinkValidationResult, AuthToken, GenerateSessionTokenResult, HashedAuthLink,
         SessionToken,
         service::test_utils::{MockUserRepository, mail_and_password_service_with_session},
@@ -2098,7 +2095,7 @@ mod test_user_service_validate_auth_link {
 
 #[cfg(test)]
 mod test_user_service_check_session_token {
-    use crate::multi_user::{
+    use crate::domain::{
         SessionToken,
         service::test_utils::{MockUserRepository, mail_and_password_service_with_session},
         test_utils::{MockMailProvider, MockSessionService},
@@ -2190,7 +2187,7 @@ mod test_spawn_expired_auth_links_cleanup {
         atomic::{AtomicUsize, Ordering},
     };
 
-    use crate::multi_user::service::test_utils::MockUserRepository;
+    use crate::domain::service::test_utils::MockUserRepository;
 
     use super::*;
 
@@ -2221,7 +2218,7 @@ mod test_user_service_update_email {
     use anyhow::anyhow;
     use chrono::{TimeDelta, Utc};
 
-    use crate::multi_user::{
+    use crate::domain::{
         EmailAddress, EmailChangeFinalizeResult, EmailChangeToken, EmailChangeValidationResult,
         HashedEmailChangeToken,
         service::test_utils::{
@@ -2722,7 +2719,7 @@ mod test_user_service_update_email {
 
 #[cfg(test)]
 mod test_user_service_get_user_info {
-    use crate::multi_user::{
+    use crate::domain::{
         EmailAddress, UserInfo,
         service::test_utils::{MockUserRepository, TEST_EMAIL, mail_and_password_service},
         test_utils::MockMailProvider,
@@ -2789,7 +2786,7 @@ mod test_user_service_get_user_info {
 
 #[cfg(test)]
 mod test_user_service_request_email_verification {
-    use crate::multi_user::{
+    use crate::domain::{
         EmailAddress, EmailVerificationResult, UserInfo,
         service::test_utils::{
             MockUserRepository, TEST_EMAIL, mail_and_password_service, password_only_service,
@@ -2920,7 +2917,7 @@ mod test_user_service_request_email_verification {
 
 #[cfg(test)]
 mod test_user_service_revoke_sessions {
-    use crate::multi_user::{
+    use crate::domain::{
         RevokeSessionsResult, SessionToken,
         service::test_utils::{MockUserRepository, mail_and_password_service_with_session},
         test_utils::{MockMailProvider, MockSessionService},

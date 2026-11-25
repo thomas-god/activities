@@ -17,15 +17,16 @@ use axum::{
     routing::{get, post},
 };
 
+use activities_core::domain::shared::UserId;
+
 use crate::{
-    domain::shared::UserId,
+    domain::{
+        IMultiUserService,
+        admin::{AdminError, IAdminService},
+    },
     infra::http::{
         AuthenticatedUser, CookieConfig,
         rate_limit::{IpRateLimitLayer, RateLimitStore},
-    },
-    multi_user::{
-        IMultiUserService,
-        admin::{AdminError, IAdminService},
     },
 };
 
@@ -172,7 +173,7 @@ mod tests {
     use mockall::mock;
     use serde_json::json;
 
-    use crate::multi_user::{
+    use crate::domain::{
         EmailAddress, Password,
         admin::{
             AdminActor, AdminUser, CreateUserOutcome, IAdminService, SetAdminOutcome,

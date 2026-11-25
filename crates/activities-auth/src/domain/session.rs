@@ -3,12 +3,11 @@ use std::sync::Arc;
 use chrono::{DateTime, TimeDelta, Utc};
 use derive_more::Constructor;
 
-use crate::{
-    domain::shared::UserId,
-    multi_user::{
-        CheckSessionResult, GenerateSessionTokenResult, HashedSession, HashedSessionToken,
-        ISessionService, Session, SessionToken,
-    },
+use activities_core::domain::shared::UserId;
+
+use crate::domain::{
+    CheckSessionResult, GenerateSessionTokenResult, HashedSession, HashedSessionToken,
+    ISessionService, Session, SessionToken,
 };
 
 const SESSION_DURATION: i64 = 30;
@@ -182,7 +181,7 @@ mod test_utils {
 
 #[cfg(test)]
 mod test_session_service_generate_session_token {
-    use crate::multi_user::session::test_utils::MockSessionRepository;
+    use crate::domain::session::test_utils::MockSessionRepository;
 
     use super::*;
 
@@ -222,7 +221,7 @@ mod test_session_service_generate_session_token {
 #[cfg(test)]
 mod test_session_service_check_session_token {
 
-    use crate::multi_user::session::test_utils::MockSessionRepository;
+    use crate::domain::session::test_utils::MockSessionRepository;
 
     use super::*;
 
@@ -289,7 +288,7 @@ mod test_session_service_check_session_token {
 
 #[cfg(test)]
 mod test_session_service_logout {
-    use crate::multi_user::session::test_utils::MockSessionRepository;
+    use crate::domain::session::test_utils::MockSessionRepository;
 
     use super::*;
 
@@ -330,7 +329,7 @@ mod test_session_service_logout {
 
 #[cfg(test)]
 mod test_session_service_revoke {
-    use crate::multi_user::session::test_utils::MockSessionRepository;
+    use crate::domain::session::test_utils::MockSessionRepository;
 
     use super::*;
 

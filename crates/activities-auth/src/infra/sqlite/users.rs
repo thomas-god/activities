@@ -7,7 +7,7 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
 };
 
-use crate::multi_user::{
+use crate::domain::{
     EmailAddress, EmailChangeFinalizeResult, HashedAuthLink, HashedAuthToken,
     HashedEmailChangeToken, HashedPassword, HashedSession, HashedSessionToken, UserInfo,
     admin::{
@@ -1725,7 +1725,7 @@ mod test_sqlite_users_repository {
     use chrono::{TimeDelta, Utc};
     use tempfile::NamedTempFile;
 
-    use crate::multi_user::{
+    use crate::domain::{
         AuthLink, AuthToken, EmailAddress, EmailChangeFinalizeResult, HashedEmailChangeToken,
         HashedSessionToken, Password, Session, SessionToken,
         admin::{

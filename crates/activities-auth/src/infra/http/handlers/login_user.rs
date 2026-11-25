@@ -7,8 +7,8 @@ use axum::{
 use serde::Deserialize;
 
 use crate::{
-    infra::http::multi_user::handlers::{AuthAppState, extractor::build_session_cookie},
-    multi_user::{EmailAddress, IMultiUserService, Password, UserLoginResult},
+    domain::{EmailAddress, IMultiUserService, Password, UserLoginResult},
+    infra::http::handlers::{AuthAppState, extractor::build_session_cookie},
 };
 
 #[derive(Debug, Deserialize)]
@@ -58,11 +58,11 @@ mod test {
     use serde_json::json;
 
     use crate::{
-        infra::http::{CookieConfig, multi_user::handlers::UserRegistration},
-        multi_user::{
+        domain::{
             GenerateSessionTokenResult, Password, SessionToken, UserLoginResult,
             test_utils::MockUserService,
         },
+        infra::http::{CookieConfig, handlers::UserRegistration},
     };
 
     use super::*;

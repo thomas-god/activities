@@ -7,8 +7,8 @@ use axum::{
 use serde::Deserialize;
 
 use crate::{
-    infra::http::multi_user::handlers::{AuthAppState, extractor::build_session_cookie},
-    multi_user::{AuthLinkValidationResult, AuthToken, IMultiUserService},
+    domain::{AuthLinkValidationResult, AuthToken, IMultiUserService},
+    infra::http::handlers::{AuthAppState, extractor::build_session_cookie},
 };
 
 #[derive(Debug, Deserialize)]

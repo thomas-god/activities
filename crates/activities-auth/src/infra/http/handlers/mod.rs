@@ -11,7 +11,7 @@ use crate::{
         CookieConfig,
         rate_limit::{IpRateLimitLayer, RateLimitStore},
     },
-    multi_user::IMultiUserService,
+    domain::IMultiUserService,
 };
 
 pub use extractor::cookie_auth_middleware;
@@ -159,7 +159,7 @@ mod tests {
     use tokio::task::JoinHandle;
     use url::Url;
 
-    use crate::multi_user::{
+    use crate::domain::{
         AuthLinkValidationResult, GenerateSessionTokenResult, SessionToken, UserLoginResult,
         UserRegistrationResult, test_utils::MockUserService,
     };

@@ -7,13 +7,13 @@ use axum::{
 use serde::Deserialize;
 
 use crate::{
-    infra::http::{
-        AuthenticatedUser, CookieConfig,
-        multi_user::handlers::{AuthAppState, extractor::build_session_cookie},
-    },
-    multi_user::{
+    domain::{
         IMultiUserService, RegisterPasswordRequest, RegisterPasswordResult, UpdatePasswordRequest,
         UpdatePasswordResult,
+    },
+    infra::http::{
+        AuthenticatedUser, CookieConfig,
+        handlers::{AuthAppState, extractor::build_session_cookie},
     },
 };
 
@@ -31,7 +31,7 @@ pub struct UpdatePasswordBody {
 fn session_response(
     cookie_config: &CookieConfig,
     headers: &HeaderMap,
-    session: &crate::multi_user::GenerateSessionTokenResult,
+    session: &crate::domain::GenerateSessionTokenResult,
 ) -> axum::response::Response {
     let cookie_config = cookie_config.for_request(headers);
     let Some(cookie) = build_session_cookie(&cookie_config, session) else {
@@ -51,7 +51,7 @@ pub async fn register_password<UR: IMultiUserService>(
     headers: HeaderMap,
     Json(body): Json<RegisterPasswordBody>,
 ) -> impl IntoResponse {
-    let Ok(new) = crate::multi_user::Password::try_from(body.new_password) else {
+    let Ok(new) = crate::domain::Password::try_from(body.new_password) else {
         return StatusCode::BAD_REQUEST.into_response();
     };
 
@@ -78,10 +78,10 @@ pub async fn update_password<UR: IMultiUserService>(
     headers: HeaderMap,
     Json(body): Json<UpdatePasswordBody>,
 ) -> impl IntoResponse {
-    let Ok(new) = crate::multi_user::Password::try_from(body.new_password) else {
+    let Ok(new) = crate::domain::Password::try_from(body.new_password) else {
         return StatusCode::BAD_REQUEST.into_response();
     };
-    let Ok(current) = crate::multi_user::Password::try_from(body.current_password) else {
+    let Ok(current) = crate::domain::Password::try_from(body.current_password) else {
         return StatusCode::BAD_REQUEST.into_response();
     };
 
@@ -113,13 +113,14 @@ mod test {
     use chrono::{TimeDelta, Utc};
     use serde_json::json;
 
+    use activities_core::domain::shared::UserId;
+
     use crate::{
-        domain::shared::UserId,
-        infra::http::CookieConfig,
-        multi_user::{
+        domain::{
             GenerateSessionTokenResult, Password, RegisterPasswordResult, SessionToken,
             UpdatePasswordResult, test_utils::MockUserService,
         },
+        infra::http::CookieConfig,
     };
 
     use super::*;
@@ -140,7 +141,7 @@ mod test {
         let state = AuthAppState {
             user_service: Arc::new(user_service),
             cookie_config: Arc::new(CookieConfig::default()),
-            registration_mode: crate::infra::http::multi_user::handlers::UserRegistration::Allowed,
+            registration_mode: crate::infra::http::handlers::UserRegistration::Allowed,
         };
 
         let app = Router::new()

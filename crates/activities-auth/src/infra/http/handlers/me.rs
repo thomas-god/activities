@@ -2,8 +2,8 @@ use axum::{Extension, Json, extract::State, http::StatusCode, response::IntoResp
 use serde::Serialize;
 
 use crate::{
-    infra::http::{AuthenticatedUser, multi_user::handlers::AuthAppState},
-    multi_user::{IMultiUserService, UserInfo, UserInfoResult},
+    domain::{IMultiUserService, UserInfo, UserInfoResult},
+    infra::http::{AuthenticatedUser, handlers::AuthAppState},
 };
 
 /// Metadata about the authenticated user's account, used by the settings page to know which
@@ -49,10 +49,11 @@ mod test {
     use axum_test::TestServer;
     use serde_json::json;
 
+    use activities_core::domain::shared::UserId;
+
     use crate::{
-        domain::shared::UserId,
+        domain::{UserInfo, UserInfoResult, test_utils::MockUserService},
         infra::http::CookieConfig,
-        multi_user::{UserInfo, UserInfoResult, test_utils::MockUserService},
     };
 
     use super::*;
@@ -73,7 +74,7 @@ mod test {
         let state = AuthAppState {
             user_service: Arc::new(user_service),
             cookie_config: Arc::new(CookieConfig::default()),
-            registration_mode: crate::infra::http::multi_user::handlers::UserRegistration::Allowed,
+            registration_mode: crate::infra::http::handlers::UserRegistration::Allowed,
         };
 
         let app = Router::new()

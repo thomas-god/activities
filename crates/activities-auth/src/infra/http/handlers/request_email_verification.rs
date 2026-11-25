@@ -1,8 +1,8 @@
 use axum::{Extension, extract::State, http::StatusCode, response::IntoResponse};
 
 use crate::{
-    infra::http::{AuthenticatedUser, multi_user::handlers::AuthAppState},
-    multi_user::{EmailVerificationResult, IMultiUserService},
+    domain::{EmailVerificationResult, IMultiUserService},
+    infra::http::{AuthenticatedUser, handlers::AuthAppState},
 };
 
 #[tracing::instrument(skip_all)]
@@ -31,10 +31,11 @@ mod test {
     use axum::{Router, http::StatusCode, routing::post};
     use axum_test::TestServer;
 
+    use activities_core::domain::shared::UserId;
+
     use crate::{
-        domain::shared::UserId,
+        domain::{EmailVerificationResult, test_utils::MockUserService},
         infra::http::CookieConfig,
-        multi_user::{EmailVerificationResult, test_utils::MockUserService},
     };
 
     use super::*;
@@ -55,7 +56,7 @@ mod test {
         let state = AuthAppState {
             user_service: Arc::new(user_service),
             cookie_config: Arc::new(CookieConfig::default()),
-            registration_mode: crate::infra::http::multi_user::handlers::UserRegistration::Allowed,
+            registration_mode: crate::infra::http::handlers::UserRegistration::Allowed,
         };
 
         let app = Router::new()

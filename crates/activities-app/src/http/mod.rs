@@ -48,8 +48,8 @@ use activities_core::{
 
 use activities_auth::{
     auth::MultiUserAuthStrategy,
-    infra::http::{add_auth_router, multi_user::handlers::admin::admin_routes},
-    multi_user::{IMultiUserService, admin::IAdminService},
+    domain::{IMultiUserService, admin::IAdminService},
+    infra::http::{add_auth_router, handlers::admin::admin_routes},
 };
 
 use crate::http::handlers::{
@@ -475,7 +475,7 @@ mod tests {
     use crate::parser::test_utils::MockFileParser;
     use activities_auth::{
         auth::{UserRegistration, test_utils::DefaultUserExtractor},
-        multi_user::{AuthMethods, test_utils::MockUserService},
+        domain::{AuthMethods, test_utils::MockUserService},
     };
     use activities_core::domain::{
         activity::{models::ActivityId, services::test_utils::MockActivityService},

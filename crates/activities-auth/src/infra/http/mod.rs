@@ -3,7 +3,7 @@ use derive_more::Constructor;
 
 pub mod auth_info;
 pub mod cookie;
-pub mod multi_user;
+pub mod handlers;
 pub mod rate_limit;
 
 pub use auth_info::add_auth_router;
@@ -19,10 +19,10 @@ impl AuthenticatedUser {
 }
 
 #[derive(Debug, Clone, Constructor)]
-pub struct AuthenticatedSession(crate::multi_user::HashedSessionToken);
+pub struct AuthenticatedSession(crate::domain::HashedSessionToken);
 
 impl AuthenticatedSession {
-    pub fn hash(&self) -> &crate::multi_user::HashedSessionToken {
+    pub fn hash(&self) -> &crate::domain::HashedSessionToken {
         &self.0
     }
 }

@@ -2,10 +2,10 @@ use axum::{Json, extract::State, http::StatusCode};
 use serde::Deserialize;
 
 use crate::{
-    infra::http::multi_user::handlers::{AuthAppState, UserRegistration},
-    multi_user::{
+    domain::{
         EmailAddress, IMultiUserService, Password, UserRegistrationRequest, UserRegistrationResult,
     },
+    infra::http::handlers::{AuthAppState, UserRegistration},
 };
 
 #[derive(Debug, Deserialize)]
@@ -49,8 +49,8 @@ mod test {
     use serde_json::json;
 
     use crate::{
-        infra::http::multi_user::handlers::UserRegistration,
-        multi_user::{EmailAddress, Password, UserRegistrationResult, test_utils::MockUserService},
+        domain::{EmailAddress, Password, UserRegistrationResult, test_utils::MockUserService},
+        infra::http::handlers::UserRegistration,
     };
 
     use super::*;

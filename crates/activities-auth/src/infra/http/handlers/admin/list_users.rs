@@ -1,7 +1,7 @@
 use axum::{Json, extract::State, response::IntoResponse};
 use serde::Serialize;
 
-use crate::multi_user::admin::{AdminUser, IAdminService};
+use crate::domain::admin::{AdminUser, IAdminService};
 
 use super::{AdminGuard, AdminServiceHandle, admin_error_status};
 

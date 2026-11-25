@@ -6,8 +6,8 @@ use axum::{
 use axum_extra::extract::CookieJar;
 
 use crate::{
-    infra::http::{build_removal_cookie, multi_user::handlers::AuthAppState},
-    multi_user::IMultiUserService,
+    domain::IMultiUserService,
+    infra::http::{build_removal_cookie, handlers::AuthAppState},
 };
 
 /// Always succeeds and clears the session cookie, whether or not a session was found: from the
@@ -33,10 +33,7 @@ mod test {
     use axum::{Router, routing::post};
     use axum_test::TestServer;
 
-    use crate::{
-        infra::http::multi_user::handlers::UserRegistration,
-        multi_user::test_utils::MockUserService,
-    };
+    use crate::{domain::test_utils::MockUserService, infra::http::handlers::UserRegistration};
 
     use super::*;
 
