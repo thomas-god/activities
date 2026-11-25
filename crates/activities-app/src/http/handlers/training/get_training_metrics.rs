@@ -12,38 +12,39 @@ use derive_more::Constructor;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::domain::activity::models::ActivityMetricSource;
-use crate::domain::activity::models::ActivityStatistic;
-use crate::domain::activity::models::TimeseriesMetric;
-use crate::domain::activity::ports::IActivityService;
-use crate::domain::preferences::ports::IPreferencesService;
-use crate::domain::shared::DateRange;
-use crate::domain::training::models::SportFilter;
-use crate::domain::training::models::TrainingMetric;
-use crate::domain::training::models::TrainingMetricActivityFilters;
-use crate::domain::training::models::TrainingMetricDefinition;
-use crate::domain::training::models::TrainingMetricScope;
-use crate::domain::training::models::TrainingMetricSource;
-use crate::domain::training::models::TrainingMetricSummaryAverage;
-use crate::domain::training::models::TrainingMetricTarget;
-use crate::domain::training::models::TrainingMetricValues;
-use crate::domain::training::models::TrainingPeriodId;
-use crate::domain::training::models::TrainingPeriodSports;
-use crate::domain::training::ports::GetTrainingMetricValuesError;
-use crate::domain::training::ports::ITrainingService;
-use crate::http::AppState;
-use crate::http::handlers::training::types::APITrainingMetricScope;
-use crate::http::handlers::training::types::APITrainingMetricSource;
-use crate::http::handlers::training::types::TrainingMetricBody;
-use crate::http::handlers::training::types::format_source_metric;
-use crate::http::handlers::training::utils::GranuleValues;
-use crate::http::handlers::training::utils::GroupedMetricValues;
-use crate::http::handlers::training::utils::MetricsDateRange;
-use crate::http::handlers::training::utils::convert_metric_target_unit;
-use crate::http::handlers::training::utils::convert_metric_values_unit;
-use crate::http::handlers::training::utils::fill_missing_granules;
-use crate::http::handlers::training::utils::group_metric_values;
-use crate::parser::ParseFile;
+use crate::{
+    domain::{
+        activity::{
+            models::{ActivityMetricSource, ActivityStatistic, TimeseriesMetric},
+            ports::IActivityService,
+        },
+        preferences::ports::IPreferencesService,
+        shared::DateRange,
+        training::{
+            models::{
+                SportFilter, TrainingMetric, TrainingMetricActivityFilters,
+                TrainingMetricDefinition, TrainingMetricScope, TrainingMetricSource,
+                TrainingMetricSummaryAverage, TrainingMetricTarget, TrainingMetricValues,
+                TrainingPeriodId, TrainingPeriodSports,
+            },
+            ports::{GetTrainingMetricValuesError, ITrainingService},
+        },
+    },
+    http::{
+        AppState,
+        handlers::training::{
+            types::{
+                APITrainingMetricScope, APITrainingMetricSource, TrainingMetricBody,
+                format_source_metric,
+            },
+            utils::{
+                GranuleValues, GroupedMetricValues, MetricsDateRange, convert_metric_target_unit,
+                convert_metric_values_unit, fill_missing_granules, group_metric_values,
+            },
+        },
+    },
+    parser::ParseFile,
+};
 use activities_auth::infra::http::AuthenticatedUser;
 
 #[derive(Debug, Clone, Serialize)]
@@ -225,11 +226,13 @@ mod tests {
     use crate::http::handlers::training::types::{
         APIActivitySource, APITrainingMetricActivityGroupBy, APITrainingMetricFilters,
     };
-    use activities_domain::activity::models::{
-        ActivityMetric, ActivityRpe, ActivityStatistic, BonkStatus, Sport, SportCategory,
-        TimeseriesAggregate, TimeseriesMetric, Unit, WorkoutType,
+    use activities_core::domain::{
+        activity::models::{
+            ActivityMetric, ActivityRpe, ActivityStatistic, BonkStatus, Sport, SportCategory,
+            TimeseriesAggregate, TimeseriesMetric, Unit, WorkoutType,
+        },
+        training::models::TrainingMetricTarget,
     };
-    use activities_domain::training::models::TrainingMetricTarget;
 
     use super::*;
 

@@ -1,4 +1,4 @@
-pub use activities_domain as domain;
+pub use activities_core::domain;
 
 pub mod auth;
 pub mod infra;

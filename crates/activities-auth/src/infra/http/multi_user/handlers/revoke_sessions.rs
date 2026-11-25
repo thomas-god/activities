@@ -5,13 +5,13 @@ use axum::{
     response::{AppendHeaders, IntoResponse},
 };
 
-use crate::infra::http::AuthenticatedSession;
-use crate::infra::http::AuthenticatedUser;
-use crate::infra::http::SessionRevoked;
-use crate::infra::http::build_removal_cookie;
-use crate::infra::http::multi_user::handlers::AuthAppState;
-use crate::multi_user::IMultiUserService;
-use crate::multi_user::RevokeSessionsResult;
+use crate::{
+    infra::http::{
+        AuthenticatedSession, AuthenticatedUser, SessionRevoked, build_removal_cookie,
+        multi_user::handlers::AuthAppState,
+    },
+    multi_user::{IMultiUserService, RevokeSessionsResult},
+};
 
 #[tracing::instrument(skip_all)]
 pub async fn revoke_other_sessions<UR: IMultiUserService>(
@@ -60,12 +60,13 @@ mod test {
     };
     use axum_test::TestServer;
 
-    use crate::domain::shared::UserId;
-    use crate::infra::http::CookieConfig;
-    use crate::multi_user::HashedSessionToken;
-    use crate::multi_user::RevokeSessionsResult;
-    use crate::multi_user::SessionToken;
-    use crate::multi_user::test_utils::MockUserService;
+    use crate::{
+        domain::shared::UserId,
+        infra::http::CookieConfig,
+        multi_user::{
+            HashedSessionToken, RevokeSessionsResult, SessionToken, test_utils::MockUserService,
+        },
+    };
 
     use super::*;
 

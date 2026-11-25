@@ -133,8 +133,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::{IpAddr, Ipv4Addr};
-    use std::time::Duration;
+    use std::{
+        net::{IpAddr, Ipv4Addr},
+        time::Duration,
+    };
 
     #[tokio::test]
     async fn test_rate_limit_store_creation() {

@@ -1,1 +1,1 @@
-pub use activities_infra::config::*;
+pub use activities_core::infra::config::*;

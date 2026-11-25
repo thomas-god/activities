@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-activities-domain.workspace = true
+activities-core.workspace = true
 anyhow.workspace = true
 argon2.workspace = true
 axum.workspace = true
@@ -32,7 +32,7 @@ tower.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-activities-domain = { workspace = true, features = ["test-utils"] }
+activities-core = { workspace = true, features = ["test-utils"] }
 axum-test.workspace = true
 mockall.workspace = true
 reqwest.workspace = true

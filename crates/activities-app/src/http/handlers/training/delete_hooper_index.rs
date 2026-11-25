@@ -8,13 +8,15 @@ use axum::{
 };
 use chrono::NaiveDate;
 
-use crate::domain::activity::ports::IActivityService;
-use crate::domain::preferences::ports::IPreferencesService;
-use crate::domain::training::ports::DeleteHooperIndexRequest;
-use crate::domain::training::ports::HooperIndexError;
-use crate::domain::training::ports::ITrainingService;
-use crate::http::AppState;
-use crate::parser::ParseFile;
+use crate::{
+    domain::{
+        activity::ports::IActivityService,
+        preferences::ports::IPreferencesService,
+        training::ports::{DeleteHooperIndexRequest, HooperIndexError, ITrainingService},
+    },
+    http::AppState,
+    parser::ParseFile,
+};
 use activities_auth::infra::http::AuthenticatedUser;
 
 #[tracing::instrument(skip_all, err)]

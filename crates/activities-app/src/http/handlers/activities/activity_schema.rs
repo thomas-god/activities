@@ -4,24 +4,17 @@ use chrono::{DateTime, FixedOffset, NaiveDate};
 use derive_more::Constructor;
 use serde::{Deserialize, Serialize};
 
-use activities_domain::activity::models::Activity;
-use activities_domain::activity::models::ActivityDurationCurve;
-use activities_domain::activity::models::ActivityMetric;
-use activities_domain::activity::models::ActivityMetrics;
-use activities_domain::activity::models::ActivityNutrition;
-use activities_domain::activity::models::ActivityTimeseries;
-use activities_domain::activity::models::ActivityWithParsedData;
-use activities_domain::activity::models::Lap;
-use activities_domain::activity::models::Timeseries;
-use activities_domain::activity::models::TimeseriesMetric;
-use activities_domain::activity::models::TimeseriesValue;
-use activities_domain::activity::models::ToUnit;
-use activities_domain::activity::models::Unit;
-use activities_domain::training::models::ActivityWithTrainingContext;
-use activities_domain::training::models::BestDurationCurve;
-use activities_domain::training::models::HooperIndex;
-use activities_domain::training::models::ReferenceBestDurationCurve;
-use activities_domain::training::models::TrainingContext;
+use activities_core::domain::{
+    activity::models::{
+        Activity, ActivityDurationCurve, ActivityMetric, ActivityMetrics, ActivityNutrition,
+        ActivityTimeseries, ActivityWithParsedData, Lap, Timeseries, TimeseriesMetric,
+        TimeseriesValue, ToUnit, Unit,
+    },
+    training::models::{
+        ActivityWithTrainingContext, BestDurationCurve, HooperIndex, ReferenceBestDurationCurve,
+        TrainingContext,
+    },
+};
 
 // =============================================================================
 // Nutrition
@@ -397,16 +390,18 @@ mod tests {
 
     use chrono::DateTime;
 
-    use activities_domain::activity::models::{
-        ActiveTime, ActivityDuration, ActivityDurationCurve, ActivityDurationCurves, ActivityId,
-        ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries,
-        ActivityWithParsedData, DurationCurveType, Sport, Timeseries, TimeseriesActiveTime,
-        TimeseriesMetric, TimeseriesTime, TimeseriesValue,
-    };
-    use activities_domain::shared::UserId;
-    use activities_domain::training::models::{
-        BestDurationCurve, HooperIndex, ReferenceBestDurationCurve, ReferenceDurationCurveKind,
-        SubjectiveScale,
+    use activities_core::domain::{
+        activity::models::{
+            ActiveTime, ActivityDuration, ActivityDurationCurve, ActivityDurationCurves,
+            ActivityId, ActivityStartTime, ActivityStatistic, ActivityStatistics,
+            ActivityTimeseries, ActivityWithParsedData, DurationCurveType, Sport, Timeseries,
+            TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+        },
+        shared::UserId,
+        training::models::{
+            BestDurationCurve, HooperIndex, ReferenceBestDurationCurve, ReferenceDurationCurveKind,
+            SubjectiveScale,
+        },
     };
 
     fn activity_id() -> ActivityId {

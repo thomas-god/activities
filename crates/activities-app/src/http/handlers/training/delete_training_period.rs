@@ -1,18 +1,25 @@
-use axum::Extension;
-use axum::extract::{Path, State};
-use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
+use axum::{
+    Extension,
+    extract::{Path, State},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use serde::Serialize;
 use uuid::Uuid;
 
 use crate::http::AppState;
 use activities_auth::infra::http::AuthenticatedUser;
-use activities_domain::activity::ports::IActivityService;
-use activities_domain::preferences::ports::IPreferencesService;
-use activities_domain::training::models::TrainingPeriodId;
-use activities_domain::training::ports::ITrainingService;
-use activities_domain::training::ports::{DeleteTrainingPeriodError, DeleteTrainingPeriodRequest};
-use activities_infra::parser::ParseFile;
+use activities_core::{
+    domain::{
+        activity::ports::IActivityService,
+        preferences::ports::IPreferencesService,
+        training::{
+            models::TrainingPeriodId,
+            ports::{DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, ITrainingService},
+        },
+    },
+    infra::parser::ParseFile,
+};
 
 #[derive(Serialize)]
 struct ErrorResponse {

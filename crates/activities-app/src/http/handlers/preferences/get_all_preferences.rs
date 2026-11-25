@@ -1,13 +1,13 @@
 use crate::http::error_status::ApiErrorStatus;
 use axum::{Extension, Json, extract::State, http::StatusCode};
 
-use crate::http::AppState;
-use crate::parser::ParseFile;
+use crate::{http::AppState, parser::ParseFile};
 use activities_auth::infra::http::AuthenticatedUser;
-use activities_domain::activity::ports::IActivityService;
-use activities_domain::preferences::ports::GetPreferenceError;
-use activities_domain::preferences::ports::IPreferencesService;
-use activities_domain::training::ports::ITrainingService;
+use activities_core::domain::{
+    activity::ports::IActivityService,
+    preferences::ports::{GetPreferenceError, IPreferencesService},
+    training::ports::ITrainingService,
+};
 
 use super::types::PreferencePayload;
 
@@ -51,17 +51,21 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    use crate::domain::activity::models::ActivityMetric;
-    use crate::domain::activity::services::test_utils::MockActivityService;
-    use crate::domain::preferences::models::ActivityListSummary;
-    use crate::domain::preferences::models::ActivityListSummaryItem;
-    use crate::domain::preferences::models::Preference;
-    use crate::domain::preferences::services::tests_utils::MockPreferencesService;
-    use crate::domain::shared::UserId;
-    use crate::domain::training::models::TrainingMetricId;
-    use crate::domain::training::models::TrainingMetricScope;
-    use crate::domain::training::services::test_utils::MockTrainingService;
-    use crate::parser::test_utils::MockFileParser;
+    use crate::{
+        domain::{
+            activity::{models::ActivityMetric, services::test_utils::MockActivityService},
+            preferences::{
+                models::{ActivityListSummary, ActivityListSummaryItem, Preference},
+                services::tests_utils::MockPreferencesService,
+            },
+            shared::UserId,
+            training::{
+                models::{TrainingMetricId, TrainingMetricScope},
+                services::test_utils::MockTrainingService,
+            },
+        },
+        parser::test_utils::MockFileParser,
+    };
     use mockall::predicate::*;
 
     fn create_test_state(

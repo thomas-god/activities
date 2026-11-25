@@ -4,8 +4,7 @@ members = [
     "crates/activities-app",
     "crates/activities-auth",
     "crates/activities-cli",
-    "crates/activities-domain",
-    "crates/activities-infra",
+    "crates/activities-core",
     "crates/fit-codegen",
     "crates/fit-parser",
 ]
@@ -20,8 +19,7 @@ edition = "2024"
 activities-app = { path = "crates/activities-app" }
 activities-auth = { path = "crates/activities-auth" }
 activities-cli = { path = "crates/activities-cli" }
-activities-domain = { path = "crates/activities-domain" }
-activities-infra = { path = "crates/activities-infra" }
+activities-core = { path = "crates/activities-core" }
 fit-parser = { path = "crates/fit-parser" }
 
 # External dependencies shared by the activities-* crates

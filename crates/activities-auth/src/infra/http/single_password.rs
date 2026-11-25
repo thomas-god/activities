@@ -15,12 +15,14 @@ use hmac::{Hmac, KeyInit, Mac};
 use serde::Deserialize;
 use sha2::Sha256;
 
-use crate::auth::SinglePassword;
-use crate::domain::shared::UserId;
-use crate::infra::http::CookieConfig;
-use crate::infra::http::build_removal_cookie;
-use crate::infra::http::rate_limit::IpRateLimitLayer;
-use crate::infra::http::rate_limit::RateLimitStore;
+use crate::{
+    auth::SinglePassword,
+    domain::shared::UserId,
+    infra::http::{
+        CookieConfig, build_removal_cookie,
+        rate_limit::{IpRateLimitLayer, RateLimitStore},
+    },
+};
 
 use crate::infra::http::AuthenticatedUser;
 

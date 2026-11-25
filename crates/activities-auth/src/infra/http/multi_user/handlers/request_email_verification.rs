@@ -1,9 +1,9 @@
 use axum::{Extension, extract::State, http::StatusCode, response::IntoResponse};
 
-use crate::infra::http::AuthenticatedUser;
-use crate::infra::http::multi_user::handlers::AuthAppState;
-use crate::multi_user::EmailVerificationResult;
-use crate::multi_user::IMultiUserService;
+use crate::{
+    infra::http::{AuthenticatedUser, multi_user::handlers::AuthAppState},
+    multi_user::{EmailVerificationResult, IMultiUserService},
+};
 
 #[tracing::instrument(skip_all)]
 pub async fn request_email_verification<UR: IMultiUserService>(
@@ -31,10 +31,11 @@ mod test {
     use axum::{Router, http::StatusCode, routing::post};
     use axum_test::TestServer;
 
-    use crate::domain::shared::UserId;
-    use crate::infra::http::CookieConfig;
-    use crate::multi_user::EmailVerificationResult;
-    use crate::multi_user::test_utils::MockUserService;
+    use crate::{
+        domain::shared::UserId,
+        infra::http::CookieConfig,
+        multi_user::{EmailVerificationResult, test_utils::MockUserService},
+    };
 
     use super::*;
 

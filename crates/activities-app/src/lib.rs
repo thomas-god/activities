@@ -1,5 +1,4 @@
-pub use activities_domain as domain;
-pub use activities_infra::parser;
+pub use activities_core::{domain, infra::parser};
 
 pub mod bootstrap;
 pub mod config;

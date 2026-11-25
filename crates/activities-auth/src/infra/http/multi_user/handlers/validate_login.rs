@@ -6,11 +6,10 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::infra::http::multi_user::handlers::AuthAppState;
-use crate::infra::http::multi_user::handlers::extractor::build_session_cookie;
-use crate::multi_user::AuthLinkValidationResult;
-use crate::multi_user::AuthToken;
-use crate::multi_user::IMultiUserService;
+use crate::{
+    infra::http::multi_user::handlers::{AuthAppState, extractor::build_session_cookie},
+    multi_user::{AuthLinkValidationResult, AuthToken, IMultiUserService},
+};
 
 #[derive(Debug, Deserialize)]
 pub struct ValidateLoginBody {

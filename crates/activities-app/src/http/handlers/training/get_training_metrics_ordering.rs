@@ -5,14 +5,18 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::domain::activity::ports::IActivityService;
-use crate::domain::preferences::ports::IPreferencesService;
-use crate::domain::training::models::TrainingMetricId;
-use crate::domain::training::ports::GetTrainingMetricsOrderingError;
-use crate::domain::training::ports::ITrainingService;
-use crate::http::AppState;
-use crate::http::handlers::training::types::APITrainingMetricScope;
-use crate::parser::ParseFile;
+use crate::{
+    domain::{
+        activity::ports::IActivityService,
+        preferences::ports::IPreferencesService,
+        training::{
+            models::TrainingMetricId,
+            ports::{GetTrainingMetricsOrderingError, ITrainingService},
+        },
+    },
+    http::{AppState, handlers::training::types::APITrainingMetricScope},
+    parser::ParseFile,
+};
 use activities_auth::infra::http::AuthenticatedUser;
 
 #[derive(Debug, Deserialize)]

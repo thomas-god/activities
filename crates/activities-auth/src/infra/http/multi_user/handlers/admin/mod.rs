@@ -17,14 +17,17 @@ use axum::{
     routing::{get, post},
 };
 
-use crate::domain::shared::UserId;
-use crate::infra::http::AuthenticatedUser;
-use crate::infra::http::CookieConfig;
-use crate::infra::http::rate_limit::IpRateLimitLayer;
-use crate::infra::http::rate_limit::RateLimitStore;
-use crate::multi_user::IMultiUserService;
-use crate::multi_user::admin::AdminError;
-use crate::multi_user::admin::IAdminService;
+use crate::{
+    domain::shared::UserId,
+    infra::http::{
+        AuthenticatedUser, CookieConfig,
+        rate_limit::{IpRateLimitLayer, RateLimitStore},
+    },
+    multi_user::{
+        IMultiUserService,
+        admin::{AdminError, IAdminService},
+    },
+};
 
 use super::cookie_auth_middleware;
 
@@ -169,16 +172,14 @@ mod tests {
     use mockall::mock;
     use serde_json::json;
 
-    use crate::multi_user::EmailAddress;
-    use crate::multi_user::Password;
-    use crate::multi_user::admin::AdminActor;
-    use crate::multi_user::admin::AdminUser;
-    use crate::multi_user::admin::CreateUserOutcome;
-    use crate::multi_user::admin::IAdminService;
-    use crate::multi_user::admin::SetAdminOutcome;
-    use crate::multi_user::admin::SetUserEmailOutcome;
-    use crate::multi_user::admin::SetUserPasswordOutcome;
-    use crate::multi_user::test_utils::MockUserService;
+    use crate::multi_user::{
+        EmailAddress, Password,
+        admin::{
+            AdminActor, AdminUser, CreateUserOutcome, IAdminService, SetAdminOutcome,
+            SetUserEmailOutcome, SetUserPasswordOutcome,
+        },
+        test_utils::MockUserService,
+    };
 
     use super::*;
 

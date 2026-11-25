@@ -1,4 +1,4 @@
-use activities_domain::shared::UserId;
+use activities_core::domain::shared::UserId;
 use derive_more::Constructor;
 
 pub mod auth_info;

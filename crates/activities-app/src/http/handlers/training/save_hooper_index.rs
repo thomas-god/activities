@@ -9,15 +9,18 @@ use axum::{
 use chrono::NaiveDate;
 use serde::Deserialize;
 
-use crate::domain::activity::ports::IActivityService;
-use crate::domain::preferences::ports::IPreferencesService;
-use crate::domain::training::models::HooperIndexPatch;
-use crate::domain::training::ports::HooperIndexError;
-use crate::domain::training::ports::ITrainingService;
-use crate::domain::training::ports::SaveHooperIndexRequest;
-use crate::http::AppState;
-use crate::http::handlers::training::types::APIHooperIndexPatch;
-use crate::parser::ParseFile;
+use crate::{
+    domain::{
+        activity::ports::IActivityService,
+        preferences::ports::IPreferencesService,
+        training::{
+            models::HooperIndexPatch,
+            ports::{HooperIndexError, ITrainingService, SaveHooperIndexRequest},
+        },
+    },
+    http::{AppState, handlers::training::types::APIHooperIndexPatch},
+    parser::ParseFile,
+};
 use activities_auth::infra::http::AuthenticatedUser;
 
 /// Body of the `PATCH /api/training/hooper-index/{date}` request.

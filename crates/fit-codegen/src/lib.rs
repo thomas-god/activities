@@ -3,9 +3,11 @@
 
 use std::path::Path;
 
-use crate::messages::{generate_messages_code, parse_messages_definitions};
-use crate::types::{generate_enums_code, parse_enums};
-use crate::utils::format_code;
+use crate::{
+    messages::{generate_messages_code, parse_messages_definitions},
+    types::{generate_enums_code, parse_enums},
+    utils::format_code,
+};
 
 mod messages;
 mod types;

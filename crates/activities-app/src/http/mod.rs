@@ -1,48 +1,59 @@
-use std::convert::Infallible;
-use std::future::Future;
-use std::marker::PhantomData;
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::{Context as TaskContext, Poll};
+use std::{
+    convert::Infallible,
+    future::Future,
+    marker::PhantomData,
+    net::SocketAddr,
+    path::PathBuf,
+    pin::Pin,
+    sync::Arc,
+    task::{Context as TaskContext, Poll},
+};
 
 use anyhow::Context;
-use axum::extract::DefaultBodyLimit;
-use axum::extract::Request;
-use axum::http::header::{CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_TYPE, COOKIE, SET_COOKIE};
-use axum::http::{HeaderValue, Method, StatusCode};
-use axum::middleware::{self, Next};
-use axum::response::Response;
+use axum::{
+    extract::{DefaultBodyLimit, Request},
+    http::{
+        HeaderValue, Method, StatusCode,
+        header::{CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_TYPE, COOKIE, SET_COOKIE},
+    },
+    middleware::{self, Next},
+    response::Response,
+};
 
-use axum::routing::{delete, get, patch};
-use axum::{Json, Router, response::IntoResponse, routing::post};
+use axum::{
+    Json, Router,
+    response::IntoResponse,
+    routing::{delete, get, patch, post},
+};
 use serde_json::json;
 use tokio::net;
 use tower::Service;
-use tower_http::compression::CompressionLayer;
-use tower_http::compression::predicate::{NotForContentType, Predicate, SizeAbove};
-use tower_http::cors::CorsLayer;
-use tower_http::services::{ServeDir, ServeFile};
+use tower_http::{
+    compression::{
+        CompressionLayer,
+        predicate::{NotForContentType, Predicate, SizeAbove},
+    },
+    cors::CorsLayer,
+    services::{ServeDir, ServeFile},
+};
 
 use crate::config::{AppMode, BaseConfig};
-use activities_domain::activity::ports::IActivityService;
-use activities_domain::preferences::ports::IPreferencesService;
-use activities_domain::search::ports::ISearchService;
-use activities_domain::training::ports::ITrainingService;
-
-use activities_auth::auth::{
-    AuthStrategy, MultiUserAuthStrategy, SinglePassword, UserRegistration,
+use activities_core::domain::{
+    activity::ports::IActivityService, preferences::ports::IPreferencesService,
+    search::ports::ISearchService, training::ports::ITrainingService,
 };
-use activities_auth::infra::http::add_auth_router;
-use activities_auth::infra::http::multi_user::handlers::admin::admin_routes;
-use activities_auth::multi_user::{AuthMethods, IMultiUserService, admin::IAdminService};
-use activities_infra::config::SingleUserConfig;
+
+use activities_auth::{
+    auth::{AuthStrategy, MultiUserAuthStrategy, SinglePassword, UserRegistration},
+    infra::http::{add_auth_router, multi_user::handlers::admin::admin_routes},
+    multi_user::{AuthMethods, IMultiUserService, admin::IAdminService},
+};
+use activities_core::infra::config::SingleUserConfig;
 
 use crate::http::handlers::{
     get_default_activity_metrics, get_training_metric_templates, upload_bulk_weight_and_nutrition,
 };
-use activities_infra::parser::ParseFile;
+use activities_core::infra::parser::ParseFile;
 use handlers::{
     compute_training_metric_values, copy_training_metric, create_standalone_activity,
     create_training_metric, create_training_note, create_training_period, delete_activity,
@@ -475,19 +486,20 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use activities_domain::shared::UserId;
+    use activities_core::domain::shared::UserId;
     use axum_test::TestServer;
 
     use crate::parser::test_utils::MockFileParser;
-    use activities_auth::auth::AuthStrategy;
-    use activities_auth::auth::SinglePassword;
-    use activities_auth::multi_user::test_utils::MockUserService;
-    use activities_domain::activity::models::ActivityId;
-    use activities_domain::activity::services::test_utils::MockActivityService;
-    use activities_domain::preferences::services::tests_utils::MockPreferencesService;
-    use activities_domain::search::ports::SearchResult;
-    use activities_domain::search::ports::search_test_utils::MockSearchService;
-    use activities_domain::training::services::test_utils::MockTrainingService;
+    use activities_auth::{
+        auth::{AuthStrategy, SinglePassword},
+        multi_user::test_utils::MockUserService,
+    };
+    use activities_core::domain::{
+        activity::{models::ActivityId, services::test_utils::MockActivityService},
+        preferences::services::tests_utils::MockPreferencesService,
+        search::ports::{SearchResult, search_test_utils::MockSearchService},
+        training::services::test_utils::MockTrainingService,
+    };
 
     #[tokio::test]
     async fn health_returns_ok() {
@@ -614,7 +626,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_hooper_index_route_calls_service() {
-        use activities_domain::training::models::SubjectiveScale;
+        use activities_core::domain::training::models::SubjectiveScale;
 
         let mut training_service = MockTrainingService::new();
         training_service
@@ -718,7 +730,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_hooper_index_route_returns_values() {
-        use activities_domain::training::models::{HooperIndex, SubjectiveScale};
+        use activities_core::domain::training::models::{HooperIndex, SubjectiveScale};
 
         let mut training_service = MockTrainingService::new();
         training_service
@@ -865,7 +877,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_weight_and_nutrition_route_returns_values() {
-        use activities_domain::training::models::WeightAndNutrition;
+        use activities_core::domain::training::models::WeightAndNutrition;
 
         let mut training_service = MockTrainingService::new();
         training_service

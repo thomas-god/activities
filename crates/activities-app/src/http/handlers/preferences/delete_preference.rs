@@ -5,13 +5,19 @@ use axum::{
     http::StatusCode,
 };
 
-use crate::domain::activity::ports::IActivityService;
-use crate::domain::preferences::ports::DeletePreferenceError;
-use crate::domain::preferences::ports::IPreferencesService;
-use crate::domain::training::ports::ITrainingService;
-use crate::{domain::preferences::models::PreferenceKey, http::AppState};
+use crate::{
+    domain::{
+        activity::ports::IActivityService,
+        preferences::{
+            models::PreferenceKey,
+            ports::{DeletePreferenceError, IPreferencesService},
+        },
+        training::ports::ITrainingService,
+    },
+    http::AppState,
+};
 use activities_auth::infra::http::AuthenticatedUser;
-use activities_infra::parser::ParseFile;
+use activities_core::infra::parser::ParseFile;
 
 #[tracing::instrument(skip_all, err)]
 pub async fn delete_preference<

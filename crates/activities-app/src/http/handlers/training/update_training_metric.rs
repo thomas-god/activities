@@ -1,29 +1,39 @@
-use axum::extract::{Path, State};
-use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
-use axum::{Extension, Json};
+use axum::{
+    Extension, Json,
+    extract::{Path, State},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::http::AppState;
-use crate::http::handlers::training::types::{
-    APITimeseriesWindow, APITrainingMetricFilters, APITrainingMetricScope, APITrainingMetricSource,
-    APITrainingMetricSummary, APITrainingMetricTarget,
+use crate::http::{
+    AppState,
+    handlers::training::types::{
+        APITimeseriesWindow, APITrainingMetricFilters, APITrainingMetricScope,
+        APITrainingMetricSource, APITrainingMetricSummary, APITrainingMetricTarget,
+    },
 };
 use activities_auth::infra::http::AuthenticatedUser;
-use activities_domain::activity::models::ActivityMetric;
-use activities_domain::activity::ports::IActivityService;
-use activities_domain::preferences::ports::IPreferencesService;
-use activities_domain::shared::UserId;
-use activities_domain::training::models::{
-    TrainingMetricActivityFilters, TrainingMetricId, TrainingMetricName, TrainingMetricScope,
-    TrainingMetricSource, TrainingMetricTarget, TrainingMetricWindow, TrainingPeriodId,
+use activities_core::{
+    domain::{
+        activity::{models::ActivityMetric, ports::IActivityService},
+        preferences::ports::IPreferencesService,
+        shared::UserId,
+        training::{
+            models::{
+                TrainingMetricActivityFilters, TrainingMetricId, TrainingMetricName,
+                TrainingMetricScope, TrainingMetricSource, TrainingMetricTarget,
+                TrainingMetricWindow, TrainingPeriodId,
+            },
+            ports::{
+                ITrainingService, UpdateTrainingMetricError, UpdateTrainingMetricNameError,
+                UpdateTrainingMetricNameRequest, UpdateTrainingMetricRequest,
+            },
+        },
+    },
+    infra::parser::ParseFile,
 };
-use activities_domain::training::ports::ITrainingService;
-use activities_domain::training::ports::UpdateTrainingMetricNameError;
-use activities_domain::training::ports::UpdateTrainingMetricNameRequest;
-use activities_domain::training::ports::{UpdateTrainingMetricError, UpdateTrainingMetricRequest};
-use activities_infra::parser::ParseFile;
 
 #[derive(Deserialize)]
 pub struct UpdateTrainingMetricBody {

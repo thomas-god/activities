@@ -17,19 +17,23 @@ use activities_auth::{
         spawn_expired_sessions_cleanup,
     },
 };
-use activities_domain::activity::services::ActivityService;
-use activities_domain::preferences::services::PreferencesService;
-use activities_domain::search::services::SearchService;
-use activities_domain::training::services::TrainingService;
-use activities_infra::{
-    backup::BackupService,
-    clock::Clock,
-    config::{AppMode, BackupConfig, BaseConfig, EmailAuthConfig, MultiUserConfig, StdEnvironment},
-    fs::FilesystemRawDataRepository,
-    parser::Parser,
-    sqlite::{
-        activity::SqliteActivityRepository, preferences::SqlitePreferencesRepository,
-        search::SearchRepository, training::SqliteTrainingRepository,
+use activities_core::{
+    domain::{
+        activity::services::ActivityService, preferences::services::PreferencesService,
+        search::services::SearchService, training::services::TrainingService,
+    },
+    infra::{
+        backup::BackupService,
+        clock::Clock,
+        config::{
+            AppMode, BackupConfig, BaseConfig, EmailAuthConfig, MultiUserConfig, StdEnvironment,
+        },
+        fs::FilesystemRawDataRepository,
+        parser::Parser,
+        sqlite::{
+            activity::SqliteActivityRepository, preferences::SqlitePreferencesRepository,
+            search::SearchRepository, training::SqliteTrainingRepository,
+        },
     },
 };
 

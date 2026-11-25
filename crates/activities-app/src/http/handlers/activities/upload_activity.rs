@@ -11,14 +11,15 @@ use axum::{
 use flate2::read::GzDecoder;
 use serde::{Deserialize, Serialize};
 
-use crate::domain::activity::ports::CreateActivityError;
-use crate::domain::activity::ports::IActivityService;
-use crate::domain::preferences::ports::IPreferencesService;
-use crate::domain::training::ports::ITrainingService;
-use crate::http::AppState;
-use crate::parser::ParseBytesError;
-use crate::parser::ParseFile;
-use crate::parser::SupportedExtension;
+use crate::{
+    domain::{
+        activity::ports::{CreateActivityError, IActivityService},
+        preferences::ports::IPreferencesService,
+        training::ports::ITrainingService,
+    },
+    http::AppState,
+    parser::{ParseBytesError, ParseFile, SupportedExtension},
+};
 use activities_auth::infra::http::AuthenticatedUser;
 
 impl ApiErrorStatus for CreateActivityError {
@@ -160,17 +161,21 @@ mod tests {
     use axum_test::TestServer;
     use mockall::Sequence;
 
-    use crate::domain::activity::models::Activity;
-    use crate::domain::activity::models::ActivityDuration;
-    use crate::domain::activity::models::ActivityId;
-    use crate::domain::activity::models::ActivityStartTime;
-    use crate::domain::activity::models::ActivityStatistics;
-    use crate::domain::activity::models::Sport;
-    use crate::domain::activity::services::test_utils::MockActivityService;
-    use crate::domain::preferences::services::tests_utils::MockPreferencesService;
-    use crate::domain::shared::UserId;
-    use crate::domain::training::services::test_utils::MockTrainingService;
-    use crate::parser::test_utils::MockFileParser;
+    use crate::{
+        domain::{
+            activity::{
+                models::{
+                    Activity, ActivityDuration, ActivityId, ActivityStartTime, ActivityStatistics,
+                    Sport,
+                },
+                services::test_utils::MockActivityService,
+            },
+            preferences::services::tests_utils::MockPreferencesService,
+            shared::UserId,
+            training::services::test_utils::MockTrainingService,
+        },
+        parser::test_utils::MockFileParser,
+    };
     use activities_auth::infra::http::no_auth::DefaultUserExtractor;
 
     use super::*;
@@ -304,7 +309,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_upload_with_unprocessable_files() {
-        use activities_domain::activity::ports::CreateActivityError;
+        use activities_core::domain::activity::ports::CreateActivityError;
 
         let mut seq = Sequence::new();
         let mut service = MockActivityService::new();

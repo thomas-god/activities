@@ -1,13 +1,12 @@
 use axum::{Json, extract::State, http::StatusCode};
 use serde::Deserialize;
 
-use crate::infra::http::multi_user::handlers::AuthAppState;
-use crate::infra::http::multi_user::handlers::UserRegistration;
-use crate::multi_user::EmailAddress;
-use crate::multi_user::IMultiUserService;
-use crate::multi_user::Password;
-use crate::multi_user::UserRegistrationRequest;
-use crate::multi_user::UserRegistrationResult;
+use crate::{
+    infra::http::multi_user::handlers::{AuthAppState, UserRegistration},
+    multi_user::{
+        EmailAddress, IMultiUserService, Password, UserRegistrationRequest, UserRegistrationResult,
+    },
+};
 
 #[derive(Debug, Deserialize)]
 pub struct RegisterUserBody {
@@ -49,11 +48,10 @@ mod test {
     use axum_test::TestServer;
     use serde_json::json;
 
-    use crate::infra::http::multi_user::handlers::UserRegistration;
-    use crate::multi_user::EmailAddress;
-    use crate::multi_user::Password;
-    use crate::multi_user::UserRegistrationResult;
-    use crate::multi_user::test_utils::MockUserService;
+    use crate::{
+        infra::http::multi_user::handlers::UserRegistration,
+        multi_user::{EmailAddress, Password, UserRegistrationResult, test_utils::MockUserService},
+    };
 
     use super::*;
 

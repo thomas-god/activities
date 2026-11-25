@@ -7,7 +7,7 @@
 
 use chrono::{DateTime, Utc};
 
-use activities_domain::shared::UserId;
+use activities_core::domain::shared::UserId;
 
 use super::EmailAddress;
 

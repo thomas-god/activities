@@ -8,7 +8,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use activities_auth::infra::http::AuthenticatedUser;
-use activities_domain::search::ports::{ISearchService, SearchResult};
+use activities_core::domain::search::ports::{ISearchService, SearchResult};
 
 #[derive(Debug, Deserialize)]
 pub struct SearchQuery {
@@ -65,10 +65,10 @@ mod tests {
     use axum::extract::Query;
 
     use super::*;
-    use activities_domain::activity::models::ActivityId;
-    use activities_domain::search::ports::search_test_utils::MockSearchService;
-    use activities_domain::shared::UserId;
-    use activities_domain::training::models::TrainingNoteId;
+    use activities_core::domain::{
+        activity::models::ActivityId, search::ports::search_test_utils::MockSearchService,
+        shared::UserId, training::models::TrainingNoteId,
+    };
 
     #[tokio::test]
     async fn test_search_success() {

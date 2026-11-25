@@ -1,15 +1,18 @@
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use serde::Deserialize;
 
-use crate::domain::activity::ports::IActivityService;
-use crate::domain::preferences::ports::IPreferencesService;
-use crate::domain::training::models::TrainingMetricId;
-use crate::domain::training::models::TrainingMetricsOrdering;
-use crate::domain::training::ports::ITrainingService;
-use crate::domain::training::ports::SetTrainingMetricsOrderingError;
-use crate::http::AppState;
-use crate::http::handlers::training::types::APITrainingMetricScope;
-use crate::parser::ParseFile;
+use crate::{
+    domain::{
+        activity::ports::IActivityService,
+        preferences::ports::IPreferencesService,
+        training::{
+            models::{TrainingMetricId, TrainingMetricsOrdering},
+            ports::{ITrainingService, SetTrainingMetricsOrderingError},
+        },
+    },
+    http::{AppState, handlers::training::types::APITrainingMetricScope},
+    parser::ParseFile,
+};
 use activities_auth::infra::http::AuthenticatedUser;
 
 #[derive(Debug, Deserialize)]

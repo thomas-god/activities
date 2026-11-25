@@ -5,8 +5,7 @@ edition.workspace = true
 
 [dependencies]
 activities-auth.workspace = true
-activities-domain.workspace = true
-activities-infra.workspace = true
+activities-core.workspace = true
 anyhow.workspace = true
 axum.workspace = true
 chrono.workspace = true
@@ -32,8 +31,7 @@ zip.workspace = true
 
 [dev-dependencies]
 activities-auth = { workspace = true, features = ["test-utils"] }
-activities-domain = { workspace = true, features = ["test-utils"] }
-activities-infra = { workspace = true, features = ["test-utils"] }
+activities-core = { workspace = true, features = ["test-utils"] }
 axum-test.workspace = true
 mockall.workspace = true
 reqwest.workspace = true

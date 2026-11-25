@@ -5,16 +5,21 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::domain::activity::models::ActivityId;
-use crate::domain::activity::models::DEFAULT_METRICS;
-use crate::domain::activity::ports::GetActivityError;
-use crate::domain::activity::ports::IActivityService;
-use crate::domain::preferences::ports::IPreferencesService;
-use crate::domain::training::models::TrainingPeriodId;
-use crate::domain::training::ports::ActivityWithTrainingContextError;
-use crate::domain::training::ports::ITrainingService;
-use crate::http::AppState;
-use crate::parser::ParseFile;
+use crate::{
+    domain::{
+        activity::{
+            models::{ActivityId, DEFAULT_METRICS},
+            ports::{GetActivityError, IActivityService},
+        },
+        preferences::ports::IPreferencesService,
+        training::{
+            models::TrainingPeriodId,
+            ports::{ActivityWithTrainingContextError, ITrainingService},
+        },
+    },
+    http::AppState,
+    parser::ParseFile,
+};
 use activities_auth::infra::http::AuthenticatedUser;
 
 use super::activity_schema::PublicActivityWithTimeseries;
@@ -72,41 +77,34 @@ mod tests {
     use chrono::{DateTime, FixedOffset};
     use mockall::predicate::eq;
 
-    use crate::domain::activity::models::ActiveTime;
-    use crate::domain::activity::models::Activity;
-    use crate::domain::activity::models::ActivityDuration;
-    use crate::domain::activity::models::ActivityDurationCurves;
-    use crate::domain::activity::models::ActivityId;
-    use crate::domain::activity::models::ActivityMetric;
-    use crate::domain::activity::models::ActivityMetrics;
-    use crate::domain::activity::models::ActivityStartTime;
-    use crate::domain::activity::models::ActivityStatistic;
-    use crate::domain::activity::models::ActivityStatistics;
-    use crate::domain::activity::models::ActivityTimeseries;
-    use crate::domain::activity::models::ActivityWithParsedData;
-    use crate::domain::activity::models::Sport;
-    use crate::domain::activity::models::Timeseries;
-    use crate::domain::activity::models::TimeseriesActiveTime;
-    use crate::domain::activity::models::TimeseriesMetric;
-    use crate::domain::activity::models::TimeseriesTime;
-    use crate::domain::activity::models::TimeseriesValue;
-    use crate::domain::activity::ports::GetActivityError;
-    use crate::domain::activity::services::test_utils::MockActivityService;
-    use crate::domain::preferences::services::tests_utils::MockPreferencesService;
-    use crate::domain::shared::UserId;
-    use crate::domain::training::models::ActivityWithTrainingContext;
-    use crate::domain::training::models::HooperIndex;
-    use crate::domain::training::models::SubjectiveScale;
-    use crate::domain::training::models::TrainingContext;
-    use crate::domain::training::services::test_utils::MockTrainingService;
-    use crate::http::handlers::activities::activity_schema::PublicActivity;
-    use crate::http::handlers::activities::activity_schema::PublicActivityTimeseries;
-    use crate::http::handlers::activities::activity_schema::PublicHooperIndex;
-    use crate::http::handlers::activities::activity_schema::PublicMetricValue;
-    use crate::http::handlers::activities::activity_schema::PublicTimeseries;
-    use crate::http::handlers::activities::activity_schema::PublicTimeseriesValue;
-    use crate::http::handlers::activities::activity_schema::PublicTrainingContext;
-    use crate::parser::test_utils::MockFileParser;
+    use crate::{
+        domain::{
+            activity::{
+                models::{
+                    ActiveTime, Activity, ActivityDuration, ActivityDurationCurves, ActivityId,
+                    ActivityMetric, ActivityMetrics, ActivityStartTime, ActivityStatistic,
+                    ActivityStatistics, ActivityTimeseries, ActivityWithParsedData, Sport,
+                    Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
+                    TimeseriesValue,
+                },
+                ports::GetActivityError,
+                services::test_utils::MockActivityService,
+            },
+            preferences::services::tests_utils::MockPreferencesService,
+            shared::UserId,
+            training::{
+                models::{
+                    ActivityWithTrainingContext, HooperIndex, SubjectiveScale, TrainingContext,
+                },
+                services::test_utils::MockTrainingService,
+            },
+        },
+        http::handlers::activities::activity_schema::{
+            PublicActivity, PublicActivityTimeseries, PublicHooperIndex, PublicMetricValue,
+            PublicTimeseries, PublicTimeseriesValue, PublicTrainingContext,
+        },
+        parser::test_utils::MockFileParser,
+    };
 
     use super::{PublicActivityWithTimeseries, *};
 

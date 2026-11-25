@@ -5,14 +5,16 @@ use axum::{
     http::StatusCode,
 };
 
-use crate::domain::training::models::TrainingNoteId;
-use crate::http::AppState;
+use crate::{domain::training::models::TrainingNoteId, http::AppState};
 use activities_auth::infra::http::AuthenticatedUser;
-use activities_domain::activity::ports::IActivityService;
-use activities_domain::preferences::ports::IPreferencesService;
-use activities_domain::training::ports::GetTrainingNoteError;
-use activities_domain::training::ports::ITrainingService;
-use activities_infra::parser::ParseFile;
+use activities_core::{
+    domain::{
+        activity::ports::IActivityService,
+        preferences::ports::IPreferencesService,
+        training::ports::{GetTrainingNoteError, ITrainingService},
+    },
+    infra::parser::ParseFile,
+};
 
 use super::get_training_notes::TrainingNoteResponse;
 

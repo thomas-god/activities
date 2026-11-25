@@ -1,23 +1,29 @@
-use axum::Extension;
-use axum::extract::{Path, State};
-use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
+use axum::{
+    Extension,
+    extract::{Path, State},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use activities_domain::training::models::TrainingPeriodId;
+use activities_core::domain::training::models::TrainingPeriodId;
 
 use crate::http::AppState;
 use activities_auth::infra::http::AuthenticatedUser;
-use activities_domain::activity::ports::IActivityService;
-use activities_domain::preferences::ports::IPreferencesService;
-use activities_domain::training::ports::{
-    ITrainingService, UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
-    UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest, UpdateTrainingPeriodNoteError,
-    UpdateTrainingPeriodNoteRequest,
+use activities_core::{
+    domain::{
+        activity::ports::IActivityService,
+        preferences::ports::IPreferencesService,
+        training::ports::{
+            ITrainingService, UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
+            UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
+            UpdateTrainingPeriodNoteError, UpdateTrainingPeriodNoteRequest,
+        },
+    },
+    infra::parser::ParseFile,
 };
-use activities_infra::parser::ParseFile;
 
 #[derive(Serialize)]
 struct ErrorResponse {

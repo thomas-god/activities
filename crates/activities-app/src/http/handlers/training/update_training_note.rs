@@ -6,17 +6,18 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::domain::training::models::TrainingNoteContent;
-use crate::domain::training::models::TrainingNoteDate;
-use crate::domain::training::models::TrainingNoteId;
-use crate::domain::training::models::TrainingNoteTitle;
-use crate::domain::training::ports::ITrainingService;
-use crate::domain::training::ports::UpdateTrainingNoteError;
-use crate::http::AppState;
+use crate::{
+    domain::training::{
+        models::{TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle},
+        ports::{ITrainingService, UpdateTrainingNoteError},
+    },
+    http::AppState,
+};
 use activities_auth::infra::http::AuthenticatedUser;
-use activities_domain::activity::ports::IActivityService;
-use activities_domain::preferences::ports::IPreferencesService;
-use activities_infra::parser::ParseFile;
+use activities_core::{
+    domain::{activity::ports::IActivityService, preferences::ports::IPreferencesService},
+    infra::parser::ParseFile,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateTrainingNoteBody {

@@ -1,9 +1,6 @@
 use derive_more::Constructor;
 
-use crate::multi_user::AuthLink;
-use crate::multi_user::EmailAddress;
-use crate::multi_user::EmailChangeToken;
-use crate::multi_user::MailProvider;
+use crate::multi_user::{AuthLink, EmailAddress, EmailChangeToken, MailProvider};
 
 pub mod smtp;
 

@@ -1,12 +1,14 @@
 use axum::{Json, Router, extract::State, response::IntoResponse, routing::get};
 use serde::Serialize;
 
-use crate::auth::AuthStrategy;
-use crate::infra::http::multi_user::handlers::multi_user_login_routes;
-use crate::infra::http::no_auth::no_auth_login_routes;
-use crate::infra::http::single_password::single_password_login_routes;
-use crate::multi_user::AuthMethods;
-use crate::multi_user::IMultiUserService;
+use crate::{
+    auth::AuthStrategy,
+    infra::http::{
+        multi_user::handlers::multi_user_login_routes, no_auth::no_auth_login_routes,
+        single_password::single_password_login_routes,
+    },
+    multi_user::{AuthMethods, IMultiUserService},
+};
 
 /// Public information about the configured authentication strategy, exposed at `/api/auth_info`.
 #[derive(Debug, Clone, Serialize)]
@@ -81,14 +83,14 @@ pub async fn auth_info(State(state): State<AuthInfoResponse>) -> impl IntoRespon
 
 #[cfg(test)]
 mod tests {
-    use axum::Router;
-    use axum::http::StatusCode;
-    use axum::routing::get;
+    use axum::{Router, http::StatusCode, routing::get};
     use axum_test::TestServer;
     use serde_json::json;
 
-    use crate::auth::{MultiUserAuthStrategy, UserRegistration};
-    use crate::multi_user::{AuthMethods, test_utils::MockUserService};
+    use crate::{
+        auth::{MultiUserAuthStrategy, UserRegistration},
+        multi_user::{AuthMethods, test_utils::MockUserService},
+    };
 
     use super::*;
 

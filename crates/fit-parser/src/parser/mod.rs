@@ -9,9 +9,10 @@ use crate::parser::{
     records::{CompressedTimestamp, RecordError},
 };
 
-pub use crate::parser::definition::{Definition, Endianness};
-pub use crate::parser::records::Record;
-pub use crate::parser::records::{DataMessage, DataMessageField};
+pub use crate::parser::{
+    definition::{Definition, Endianness},
+    records::{DataMessage, DataMessageField, Record},
+};
 
 mod definition;
 mod header;

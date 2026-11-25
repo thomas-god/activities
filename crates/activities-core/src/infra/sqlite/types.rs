@@ -1,0 +1,1226 @@
+use std::collections::HashMap;
+
+use chrono::{DateTime, NaiveDate};
+use sqlx::{Database, encode::IsNull, error::BoxDynError};
+
+use crate::domain::{
+    activity::{
+        models::{
+            ActivityDuration, ActivityFeedback, ActivityId, ActivityMetric, ActivityMetricSource,
+            ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime,
+            ActivityStatistic, ActivityStatistics, DurationCurveType, Sport, TimeseriesAggregate,
+            TimeseriesMetric, WorkoutType,
+        },
+        ports::DurationCurveEvent,
+    },
+    preferences::models::{ActivityListSummary, Preference, PreferenceKey},
+    search::models::SearchDocumentEvent,
+    shared::UserId,
+    training::models::{
+        DurationCurveSource, HooperIndexSource, SubjectiveScale, TrainingMetricActivityFilters,
+        TrainingMetricActivityGroupBy, TrainingMetricAggregate, TrainingMetricGranularity,
+        TrainingMetricId, TrainingMetricName, TrainingMetricSource, TrainingMetricSummary,
+        TrainingMetricTarget, TrainingMetricValue, TrainingNoteContent, TrainingNoteDate,
+        TrainingNoteId, TrainingNoteTitle, TrainingPeriodId, TrainingPeriodSports,
+        WeightAndNutritionSource,
+    },
+};
+
+impl sqlx::Type<sqlx::Sqlite> for ActivityId {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityId {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityId {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::from(s))
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for UserId {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for UserId {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for UserId {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::from(s))
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for ActivityName {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityName {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityName {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::from(s))
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for ActivityFeedback {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityFeedback {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityFeedback {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::from(s))
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for ActivityNaturalKey {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityNaturalKey {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityNaturalKey {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::from(s))
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for ActivityStartTime {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityStartTime {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityStartTime {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        let date = DateTime::parse_from_rfc3339(s)?;
+        Ok(Self::from(date))
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for Sport {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for Sport {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(
+            self.to_string().into(),
+        ));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for Sport {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        s.parse::<Sport>()
+            .map_err(|_| format!("Unknown Sport: {}", s).into())
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for ActivityStatistics {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <Vec<u8> as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityStatistics {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let json_bytes = serde_json::to_vec(&self).unwrap();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Blob(json_bytes.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityStatistics {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let bytes = <&[u8] as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        let map: HashMap<ActivityStatistic, f64> = serde_json::from_slice(bytes)?;
+        Ok(ActivityStatistics::new(map))
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingMetricId {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricId {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricId {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::from(s))
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingMetricName {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricName {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricName {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::from(s))
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for ActivityMetricSource {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <Vec<u8> as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityMetricSource {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let json_bytes = serde_json::to_vec(&self).unwrap();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Blob(json_bytes.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityMetricSource {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let bytes = <&[u8] as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(serde_json::from_slice(bytes)?)
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingMetricGranularity {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricGranularity {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Daily => "daily",
+            Self::Weekly => "weekly",
+            Self::Monthly => "monthly",
+        };
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricGranularity {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match s {
+            "daily" => Ok(Self::Daily),
+            "weekly" => Ok(Self::Weekly),
+            "monthly" => Ok(Self::Monthly),
+            _ => Err(format!("Unknown Granularity: {}", s).into()),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingMetricAggregate {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricAggregate {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Average => "average",
+            Self::Max => "max",
+            Self::Min => "min",
+            Self::Sum => "sum",
+            Self::NumberOfActivities => "number_of_activities",
+        };
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricAggregate {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match s {
+            "average" => Ok(Self::Average),
+            "max" => Ok(Self::Max),
+            "min" => Ok(Self::Min),
+            "sum" => Ok(Self::Sum),
+            "number_of_activities" => Ok(Self::NumberOfActivities),
+            _ => Err(format!("Unknown Aggregate: {}", s).into()),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingMetricValue {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <Vec<u8> as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricValue {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let json_bytes = serde_json::to_vec(&self).unwrap();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Blob(json_bytes.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricValue {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let bytes = <&[u8] as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(serde_json::from_slice(bytes)?)
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingMetricActivityFilters {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <Vec<u8> as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricActivityFilters {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let json_bytes = serde_json::to_vec(&self).unwrap();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Blob(json_bytes.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricActivityFilters {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let bytes = <&[u8] as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(serde_json::from_slice(bytes)?)
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingPeriodId {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingPeriodId {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingPeriodId {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::from(s))
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingPeriodSports {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <Vec<u8> as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingPeriodSports {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let json_bytes = serde_json::to_vec(&self).unwrap();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Blob(json_bytes.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingPeriodSports {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let bytes = <&[u8] as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(serde_json::from_slice(bytes)?)
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for ActivityRpe {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <u64 as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityRpe {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let value = self.value();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Int(value.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityRpe {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <u64 as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::try_from(u8::try_from(s)?)?)
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for WorkoutType {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for WorkoutType {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for WorkoutType {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(s.parse()?)
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for ActivityNutrition {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <Vec<u8> as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityNutrition {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let json_bytes = serde_json::to_vec(&self).unwrap();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Blob(json_bytes.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityNutrition {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let bytes = <&[u8] as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(serde_json::from_slice(bytes)?)
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingMetricActivityGroupBy {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricActivityGroupBy {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Sport => "sport",
+            Self::SportCategory => "sport_category",
+            Self::WorkoutType => "workout_type",
+            Self::RpeRange => "rpe_range",
+            Self::Bonked => "bonked",
+        };
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricActivityGroupBy {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+
+        match s {
+            "sport" => Ok(Self::Sport),
+            "sport_category" => Ok(Self::SportCategory),
+            "workout_type" => Ok(Self::WorkoutType),
+            "rpe_range" => Ok(Self::RpeRange),
+            "bonked" => Ok(Self::Bonked),
+            _ => Err(format!("Unknown GroupBy: {}", s).into()),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingNoteId {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingNoteId {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingNoteId {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::from(s))
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingNoteTitle {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingNoteTitle {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingNoteTitle {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::from(s))
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingNoteContent {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingNoteContent {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingNoteContent {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::from(s))
+    }
+}
+
+// SQLx trait implementations for database operations
+impl sqlx::Type<sqlx::Sqlite> for TrainingNoteDate {
+    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
+        <&str as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingNoteDate {
+    fn decode(value: sqlx::sqlite::SqliteValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let date_str = <&str as sqlx::Decode<'r, sqlx::Sqlite>>::decode(value)?;
+        let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")?;
+        Ok(TrainingNoteDate::from(date))
+    }
+}
+
+impl sqlx::Encode<'_, sqlx::Sqlite> for TrainingNoteDate {
+    fn encode_by_ref(
+        &self,
+        buf: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'_>>,
+    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
+        let date_str = self.as_naive_date().format("%Y-%m-%d").to_string();
+        <String as sqlx::Encode<'_, sqlx::Sqlite>>::encode(date_str, buf)
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for PreferenceKey {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for PreferenceKey {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for PreferenceKey {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        s.parse().map_err(|e: String| e.into())
+    }
+}
+
+/// Serialize a preference value to string for storage
+pub fn serialize_preference_value(preference: &Preference) -> Result<String, BoxDynError> {
+    match preference {
+        Preference::ActivityListSummary(summary) => {
+            serde_json::to_string(summary).map_err(|err| err.to_string().into())
+        }
+    }
+}
+
+/// Deserialize a preference value from storage
+pub fn deserialize_preference(key: &PreferenceKey, value: &str) -> Result<Preference, BoxDynError> {
+    match key {
+        PreferenceKey::ActivityListSummary => {
+            let summary = serde_json::from_str::<ActivityListSummary>(value)?;
+            Ok(Preference::ActivityListSummary(summary))
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TimeseriesMetric {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TimeseriesMetric {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Speed => "speed",
+            Self::Power => "power",
+            Self::HeartRate => "hr",
+            Self::Distance => "distance",
+            Self::Cadence => "cadence",
+            Self::Altitude => "altitude",
+            Self::Pace => "pace-v3",
+            Self::Latitude => "altitude",
+            Self::Longitude => "longitude",
+        };
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TimeseriesMetric {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match s {
+            "speed" => Ok(Self::Speed),
+            "power" => Ok(Self::Power),
+            "hr" => Ok(Self::HeartRate),
+            "distance" => Ok(Self::Distance),
+            "cadence" => Ok(Self::Cadence),
+            "altitude" => Ok(Self::Altitude),
+            "pace" => Ok(Self::Pace),
+            _ => Err(format!("Unknown TimeseriesMetric: {}", s).into()),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TimeseriesAggregate {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TimeseriesAggregate {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Average => "average",
+            Self::Max => "max",
+            Self::Min => "min",
+        };
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TimeseriesAggregate {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match s {
+            "average" => Ok(Self::Average),
+            "max" => Ok(Self::Max),
+            "min" => Ok(Self::Min),
+            _ => Err(format!("Unknown TimeseriesAggregate: {}", s).into()),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for ActivityMetric {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityMetric {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Duration => "duration",
+            Self::Calories => "calories",
+            Self::Elevation => "elevation",
+            Self::Distance => "distance",
+            Self::NormalizedPower => "normalized-power",
+
+            Self::ActiveDuration => "active-duration",
+
+            Self::MaxSpeed => "max-speed",
+            Self::MinSpeed => "min-speed",
+            Self::AvgSpeed => "avg-speed",
+
+            Self::MaxPower => "max-power",
+            Self::MinPower => "min-power",
+            Self::AvgPower => "avg-power",
+
+            Self::MaxHeartRate => "max-hr",
+            Self::MinHeartRate => "min-hr",
+            Self::AvgHeartRate => "avg-hr",
+
+            Self::MaxCadence => "max-cadence",
+            Self::MinCadence => "min-cadence",
+            Self::AvgCadence => "avg-cadence",
+
+            Self::MaxAltitude => "max-altitude",
+            Self::MinAltitude => "min-altitude",
+            Self::AvgAltitude => "avg-altitude",
+
+            Self::MaxPace => "max-pace",
+            Self::MinPace => "min-pace",
+            Self::AvgPace => "avg-pace",
+
+            Self::NumberOfActivity => "number-of-activities",
+        };
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityMetric {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match s {
+            "duration" => Ok(Self::Duration),
+            "calories" => Ok(Self::Calories),
+            "elevation" => Ok(Self::Elevation),
+            "distance" => Ok(Self::Distance),
+            "normalized-power" => Ok(Self::NormalizedPower),
+
+            "active-duration" => Ok(Self::ActiveDuration),
+
+            "max-speed" => Ok(Self::MaxSpeed),
+            "min-speed" => Ok(Self::MinSpeed),
+            "avg-speed" => Ok(Self::AvgSpeed),
+
+            "max-power" => Ok(Self::MaxPower),
+            "min-power" => Ok(Self::MinPower),
+            "avg-power" => Ok(Self::AvgPower),
+
+            "max-hr" => Ok(Self::MaxHeartRate),
+            "min-hr" => Ok(Self::MinHeartRate),
+            "avg-hr" => Ok(Self::AvgHeartRate),
+
+            "max-cadence" => Ok(Self::MaxCadence),
+            "min-cadence" => Ok(Self::MinCadence),
+            "avg-cadence" => Ok(Self::AvgCadence),
+
+            "max-altitude" => Ok(Self::MaxAltitude),
+            "min-altitude" => Ok(Self::MinAltitude),
+            "avg-altitude" => Ok(Self::AvgAltitude),
+
+            "max-pace" => Ok(Self::MaxPace),
+            "min-pace" => Ok(Self::MinPace),
+            "avg-pace" => Ok(Self::AvgPace),
+
+            "number-of-activities" => Ok(Self::NumberOfActivity),
+
+            _ => Err(format!("Unknown ActivityMetricV2: {}", s).into()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RepositoryTrainingMetricSource {
+    Activity(ActivityMetric),
+    HooperIndex(HooperIndexSource),
+    WeightAndNutrition(WeightAndNutritionSource),
+    DurationCurve(DurationCurveSource),
+}
+
+impl From<&TrainingMetricSource> for RepositoryTrainingMetricSource {
+    fn from(value: &TrainingMetricSource) -> Self {
+        match value {
+            TrainingMetricSource::Activity(source) => Self::Activity(source.metric()),
+            TrainingMetricSource::HooperIndex(source) => Self::HooperIndex(*source),
+            TrainingMetricSource::WeightAndNutrition(source) => Self::WeightAndNutrition(*source),
+            TrainingMetricSource::DurationCurve(source) => Self::DurationCurve(*source),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for RepositoryTrainingMetricSource {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for RepositoryTrainingMetricSource {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Activity(source) => match source {
+                ActivityMetric::Duration => "duration",
+                ActivityMetric::Calories => "calories",
+                ActivityMetric::Elevation => "elevation",
+                ActivityMetric::Distance => "distance",
+                ActivityMetric::NormalizedPower => "normalized-power",
+
+                ActivityMetric::ActiveDuration => "active-duration",
+
+                ActivityMetric::MaxSpeed => "max-speed",
+                ActivityMetric::MinSpeed => "min-speed",
+                ActivityMetric::AvgSpeed => "avg-speed",
+
+                ActivityMetric::MaxPower => "max-power",
+                ActivityMetric::MinPower => "min-power",
+                ActivityMetric::AvgPower => "avg-power",
+
+                ActivityMetric::MaxHeartRate => "max-hr",
+                ActivityMetric::MinHeartRate => "min-hr",
+                ActivityMetric::AvgHeartRate => "avg-hr",
+
+                ActivityMetric::MaxCadence => "max-cadence",
+                ActivityMetric::MinCadence => "min-cadence",
+                ActivityMetric::AvgCadence => "avg-cadence",
+
+                ActivityMetric::MaxAltitude => "max-altitude",
+                ActivityMetric::MinAltitude => "min-altitude",
+                ActivityMetric::AvgAltitude => "avg-altitude",
+
+                ActivityMetric::MaxPace => "max-pace",
+                ActivityMetric::MinPace => "min-pace",
+                ActivityMetric::AvgPace => "avg-pace",
+
+                ActivityMetric::NumberOfActivity => "number-of-activities",
+            },
+            Self::HooperIndex(source) => match source {
+                HooperIndexSource::All => "subjective-all",
+                HooperIndexSource::Fatigue => "subjective-fatigue",
+                HooperIndexSource::Mood => "subjective-mood",
+                HooperIndexSource::Pain => "subjective-pain",
+                HooperIndexSource::Sleep => "subjective-sleep",
+                HooperIndexSource::Stress => "subjective-stress",
+            },
+            Self::WeightAndNutrition(source) => match source {
+                WeightAndNutritionSource::TotalWeight => "wn-weight",
+                WeightAndNutritionSource::BodyComposition => "wn-body-composition",
+                WeightAndNutritionSource::Calories => "wn-calories",
+                WeightAndNutritionSource::Macros => "wn-macros",
+                WeightAndNutritionSource::Water => "wn-water",
+                WeightAndNutritionSource::Alcohol => "wn-alcohol",
+            },
+            RepositoryTrainingMetricSource::DurationCurve(source) => match source {
+                DurationCurveSource::Cycling => "dc-cycling",
+                DurationCurveSource::Running => "dc-running",
+            },
+        };
+
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for RepositoryTrainingMetricSource {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match s {
+            "duration" => Ok(Self::Activity(ActivityMetric::Duration)),
+            "calories" => Ok(Self::Activity(ActivityMetric::Calories)),
+            "elevation" => Ok(Self::Activity(ActivityMetric::Elevation)),
+            "distance" => Ok(Self::Activity(ActivityMetric::Distance)),
+            "normalized-power" => Ok(Self::Activity(ActivityMetric::NormalizedPower)),
+
+            "active-duration" => Ok(Self::Activity(ActivityMetric::ActiveDuration)),
+
+            "max-speed" => Ok(Self::Activity(ActivityMetric::MaxSpeed)),
+            "min-speed" => Ok(Self::Activity(ActivityMetric::MinSpeed)),
+            "avg-speed" => Ok(Self::Activity(ActivityMetric::AvgSpeed)),
+
+            "max-power" => Ok(Self::Activity(ActivityMetric::MaxPower)),
+            "min-power" => Ok(Self::Activity(ActivityMetric::MinPower)),
+            "avg-power" => Ok(Self::Activity(ActivityMetric::AvgPower)),
+
+            "max-hr" => Ok(Self::Activity(ActivityMetric::MaxHeartRate)),
+            "min-hr" => Ok(Self::Activity(ActivityMetric::MinHeartRate)),
+            "avg-hr" => Ok(Self::Activity(ActivityMetric::AvgHeartRate)),
+
+            "max-cadence" => Ok(Self::Activity(ActivityMetric::MaxCadence)),
+            "min-cadence" => Ok(Self::Activity(ActivityMetric::MinCadence)),
+            "avg-cadence" => Ok(Self::Activity(ActivityMetric::AvgCadence)),
+
+            "max-altitude" => Ok(Self::Activity(ActivityMetric::MaxAltitude)),
+            "min-altitude" => Ok(Self::Activity(ActivityMetric::MinAltitude)),
+            "avg-altitude" => Ok(Self::Activity(ActivityMetric::AvgAltitude)),
+
+            "max-pace" => Ok(Self::Activity(ActivityMetric::MaxPace)),
+            "min-pace" => Ok(Self::Activity(ActivityMetric::MinPace)),
+            "avg-pace" => Ok(Self::Activity(ActivityMetric::AvgPace)),
+
+            "number-of-activities" => Ok(Self::Activity(ActivityMetric::NumberOfActivity)),
+
+            "subjective-all" => Ok(Self::HooperIndex(HooperIndexSource::All)),
+            "subjective-fatigue" => Ok(Self::HooperIndex(HooperIndexSource::Fatigue)),
+            "subjective-pain" => Ok(Self::HooperIndex(HooperIndexSource::Pain)),
+            "subjective-mood" => Ok(Self::HooperIndex(HooperIndexSource::Mood)),
+            "subjective-sleep" => Ok(Self::HooperIndex(HooperIndexSource::Sleep)),
+            "subjective-stress" => Ok(Self::HooperIndex(HooperIndexSource::Stress)),
+
+            "wn-weight" => Ok(Self::WeightAndNutrition(
+                WeightAndNutritionSource::TotalWeight,
+            )),
+            "wn-body-composition" => Ok(Self::WeightAndNutrition(
+                WeightAndNutritionSource::BodyComposition,
+            )),
+            "wn-calories" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::Calories)),
+            "wn-macros" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::Macros)),
+            "wn-water" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::Water)),
+            "wn-alcohol" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::Alcohol)),
+
+            "dc-running" => Ok(Self::DurationCurve(DurationCurveSource::Running)),
+            "dc-cycling" => Ok(Self::DurationCurve(DurationCurveSource::Cycling)),
+
+            _ => Err(format!("Unknown ActivityMetricV2: {}", s).into()),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for ActivityDuration {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <f64 as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityDuration {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        args.push(sqlx::sqlite::SqliteArgumentValue::Double(*self.as_f64()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityDuration {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <f64 as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::from(s))
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingMetricSummary {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <Vec<u8> as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricSummary {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let json_bytes = serde_json::to_vec(&self).unwrap();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Blob(json_bytes.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricSummary {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let bytes = <&[u8] as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(serde_json::from_slice(bytes)?)
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingMetricTarget {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <Vec<u8> as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricTarget {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let json_bytes = serde_json::to_vec(&self).unwrap();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Blob(json_bytes.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricTarget {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let bytes = <&[u8] as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(serde_json::from_slice(bytes)?)
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for SearchDocumentEvent {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for SearchDocumentEvent {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Updated => "updated",
+            Self::Deleted => "deleted",
+        };
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for SearchDocumentEvent {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match s {
+            "updated" => Ok(Self::Updated),
+            "deleted" => Ok(Self::Deleted),
+            _ => Err(format!("Unknown SearchDocumentEvent: {}", s).into()),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for SubjectiveScale {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <u64 as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for SubjectiveScale {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let value = self.value();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Int(value.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for SubjectiveScale {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <u64 as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::try_from(u8::try_from(s)?)?)
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for DurationCurveType {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for DurationCurveType {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Pace => "pace",
+            Self::Power => "power",
+        };
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for DurationCurveType {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match s {
+            "pace" => Ok(Self::Pace),
+            "power" => Ok(Self::Power),
+            _ => Err(format!("Unknown DurationCurveType: {}", s).into()),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for DurationCurveEvent {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for DurationCurveEvent {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Created => "created",
+            Self::Deleted => "deleted",
+        };
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for DurationCurveEvent {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match s {
+            "created" => Ok(Self::Created),
+            "deleted" => Ok(Self::Deleted),
+            _ => Err(format!("Unknown DurationCurveEvent: {}", s).into()),
+        }
+    }
+}

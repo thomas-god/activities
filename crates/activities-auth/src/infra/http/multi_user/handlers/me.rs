@@ -1,11 +1,10 @@
 use axum::{Extension, Json, extract::State, http::StatusCode, response::IntoResponse};
 use serde::Serialize;
 
-use crate::infra::http::AuthenticatedUser;
-use crate::infra::http::multi_user::handlers::AuthAppState;
-use crate::multi_user::IMultiUserService;
-use crate::multi_user::UserInfo;
-use crate::multi_user::UserInfoResult;
+use crate::{
+    infra::http::{AuthenticatedUser, multi_user::handlers::AuthAppState},
+    multi_user::{IMultiUserService, UserInfo, UserInfoResult},
+};
 
 /// Metadata about the authenticated user's account, used by the settings page to know which
 /// account actions apply (email verification state, whether a password is registered). Auth mode
@@ -50,11 +49,11 @@ mod test {
     use axum_test::TestServer;
     use serde_json::json;
 
-    use crate::domain::shared::UserId;
-    use crate::infra::http::CookieConfig;
-    use crate::multi_user::UserInfo;
-    use crate::multi_user::UserInfoResult;
-    use crate::multi_user::test_utils::MockUserService;
+    use crate::{
+        domain::shared::UserId,
+        infra::http::CookieConfig,
+        multi_user::{UserInfo, UserInfoResult, test_utils::MockUserService},
+    };
 
     use super::*;
 

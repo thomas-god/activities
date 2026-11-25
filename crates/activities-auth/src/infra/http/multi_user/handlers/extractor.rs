@@ -1,23 +1,17 @@
 use axum::{
     extract::{FromRef, FromRequestParts, Request, State},
-    http::{StatusCode, request::Parts},
+    http::{StatusCode, header::SET_COOKIE, request::Parts},
     middleware::Next,
-};
-use axum::{
-    http::header::SET_COOKIE,
     response::{IntoResponse, Response},
 };
 use axum_extra::extract::CookieJar;
 use cookie::{Cookie, time::OffsetDateTime};
 use std::{marker::PhantomData, sync::Arc};
 
-use crate::infra::http::AuthenticatedSession;
-use crate::infra::http::AuthenticatedUser;
-use crate::infra::http::CookieConfig;
-use crate::infra::http::SessionRevoked;
-use crate::multi_user::GenerateSessionTokenResult;
-use crate::multi_user::IMultiUserService;
-use crate::multi_user::SessionToken;
+use crate::{
+    infra::http::{AuthenticatedSession, AuthenticatedUser, CookieConfig, SessionRevoked},
+    multi_user::{GenerateSessionTokenResult, IMultiUserService, SessionToken},
+};
 
 /// Extractor that tries to extract user information from the request's session cookie.
 #[allow(unused)]
@@ -137,16 +131,20 @@ mod test {
     use axum_test::TestServer;
     use chrono::{TimeDelta, Utc};
 
-    use crate::domain::shared::UserId;
-    use crate::infra::http::CookieConfig;
-    use crate::infra::http::multi_user::handlers::AuthAppState;
-    use crate::infra::http::multi_user::handlers::UserRegistration;
-    use crate::infra::http::multi_user::handlers::extractor::CookieUserExtractor;
-    use crate::infra::http::multi_user::handlers::extractor::cookie_auth_middleware;
-    use crate::multi_user::CheckSessionResult;
-    use crate::multi_user::GenerateSessionTokenResult;
-    use crate::multi_user::SessionToken;
-    use crate::multi_user::test_utils::MockUserService;
+    use crate::{
+        domain::shared::UserId,
+        infra::http::{
+            CookieConfig,
+            multi_user::handlers::{
+                AuthAppState, UserRegistration,
+                extractor::{CookieUserExtractor, cookie_auth_middleware},
+            },
+        },
+        multi_user::{
+            CheckSessionResult, GenerateSessionTokenResult, SessionToken,
+            test_utils::MockUserService,
+        },
+    };
 
     use super::*;
 

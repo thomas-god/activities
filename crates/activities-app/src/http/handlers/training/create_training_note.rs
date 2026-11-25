@@ -2,17 +2,25 @@ use crate::http::error_status::ApiErrorStatus;
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
 
-use crate::domain::shared::UserId;
-use crate::domain::training::models::TrainingNoteContent;
-use crate::domain::training::ports::CreateTrainingNoteError;
-use crate::domain::training::ports::CreateTrainingNoteRequest;
-use crate::domain::training::ports::ITrainingService;
-use crate::http::AppState;
+use crate::{
+    domain::{
+        shared::UserId,
+        training::{
+            models::TrainingNoteContent,
+            ports::{CreateTrainingNoteError, CreateTrainingNoteRequest, ITrainingService},
+        },
+    },
+    http::AppState,
+};
 use activities_auth::infra::http::AuthenticatedUser;
-use activities_domain::activity::ports::IActivityService;
-use activities_domain::preferences::ports::IPreferencesService;
-use activities_domain::training::models::{TrainingNoteDate, TrainingNoteTitle};
-use activities_infra::parser::ParseFile;
+use activities_core::{
+    domain::{
+        activity::ports::IActivityService,
+        preferences::ports::IPreferencesService,
+        training::models::{TrainingNoteDate, TrainingNoteTitle},
+    },
+    infra::parser::ParseFile,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct CreateTrainingNoteBody {

@@ -6,14 +6,19 @@ use axum::{
 use chrono::NaiveDate;
 use serde::Deserialize;
 
-use crate::domain::activity::models::DEFAULT_METRICS;
-use crate::domain::activity::ports::IActivityService;
-use crate::domain::activity::ports::ListActivitiesFilters;
-use crate::domain::preferences::ports::IPreferencesService;
-use crate::domain::shared::DateRange;
-use crate::domain::training::ports::ITrainingService;
-use crate::http::AppState;
-use crate::parser::ParseFile;
+use crate::{
+    domain::{
+        activity::{
+            models::DEFAULT_METRICS,
+            ports::{IActivityService, ListActivitiesFilters},
+        },
+        preferences::ports::IPreferencesService,
+        shared::DateRange,
+        training::ports::ITrainingService,
+    },
+    http::AppState,
+    parser::ParseFile,
+};
 use activities_auth::infra::http::AuthenticatedUser;
 
 use super::activity_schema::PublicActivity;

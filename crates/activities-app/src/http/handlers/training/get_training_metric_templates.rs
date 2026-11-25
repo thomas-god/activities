@@ -9,22 +9,25 @@ use axum::{
 };
 use serde::Serialize;
 
-use crate::domain::activity::models::ActivityMetric;
-use crate::domain::activity::models::ToUnit;
-use crate::domain::activity::models::Unit;
-use crate::domain::activity::ports::IActivityService;
-use crate::domain::preferences::ports::IPreferencesService;
-use crate::domain::training::models::DurationCurveSource;
-use crate::domain::training::models::HooperIndexSource;
-use crate::domain::training::models::TrainingMetricAggregate;
-use crate::domain::training::models::TrainingMetricSource;
-use crate::domain::training::models::WeightAndNutritionSource;
-use crate::domain::training::ports::ITrainingService;
-use crate::http::AppState;
-use crate::http::handlers::training::types::APITrainingMetricSource;
-use crate::parser::ParseFile;
-use activities_auth::infra::http::AuthenticatedUser;
-use activities_auth::multi_user::IMultiUserService;
+use crate::{
+    domain::{
+        activity::{
+            models::{ActivityMetric, ToUnit, Unit},
+            ports::IActivityService,
+        },
+        preferences::ports::IPreferencesService,
+        training::{
+            models::{
+                DurationCurveSource, HooperIndexSource, TrainingMetricAggregate,
+                TrainingMetricSource, WeightAndNutritionSource,
+            },
+            ports::ITrainingService,
+        },
+    },
+    http::{AppState, handlers::training::types::APITrainingMetricSource},
+    parser::ParseFile,
+};
+use activities_auth::{infra::http::AuthenticatedUser, multi_user::IMultiUserService};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBody(Vec<TrainingMetricTemplateBody>);

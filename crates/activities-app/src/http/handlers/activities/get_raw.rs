@@ -1,25 +1,29 @@
-use axum::body::Body;
-use axum::extract::{Path, Query};
-use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
 use axum::{
     Extension,
-    extract::State,
-    http::StatusCode,
+    body::Body,
+    extract::{Path, Query, State},
+    http::{
+        StatusCode,
+        header::{CONTENT_DISPOSITION, CONTENT_TYPE},
+    },
     response::{IntoResponse, Response},
 };
 use std::io::Write;
 use zip::result::ZipError;
 
-use crate::domain::activity::ports::GetAllActivitiesRequest;
-use crate::domain::activity::ports::IActivityService;
-use crate::domain::preferences::ports::IPreferencesService;
-use crate::domain::training::ports::ITrainingService;
-use crate::http::AppState;
-use crate::parser::ParseFile;
+use crate::{
+    domain::{
+        activity::ports::{GetAllActivitiesRequest, IActivityService},
+        preferences::ports::IPreferencesService,
+        training::ports::ITrainingService,
+    },
+    http::AppState,
+    parser::ParseFile,
+};
 use activities_auth::infra::http::AuthenticatedUser;
-use activities_domain::activity::models::ActivityId;
-use activities_domain::activity::ports::{
-    GetAllActivitiesError, GetRawActivityError, GetRawActivityRequest, RawActivity,
+use activities_core::domain::activity::{
+    models::ActivityId,
+    ports::{GetAllActivitiesError, GetRawActivityError, GetRawActivityRequest, RawActivity},
 };
 
 #[tracing::instrument(skip_all, err)]
@@ -151,12 +155,15 @@ pub async fn get_raw_activity<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use activities_domain::{
-        activity::ports::RawActivity, activity::services::test_utils::MockActivityService,
-        preferences::services::tests_utils::MockPreferencesService, shared::UserId,
-        training::services::test_utils::MockTrainingService,
+    use activities_core::{
+        domain::{
+            activity::{ports::RawActivity, services::test_utils::MockActivityService},
+            preferences::services::tests_utils::MockPreferencesService,
+            shared::UserId,
+            training::services::test_utils::MockTrainingService,
+        },
+        infra::parser::test_utils::MockFileParser,
     };
-    use activities_infra::parser::test_utils::MockFileParser;
     use std::sync::Arc;
 
     #[tokio::test]
@@ -205,7 +212,7 @@ mod tests {
             .expect_get_all_raw_activities()
             .returning(|_| {
                 Err(
-                    activities_domain::activity::ports::GetAllActivitiesError::Unknown(
+                    activities_core::domain::activity::ports::GetAllActivitiesError::Unknown(
                         anyhow::anyhow!("error"),
                     ),
                 )

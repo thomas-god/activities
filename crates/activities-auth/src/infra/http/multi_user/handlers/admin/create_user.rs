@@ -1,11 +1,10 @@
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use serde::{Deserialize, Serialize};
 
-use crate::multi_user::EmailAddress;
-use crate::multi_user::Password;
-use crate::multi_user::admin::AdminActor;
-use crate::multi_user::admin::CreateUserOutcome;
-use crate::multi_user::admin::IAdminService;
+use crate::multi_user::{
+    EmailAddress, Password,
+    admin::{AdminActor, CreateUserOutcome, IAdminService},
+};
 
 use super::{AdminGuard, AdminServiceHandle, admin_error_status};
 

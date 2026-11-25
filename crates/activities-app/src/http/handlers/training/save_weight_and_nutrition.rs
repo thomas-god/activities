@@ -12,17 +12,22 @@ use chrono::NaiveDate;
 use flate2::read::GzDecoder;
 use serde::{Deserialize, Serialize};
 
-use crate::domain::activity::ports::IActivityService;
-use crate::domain::preferences::ports::IPreferencesService;
-use crate::domain::shared::DateRange;
-use crate::domain::training::models::WeightAndNutritionPatch;
-use crate::domain::training::ports::ITrainingService;
-use crate::domain::training::ports::SaveBulkWeightAndNutritionRequest;
-use crate::domain::training::ports::SaveWeightAndNutritionRequest;
-use crate::domain::training::ports::WeightAndNutritionError;
-use crate::http::AppState;
-use crate::http::handlers::training::types::APIWeightAndNutritionPatch;
-use crate::parser::ParseFile;
+use crate::{
+    domain::{
+        activity::ports::IActivityService,
+        preferences::ports::IPreferencesService,
+        shared::DateRange,
+        training::{
+            models::WeightAndNutritionPatch,
+            ports::{
+                ITrainingService, SaveBulkWeightAndNutritionRequest, SaveWeightAndNutritionRequest,
+                WeightAndNutritionError,
+            },
+        },
+    },
+    http::{AppState, handlers::training::types::APIWeightAndNutritionPatch},
+    parser::ParseFile,
+};
 use activities_auth::infra::http::AuthenticatedUser;
 
 /// Body of the `PATCH /api/training/weight-and-nutrition/{date}` request.
@@ -302,10 +307,13 @@ mod tests {
     use axum_test::TestServer;
     use chrono::NaiveDate;
 
-    use crate::domain::preferences::services::tests_utils::MockPreferencesService;
-    use crate::domain::shared::UserId;
-    use crate::domain::training::services::test_utils::MockTrainingService;
-    use crate::parser::test_utils::MockFileParser;
+    use crate::{
+        domain::{
+            preferences::services::tests_utils::MockPreferencesService, shared::UserId,
+            training::services::test_utils::MockTrainingService,
+        },
+        parser::test_utils::MockFileParser,
+    };
     use activities_auth::infra::http::no_auth::DefaultUserExtractor;
 
     use crate::http::shared::PatchField;
@@ -559,7 +567,7 @@ not-a-date,71.0\n\
     fn test_server(metrics: MockTrainingService) -> TestServer {
         let state = AppState {
             activity_service: Arc::new(
-                activities_domain::activity::services::test_utils::MockActivityService::new(),
+                activities_core::domain::activity::services::test_utils::MockActivityService::new(),
             ),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(MockFileParser::new()),

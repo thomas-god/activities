@@ -5,7 +5,7 @@ edition.workspace = true
 
 [dependencies]
 activities-auth.workspace = true
-activities-infra.workspace = true
+activities-core.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 tokio.workspace = true

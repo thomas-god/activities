@@ -8,7 +8,7 @@
 use derive_more::Constructor;
 
 use super::{EmailAddress, HashedPassword, Password};
-use activities_domain::{shared::IClock, shared::UserId};
+use activities_core::domain::shared::{IClock, UserId};
 
 pub use super::admin_audit::{AdminAction, AdminActor, AdminAuditContext, AdminAuditEntry};
 
@@ -472,7 +472,7 @@ impl IAdminService for DisabledAdminService {
 mod tests {
     use mockall::mock;
 
-    use activities_domain::clock::FakeClock;
+    use activities_core::domain::clock::FakeClock;
 
     use super::*;
 

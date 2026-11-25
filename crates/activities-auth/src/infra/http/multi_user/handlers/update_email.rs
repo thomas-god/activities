@@ -2,14 +2,13 @@ use axum::{Extension, Json, extract::State, http::StatusCode, response::IntoResp
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::infra::http::AuthenticatedUser;
-use crate::infra::http::multi_user::handlers::AuthAppState;
-use crate::multi_user::AuthToken;
-use crate::multi_user::EmailAddress;
-use crate::multi_user::EmailChangeValidationResult;
-use crate::multi_user::IMultiUserService;
-use crate::multi_user::UpdateEmailRequest;
-use crate::multi_user::UpdateEmailResult;
+use crate::{
+    infra::http::{AuthenticatedUser, multi_user::handlers::AuthAppState},
+    multi_user::{
+        AuthToken, EmailAddress, EmailChangeValidationResult, IMultiUserService,
+        UpdateEmailRequest, UpdateEmailResult,
+    },
+};
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateEmailBody {

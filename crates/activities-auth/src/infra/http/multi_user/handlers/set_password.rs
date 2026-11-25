@@ -6,15 +6,16 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::infra::http::AuthenticatedUser;
-use crate::infra::http::CookieConfig;
-use crate::infra::http::multi_user::handlers::AuthAppState;
-use crate::infra::http::multi_user::handlers::extractor::build_session_cookie;
-use crate::multi_user::IMultiUserService;
-use crate::multi_user::RegisterPasswordRequest;
-use crate::multi_user::RegisterPasswordResult;
-use crate::multi_user::UpdatePasswordRequest;
-use crate::multi_user::UpdatePasswordResult;
+use crate::{
+    infra::http::{
+        AuthenticatedUser, CookieConfig,
+        multi_user::handlers::{AuthAppState, extractor::build_session_cookie},
+    },
+    multi_user::{
+        IMultiUserService, RegisterPasswordRequest, RegisterPasswordResult, UpdatePasswordRequest,
+        UpdatePasswordResult,
+    },
+};
 
 #[derive(Debug, Deserialize)]
 pub struct RegisterPasswordBody {
@@ -112,14 +113,14 @@ mod test {
     use chrono::{TimeDelta, Utc};
     use serde_json::json;
 
-    use crate::domain::shared::UserId;
-    use crate::infra::http::CookieConfig;
-    use crate::multi_user::GenerateSessionTokenResult;
-    use crate::multi_user::Password;
-    use crate::multi_user::RegisterPasswordResult;
-    use crate::multi_user::SessionToken;
-    use crate::multi_user::UpdatePasswordResult;
-    use crate::multi_user::test_utils::MockUserService;
+    use crate::{
+        domain::shared::UserId,
+        infra::http::CookieConfig,
+        multi_user::{
+            GenerateSessionTokenResult, Password, RegisterPasswordResult, SessionToken,
+            UpdatePasswordResult, test_utils::MockUserService,
+        },
+    };
 
     use super::*;
 

@@ -7,32 +7,19 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
 };
 
-use crate::multi_user::EmailAddress;
-use crate::multi_user::EmailChangeFinalizeResult;
-use crate::multi_user::HashedAuthLink;
-use crate::multi_user::HashedAuthToken;
-use crate::multi_user::HashedEmailChangeToken;
-use crate::multi_user::HashedPassword;
-use crate::multi_user::HashedSession;
-use crate::multi_user::HashedSessionToken;
-use crate::multi_user::UserInfo;
-use crate::multi_user::admin::AdminAction;
-use crate::multi_user::admin::AdminAuditContext;
-use crate::multi_user::admin::AdminAuditEntry;
-use crate::multi_user::admin::AdminRepository;
-use crate::multi_user::admin::AdminUser;
-use crate::multi_user::admin::BootstrapAdminMode;
-use crate::multi_user::admin::BootstrapAdminOutcome;
-use crate::multi_user::admin::CreateUserOutcome;
-use crate::multi_user::admin::PromoteAdminOutcome;
-use crate::multi_user::admin::RevokeAdminOutcome;
-use crate::multi_user::admin::SetAdminOutcome;
-use crate::multi_user::admin::SetUserEmailOutcome;
-use crate::multi_user::admin::SetUserPasswordOutcome;
-use crate::multi_user::service::UserRepository;
-use crate::multi_user::session::SessionRepository;
+use crate::multi_user::{
+    EmailAddress, EmailChangeFinalizeResult, HashedAuthLink, HashedAuthToken,
+    HashedEmailChangeToken, HashedPassword, HashedSession, HashedSessionToken, UserInfo,
+    admin::{
+        AdminAction, AdminAuditContext, AdminAuditEntry, AdminRepository, AdminUser,
+        BootstrapAdminMode, BootstrapAdminOutcome, CreateUserOutcome, PromoteAdminOutcome,
+        RevokeAdminOutcome, SetAdminOutcome, SetUserEmailOutcome, SetUserPasswordOutcome,
+    },
+    service::UserRepository,
+    session::SessionRepository,
+};
 
-use activities_domain::shared::UserId;
+use activities_core::domain::shared::UserId;
 
 /// SQLite repository backed by the user database (`user.db`).
 ///
@@ -1738,30 +1725,19 @@ mod test_sqlite_users_repository {
     use chrono::{TimeDelta, Utc};
     use tempfile::NamedTempFile;
 
-    use crate::multi_user::AuthLink;
-    use crate::multi_user::AuthToken;
-    use crate::multi_user::EmailAddress;
-    use crate::multi_user::EmailChangeFinalizeResult;
-    use crate::multi_user::HashedEmailChangeToken;
-    use crate::multi_user::HashedSessionToken;
-    use crate::multi_user::Password;
-    use crate::multi_user::Session;
-    use crate::multi_user::SessionToken;
-    use crate::multi_user::admin::AdminActor;
-    use crate::multi_user::admin::AdminAuditContext;
-    use crate::multi_user::admin::AdminRepository;
-    use crate::multi_user::admin::BootstrapAdminMode;
-    use crate::multi_user::admin::BootstrapAdminOutcome;
-    use crate::multi_user::admin::CreateUserOutcome;
-    use crate::multi_user::admin::PromoteAdminOutcome;
-    use crate::multi_user::admin::RevokeAdminOutcome;
-    use crate::multi_user::admin::SetAdminOutcome;
-    use crate::multi_user::admin::SetUserEmailOutcome;
-    use crate::multi_user::admin::SetUserPasswordOutcome;
-    use crate::multi_user::service::UserRepository;
-    use crate::multi_user::session::SessionRepository;
+    use crate::multi_user::{
+        AuthLink, AuthToken, EmailAddress, EmailChangeFinalizeResult, HashedEmailChangeToken,
+        HashedSessionToken, Password, Session, SessionToken,
+        admin::{
+            AdminActor, AdminAuditContext, AdminRepository, BootstrapAdminMode,
+            BootstrapAdminOutcome, CreateUserOutcome, PromoteAdminOutcome, RevokeAdminOutcome,
+            SetAdminOutcome, SetUserEmailOutcome, SetUserPasswordOutcome,
+        },
+        service::UserRepository,
+        session::SessionRepository,
+    };
 
-    use activities_domain::shared::UserId;
+    use activities_core::domain::shared::UserId;
 
     use super::*;
 

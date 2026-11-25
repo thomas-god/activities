@@ -8,9 +8,10 @@ use crate::{
     parser::{ParseBytesError, ParseFile, ParsedFileContent, json::StandaloneActivity},
 };
 use activities_auth::infra::http::AuthenticatedUser;
-use activities_domain::activity::ports::CreateActivityError;
-use activities_domain::preferences::ports::IPreferencesService;
-use activities_domain::training::ports::ITrainingService;
+use activities_core::domain::{
+    activity::ports::CreateActivityError, preferences::ports::IPreferencesService,
+    training::ports::ITrainingService,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateStandaloneActivityResponse {
@@ -59,17 +60,20 @@ mod tests {
     use axum::{Router, middleware::from_extractor, routing::post};
     use axum_test::TestServer;
 
-    use crate::domain::activity::models::ActivityDuration;
-    use crate::domain::activity::models::ActivityId;
-    use crate::domain::activity::models::ActivityStartTime;
-    use crate::domain::activity::models::Sport;
-    use crate::domain::activity::services::test_utils::MockActivityService;
-    use crate::domain::preferences::services::tests_utils::MockPreferencesService;
-    use crate::domain::shared::UserId;
-    use crate::domain::training::services::test_utils::MockTrainingService;
-    use crate::parser::test_utils::MockFileParser;
+    use crate::{
+        domain::{
+            activity::{
+                models::{ActivityDuration, ActivityId, ActivityStartTime, Sport},
+                services::test_utils::MockActivityService,
+            },
+            preferences::services::tests_utils::MockPreferencesService,
+            shared::UserId,
+            training::services::test_utils::MockTrainingService,
+        },
+        parser::test_utils::MockFileParser,
+    };
     use activities_auth::infra::http::no_auth::DefaultUserExtractor;
-    use activities_domain::activity::models::Activity;
+    use activities_core::domain::activity::models::Activity;
 
     use super::*;
 

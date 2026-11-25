@@ -4,7 +4,10 @@
 //! application's data, so they work even when the server is not running and do not require a
 //! session or the full server configuration.
 
-use std::{ffi::OsStr, ffi::OsString, path::PathBuf};
+use std::{
+    ffi::{OsStr, OsString},
+    path::PathBuf,
+};
 
 use anyhow::anyhow;
 use clap::{Args, Parser, Subcommand};
@@ -19,7 +22,7 @@ use activities_auth::{
         },
     },
 };
-use activities_infra::{
+use activities_core::infra::{
     backup::BackupService,
     clock::Clock,
     config::{BackupConfig, StdEnvironment, data_path_from_env},

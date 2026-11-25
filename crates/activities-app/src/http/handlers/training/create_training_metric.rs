@@ -2,30 +2,29 @@ use crate::http::error_status::ApiErrorStatus;
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use serde::Deserialize;
 
-use crate::domain::activity::models::ActivityMetric;
-use crate::domain::activity::ports::IActivityService;
-use crate::domain::preferences::ports::IPreferencesService;
-use crate::domain::shared::UserId;
-use crate::domain::training::models::TrainingMetricActivityFilters;
-use crate::domain::training::models::TrainingMetricActivityGroupBy;
-use crate::domain::training::models::TrainingMetricName;
-use crate::domain::training::models::TrainingMetricSource;
-use crate::domain::training::models::TrainingMetricTarget;
-use crate::domain::training::models::TrainingMetricWindow;
-use crate::domain::training::ports::CreateTrainingMetricError;
-use crate::domain::training::ports::CreateTrainingMetricRequest;
-use crate::domain::training::ports::ITrainingService;
-use crate::http::AppState;
-use crate::http::handlers::training::types::APIActivityMetricSource;
-use crate::http::handlers::training::types::APITimeseriesWindow;
-use crate::http::handlers::training::types::APITrainingMetricAggregate;
-use crate::http::handlers::training::types::APITrainingMetricFilters;
-use crate::http::handlers::training::types::APITrainingMetricGranularity;
-use crate::http::handlers::training::types::APITrainingMetricScope;
-use crate::http::handlers::training::types::APITrainingMetricSource;
-use crate::http::handlers::training::types::APITrainingMetricSummary;
-use crate::http::handlers::training::types::APITrainingMetricTarget;
-use crate::parser::ParseFile;
+use crate::{
+    domain::{
+        activity::{models::ActivityMetric, ports::IActivityService},
+        preferences::ports::IPreferencesService,
+        shared::UserId,
+        training::{
+            models::{
+                TrainingMetricActivityFilters, TrainingMetricActivityGroupBy, TrainingMetricName,
+                TrainingMetricSource, TrainingMetricTarget, TrainingMetricWindow,
+            },
+            ports::{CreateTrainingMetricError, CreateTrainingMetricRequest, ITrainingService},
+        },
+    },
+    http::{
+        AppState,
+        handlers::training::types::{
+            APIActivityMetricSource, APITimeseriesWindow, APITrainingMetricAggregate,
+            APITrainingMetricFilters, APITrainingMetricGranularity, APITrainingMetricScope,
+            APITrainingMetricSource, APITrainingMetricSummary, APITrainingMetricTarget,
+        },
+    },
+    parser::ParseFile,
+};
 use activities_auth::infra::http::AuthenticatedUser;
 
 #[derive(Debug, Deserialize)]
@@ -108,7 +107,7 @@ mod tests_create_training_metric {
 
     use super::*;
 
-    use activities_domain::activity::models::Unit;
+    use activities_core::domain::activity::models::Unit;
 
     #[test]
     fn test_payload_format() {

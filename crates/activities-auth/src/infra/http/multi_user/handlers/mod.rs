@@ -1,13 +1,18 @@
-use axum::Router;
-use axum::extract::FromRef;
-use axum::routing::{get, post};
+use axum::{
+    Router,
+    extract::FromRef,
+    routing::{get, post},
+};
 
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
-use crate::infra::http::CookieConfig;
-use crate::infra::http::rate_limit::{IpRateLimitLayer, RateLimitStore};
-use crate::multi_user::IMultiUserService;
+use crate::{
+    infra::http::{
+        CookieConfig,
+        rate_limit::{IpRateLimitLayer, RateLimitStore},
+    },
+    multi_user::IMultiUserService,
+};
 
 pub use extractor::cookie_auth_middleware;
 pub use login_user::login_user;
@@ -144,19 +149,20 @@ where
 mod tests {
     use std::net::SocketAddr;
 
-    use axum::http::header::SET_COOKIE;
-    use axum::{http::StatusCode, response::IntoResponse, routing::get};
+    use axum::{
+        http::{StatusCode, header::SET_COOKIE},
+        response::IntoResponse,
+        routing::get,
+    };
     use chrono::{TimeDelta, Utc};
     use reqwest::header::CONTENT_TYPE;
     use tokio::task::JoinHandle;
     use url::Url;
 
-    use crate::multi_user::AuthLinkValidationResult;
-    use crate::multi_user::GenerateSessionTokenResult;
-    use crate::multi_user::SessionToken;
-    use crate::multi_user::UserLoginResult;
-    use crate::multi_user::UserRegistrationResult;
-    use crate::multi_user::test_utils::MockUserService;
+    use crate::multi_user::{
+        AuthLinkValidationResult, GenerateSessionTokenResult, SessionToken, UserLoginResult,
+        UserRegistrationResult, test_utils::MockUserService,
+    };
 
     use super::*;
 

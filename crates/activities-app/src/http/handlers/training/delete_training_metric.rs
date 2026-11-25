@@ -5,14 +5,18 @@ use axum::{
     http::StatusCode,
 };
 
-use crate::domain::activity::ports::IActivityService;
-use crate::domain::preferences::ports::IPreferencesService;
-use crate::domain::training::models::TrainingMetricId;
-use crate::domain::training::ports::DeleteTrainingMetricError;
-use crate::domain::training::ports::DeleteTrainingMetricRequest;
-use crate::domain::training::ports::ITrainingService;
-use crate::http::AppState;
-use crate::parser::ParseFile;
+use crate::{
+    domain::{
+        activity::ports::IActivityService,
+        preferences::ports::IPreferencesService,
+        training::{
+            models::TrainingMetricId,
+            ports::{DeleteTrainingMetricError, DeleteTrainingMetricRequest, ITrainingService},
+        },
+    },
+    http::AppState,
+    parser::ParseFile,
+};
 use activities_auth::infra::http::AuthenticatedUser;
 
 impl ApiErrorStatus for DeleteTrainingMetricError {

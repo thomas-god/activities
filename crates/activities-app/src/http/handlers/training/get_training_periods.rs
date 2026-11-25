@@ -10,23 +10,24 @@ use chrono::{DateTime, FixedOffset, Local, NaiveDate};
 use serde::{Deserialize, Serialize, de};
 use serde_json::json;
 
-use crate::domain::activity::models::ActivityMetricSource;
-use crate::domain::activity::models::ActivityStatistic;
-use crate::domain::activity::models::TimeseriesMetric;
-use crate::domain::activity::models::ToUnit;
-use crate::domain::activity::models::Unit;
-use crate::domain::activity::ports::IActivityService;
-use crate::domain::preferences::ports::IPreferencesService;
-use crate::domain::training::models::SportFilter;
-use crate::domain::training::models::TrainingMetricDefinition;
-use crate::domain::training::models::TrainingMetricGranularity;
-use crate::domain::training::models::TrainingMetricValues;
-use crate::domain::training::models::TrainingPeriod;
-use crate::domain::training::models::TrainingPeriodSports;
-use crate::domain::training::ports::ITrainingService;
-use crate::http::AppState;
-use crate::http::handlers::training::types::SportsResponse;
-use crate::parser::ParseFile;
+use crate::{
+    domain::{
+        activity::{
+            models::{ActivityMetricSource, ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
+            ports::IActivityService,
+        },
+        preferences::ports::IPreferencesService,
+        training::{
+            models::{
+                SportFilter, TrainingMetricDefinition, TrainingMetricGranularity,
+                TrainingMetricValues, TrainingPeriod, TrainingPeriodSports,
+            },
+            ports::ITrainingService,
+        },
+    },
+    http::{AppState, handlers::training::types::SportsResponse},
+    parser::ParseFile,
+};
 use activities_auth::infra::http::AuthenticatedUser;
 
 #[derive(Debug, Clone, Serialize)]
