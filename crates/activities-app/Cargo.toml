@@ -2,6 +2,7 @@
 name = "activities-app"
 version.workspace = true
 edition.workspace = true
+default-run = "activities-app"
 
 [dependencies]
 activities-auth.workspace = true

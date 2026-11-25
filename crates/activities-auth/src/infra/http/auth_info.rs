@@ -2,25 +2,16 @@ use axum::{Json, Router, extract::State, response::IntoResponse, routing::get};
 use serde::Serialize;
 
 use crate::{
-    auth::AuthStrategy,
-    infra::http::{
-        multi_user::handlers::multi_user_login_routes, no_auth::no_auth_login_routes,
-        single_password::single_password_login_routes,
-    },
+    auth::MultiUserAuthStrategy,
+    infra::http::multi_user::handlers::multi_user_login_routes,
     multi_user::{AuthMethods, IMultiUserService},
 };
 
 /// Public information about the configured authentication strategy, exposed at `/api/auth_info`.
 #[derive(Debug, Clone, Serialize)]
 pub struct AuthInfoResponse {
-    /// Strategy name: `"NoAuth"`, `"SinglePassword"` or `"MultiUser"`.
-    strategy: String,
-    /// Whether new users can register; only set for the multi-user (`MultiUser`) strategy.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    registration_open: Option<bool>,
-    /// Multi-user only: which authentication methods are active on this instance.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    auth_methods: Option<AuthInfoMethods>,
+    registration_open: bool,
+    auth_methods: AuthInfoMethods,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -40,37 +31,22 @@ impl From<&AuthMethods> for AuthInfoMethods {
 }
 
 pub fn add_auth_router<S, US: IMultiUserService>(
-    strategy: AuthStrategy,
+    strategy: MultiUserAuthStrategy,
     base_router: Router<S>,
     user_service: US,
 ) -> Router<S>
 where
     S: Clone + Send + Sync + 'static,
 {
-    let (registration_open, auth_methods) = match &strategy {
-        AuthStrategy::MultiUser(multi_user) => (
-            Some(bool::from(multi_user.registration())),
-            Some(AuthInfoMethods::from(multi_user.auth_methods())),
-        ),
-        AuthStrategy::NoAuth | AuthStrategy::SinglePassword(_) => (None, None),
-    };
+    let registration_open = bool::from(strategy.registration());
+    let auth_methods = AuthInfoMethods::from(strategy.auth_methods());
 
-    let router = match &strategy {
-        AuthStrategy::NoAuth => no_auth_login_routes(base_router),
-        AuthStrategy::SinglePassword(pwd) => single_password_login_routes(base_router, pwd),
-        // Every multi-user combination mounts the same routes: `/api/login` handles both password
-        // and mail flows, and `/api/register` requires a password. Which methods are active (email
-        // being optional, password always on) is advertised through `/api/auth_info`, not through
-        // the route set.
-        AuthStrategy::MultiUser(multi_user) => {
-            multi_user_login_routes(base_router, user_service, multi_user.registration().clone())
-        }
-    };
+    let router =
+        multi_user_login_routes(base_router, user_service, strategy.registration().clone());
 
     let info_router = Router::new()
         .route("/auth_info", get(auth_info))
         .with_state(AuthInfoResponse {
-            strategy: format!("{strategy}"),
             registration_open,
             auth_methods,
         });
@@ -85,7 +61,6 @@ pub async fn auth_info(State(state): State<AuthInfoResponse>) -> impl IntoRespon
 mod tests {
     use axum::{Router, http::StatusCode, routing::get};
     use axum_test::TestServer;
-    use serde_json::json;
 
     use crate::{
         auth::{MultiUserAuthStrategy, UserRegistration},
@@ -94,18 +69,18 @@ mod tests {
 
     use super::*;
 
-    fn multi_user_strategy(email: bool, allow_registration: bool) -> AuthStrategy {
-        AuthStrategy::MultiUser(MultiUserAuthStrategy::new(
+    fn multi_user_strategy(email: bool, allow_registration: bool) -> MultiUserAuthStrategy {
+        MultiUserAuthStrategy::new(
             AuthMethods::new(email),
             UserRegistration::from(allow_registration),
-        ))
+        )
     }
 
-    fn build_server(strategy: AuthStrategy, user_service: MockUserService) -> TestServer {
+    fn build_server(config: MultiUserAuthStrategy, user_service: MockUserService) -> TestServer {
         // `add_auth_router` adds a `route_layer`, which panics if the base router has no route
         // yet; give it one so the middleware has something to wrap.
         let base_router = Router::new().route("/", get(|| async { StatusCode::OK }));
-        TestServer::new(add_auth_router(strategy, base_router, user_service))
+        TestServer::new(add_auth_router(config, base_router, user_service))
     }
 
     #[tokio::test]
@@ -115,19 +90,9 @@ mod tests {
         let response = server.get("/api/auth_info").await;
         response.assert_status(StatusCode::OK);
         let body: serde_json::Value = response.json();
-        assert_eq!(body["strategy"], "MultiUser");
         assert_eq!(body["registration_open"], false);
         assert_eq!(body["auth_methods"]["email"], false);
         assert_eq!(body["auth_methods"]["password"], true);
-
-        // Password-only mode still mounts the (shared) email-based login routes. The test server
-        // has no `ConnectInfo`, so the rate limiter short-circuits with 429; what matters here is
-        // that the route is mounted rather than answering 404.
-        let response = server
-            .post("/api/login")
-            .json(&json!({"email": "test@mail.test", "password": "secret"}))
-            .await;
-        assert_ne!(response.status_code(), StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
@@ -137,7 +102,6 @@ mod tests {
         let response = server.get("/api/auth_info").await;
         response.assert_status(StatusCode::OK);
         let body: serde_json::Value = response.json();
-        assert_eq!(body["strategy"], "MultiUser");
         assert_eq!(body["registration_open"], true);
         assert_eq!(body["auth_methods"]["email"], true);
         assert_eq!(body["auth_methods"]["password"], true);

@@ -314,7 +314,7 @@ mod tests {
         },
         parser::test_utils::MockFileParser,
     };
-    use activities_auth::infra::http::no_auth::DefaultUserExtractor;
+    use activities_auth::auth::test_utils::DefaultUserExtractor;
 
     use crate::http::shared::PatchField;
 

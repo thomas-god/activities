@@ -4,9 +4,7 @@ use derive_more::Constructor;
 pub mod auth_info;
 pub mod cookie;
 pub mod multi_user;
-pub mod no_auth;
 pub mod rate_limit;
-pub mod single_password;
 
 pub use auth_info::add_auth_router;
 pub use cookie::{CookieConfig, build_removal_cookie};

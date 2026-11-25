@@ -25,9 +25,7 @@ use activities_core::{
     infra::{
         backup::BackupService,
         clock::Clock,
-        config::{
-            AppMode, BackupConfig, BaseConfig, EmailAuthConfig, MultiUserConfig, StdEnvironment,
-        },
+        config::{BackupConfig, BaseConfig, EmailAuthConfig, MultiUserConfig, StdEnvironment},
         fs::FilesystemRawDataRepository,
         parser::Parser,
         sqlite::{
@@ -64,10 +62,7 @@ type ActualBackupService = BackupService<Clock>;
 const EXPIRED_AUTH_STATE_CLEANUP_INTERVAL: std::time::Duration =
     std::time::Duration::from_secs(3600 * 24);
 
-pub async fn bootstrap_multi_user(
-    mode_config: MultiUserConfig,
-    mode: AppMode,
-) -> anyhow::Result<(
+pub async fn bootstrap_app() -> anyhow::Result<(
     HttpServer<
         ActualActivityService,
         Parser,
@@ -84,6 +79,8 @@ pub async fn bootstrap_multi_user(
     tracing::info!("Starting multi-user app");
 
     let config = BaseConfig::from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
+    let user_config =
+        MultiUserConfig::try_from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
 
     let activity_notify = Arc::new(tokio::sync::Notify::new());
     let training_notify = Arc::new(tokio::sync::Notify::new());
@@ -97,7 +94,7 @@ pub async fn bootstrap_multi_user(
     )
     .await?;
 
-    let (user_service, admin_service) = build_user_service(&config, &mode_config).await?;
+    let (user_service, admin_service) = build_user_service(&config, &user_config).await?;
 
     let preferences_service = build_preferences_service(&config).await?;
 
@@ -117,7 +114,6 @@ pub async fn bootstrap_multi_user(
     );
 
     let http_server = HttpServer::new(
-        &mode,
         activity_service.clone(),
         parser,
         training_service.clone(),
@@ -126,6 +122,7 @@ pub async fn bootstrap_multi_user(
         preferences_service,
         search_service.clone(),
         config,
+        user_config,
     )
     .await?;
     Ok((

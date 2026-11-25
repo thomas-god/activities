@@ -85,7 +85,10 @@ tower-http = { version = "0.7.0", features = [
 ] }
 tracing = { version = "0.1.41", features = ["log"] }
 tracing-opentelemetry = "0.34.0"
-tracing-subscriber = { version = "0.3.20", features = ["env-filter", "registry"] }
+tracing-subscriber = { version = "0.3.20", features = [
+    "env-filter",
+    "registry",
+] }
 unicode-normalization = "0.1.25"
 unicode_categories = "0.1.1"
 url = "2.5.8"

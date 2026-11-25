@@ -3,21 +3,28 @@
 /// data by a dedicated external cron.
 use std::{marker::PhantomData, net::SocketAddr, path::PathBuf, sync::Arc};
 
+use activities_auth::infra::http::AuthenticatedUser;
 use anyhow::{Context, anyhow};
 use axum::{
+    Json, Router,
+    extract::{FromRequestParts, State},
     http::{
-        HeaderValue, Method,
+        HeaderValue, Method, StatusCode,
         header::{CONTENT_DISPOSITION, CONTENT_TYPE, COOKIE, SET_COOKIE},
+        request::Parts,
     },
-    middleware,
+    middleware::{self, from_extractor},
+    response::IntoResponse,
     routing::get,
 };
+use derive_more::Constructor;
+use serde::Serialize;
 use tower_http::cors::CorsLayer;
 
 use activities_app::{
     domain::{
         activity::ports::IActivityService, preferences::ports::IPreferencesService,
-        search::ports::ISearchService, training::ports::ITrainingService,
+        search::ports::ISearchService, shared::UserId, training::ports::ITrainingService,
     },
     http::{
         AppState, StaticFiles, compression_layer, core_routes, health, search_routes,
@@ -223,7 +230,13 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, PS: IPreference
             .with_context(|| format!("Not a valid origin {}", config.allow_origin))?;
 
         let api_routes = core_routes(state.clone()).merge(search_routes(search_service));
-        let router = axum::Router::new().nest("/api", api_routes);
+        let mut router = axum::Router::new().nest("/api", api_routes);
+
+        let info_router = Router::new()
+            .route("/auth_info", get(auth_info))
+            .with_state(DemoAuthInfoResponse::new("NoAuth".to_string()));
+
+        router = router.nest("/api", info_router);
 
         let mut router = router.route("/health", get(health));
 
@@ -232,6 +245,7 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, PS: IPreference
         }
 
         router = router
+            .layer(from_extractor::<DefaultUserExtractor>())
             .layer(middleware::from_fn(static_cache_control))
             .layer(trace_layer)
             .layer(
@@ -269,6 +283,15 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, PS: IPreference
         .context("received error from running server")?;
         Ok(())
     }
+}
+/// Public information about the configured authentication strategy, exposed at `/api/auth_info`.
+#[derive(Debug, Clone, Serialize, Constructor)]
+pub struct DemoAuthInfoResponse {
+    strategy: String,
+}
+
+pub async fn auth_info(State(state): State<DemoAuthInfoResponse>) -> impl IntoResponse {
+    Json(state)
 }
 
 async fn build_preferences_service(
@@ -317,4 +340,22 @@ async fn build_search_service(
         tokio_util::sync::CancellationToken::new(),
         Clock::new(),
     ))
+}
+
+/// Dummy extractor that always returns the default [UserId], regardless of the request.
+pub struct DefaultUserExtractor;
+
+impl<S> FromRequestParts<S> for DefaultUserExtractor
+where
+    S: Send + Sync,
+{
+    type Rejection = StatusCode;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        let user = AuthenticatedUser::new(UserId::default());
+
+        parts.extensions.insert(user);
+
+        Ok(Self)
+    }
 }

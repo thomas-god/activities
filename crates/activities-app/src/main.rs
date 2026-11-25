@@ -1,34 +1,15 @@
-use activities_app::config::{AppMode, StdEnvironment, TelemetryConfig};
-use anyhow::anyhow;
+use activities_app::config::{StdEnvironment, TelemetryConfig};
 
 async fn run() -> anyhow::Result<()> {
-    let mode = AppMode::try_from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
-    match &mode {
-        AppMode::MultiUser(config) => {
-            let (server, search_service, training_service, activity_service, backup_service) =
-                activities_app::bootstrap::multi_user::bootstrap_multi_user(config.clone(), mode)
-                    .await?;
-            let _ = tokio::join!(
-                server.run(),
-                search_service.run(),
-                training_service.run(),
-                activity_service.compute_missing_duration_curves(),
-                backup_service.run()
-            );
-        }
-        AppMode::SingleUser(config) => {
-            let (server, search_service, training_service, activity_service, backup_service) =
-                activities_app::bootstrap::single_user::bootstrap_single_user(config.clone(), mode)
-                    .await?;
-            let _ = tokio::join!(
-                server.run(),
-                search_service.run(),
-                training_service.run(),
-                activity_service.compute_missing_duration_curves(),
-                backup_service.run()
-            );
-        }
-    };
+    let (server, search_service, training_service, activity_service, backup_service) =
+        activities_app::bootstrap::bootstrap_app().await?;
+    let _ = tokio::join!(
+        server.run(),
+        search_service.run(),
+        training_service.run(),
+        activity_service.compute_missing_duration_curves(),
+        backup_service.run()
+    );
     Ok(())
 }
 

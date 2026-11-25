@@ -1,6 +1,6 @@
 import { PUBLIC_APP_URL } from '$app/env/public';
 
-export type AuthStrategy = 'NoAuth' | 'SinglePassword' | 'MultiUser';
+export type AuthStrategy = 'NoAuth' | 'MultiUser';
 
 /** Authentication methods enabled on a multi-user instance. */
 export interface AuthMethods {
@@ -9,7 +9,7 @@ export interface AuthMethods {
 }
 
 export interface AuthInfo {
-	strategy: AuthStrategy;
+	strategy?: AuthStrategy;
 	/** Whether new users can currently register (only present for the `MultiUser` strategy). */
 	registration_open?: boolean;
 	/** Authentication methods active on the instance (only present for the `MultiUser` strategy). */

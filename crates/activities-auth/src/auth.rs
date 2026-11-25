@@ -1,39 +1,8 @@
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 
-use derive_more::{Constructor, From};
-use subtle::ConstantTimeEq;
+use activities_core::infra::config::MultiUserConfig;
 
 use crate::multi_user::AuthMethods;
-
-#[derive(Clone, Constructor, From)]
-#[from(String, &str)]
-pub struct SinglePassword(String);
-
-impl SinglePassword {
-    pub fn value(&self) -> &str {
-        &self.0
-    }
-
-    pub fn as_bytes(&self) -> &[u8] {
-        self.0.as_bytes()
-    }
-}
-
-/// Constant-time comparison to avoid leaking information through response timing attacks.
-impl PartialEq for SinglePassword {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.as_bytes().ct_eq(other.0.as_bytes()).into()
-    }
-}
-
-impl Eq for SinglePassword {}
-
-/// Manual impl of Debug to avoid leaking the inner value.
-impl Debug for SinglePassword {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SinglePassword")
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UserRegistration {
@@ -62,13 +31,6 @@ impl From<&UserRegistration> for bool {
     }
 }
 
-#[derive(Clone)]
-pub enum AuthStrategy {
-    NoAuth,
-    SinglePassword(SinglePassword),
-    MultiUser(MultiUserAuthStrategy),
-}
-
 #[derive(Clone, Debug)]
 pub struct MultiUserAuthStrategy {
     auth_methods: AuthMethods,
@@ -92,75 +54,45 @@ impl MultiUserAuthStrategy {
     }
 }
 
-/// Manual impl of Debug to avoid leaking the value of [AuthStrategy::SinglePassword].
-impl Debug for AuthStrategy {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::NoAuth => write!(f, "NoAuth"),
-            AuthStrategy::MultiUser(strategy) => write!(f, "MultiUser with config: {:?}", strategy),
-            AuthStrategy::SinglePassword(_) => write!(f, "SinglePassword"),
+impl From<&MultiUserConfig> for MultiUserAuthStrategy {
+    fn from(config: &MultiUserConfig) -> Self {
+        Self {
+            auth_methods: AuthMethods::new(config.email.is_some()),
+            registration: config.allow_registration.into(),
         }
     }
 }
 
-/// Manual impl of Display to avoid leaking the value of [AuthStrategy::SinglePassword].
-impl Display for AuthStrategy {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::NoAuth => write!(f, "NoAuth"),
-            AuthStrategy::MultiUser(_) => write!(f, "MultiUser",),
-            AuthStrategy::SinglePassword(_) => write!(f, "SinglePassword"),
+#[cfg(any(test, feature = "test-utils"))]
+pub mod test_utils {
+
+    use axum::{
+        extract::FromRequestParts,
+        http::{StatusCode, request::Parts},
+    };
+
+    use activities_core::domain::shared::UserId;
+
+    use crate::infra::http::AuthenticatedUser;
+
+    /// Dummy extractor that always returns the default [UserId], regardless of the request.
+    pub struct DefaultUserExtractor;
+
+    impl<S> FromRequestParts<S> for DefaultUserExtractor
+    where
+        S: Send + Sync,
+    {
+        type Rejection = StatusCode;
+
+        async fn from_request_parts(
+            parts: &mut Parts,
+            _state: &S,
+        ) -> Result<Self, Self::Rejection> {
+            let user = AuthenticatedUser::new(UserId::default());
+
+            parts.extensions.insert(user);
+
+            Ok(Self)
         }
-    }
-}
-
-#[cfg(test)]
-mod test_auth {
-    use super::*;
-
-    #[test]
-    fn test_do_not_leak_single_password_content_when_debug() {
-        let password = SinglePassword::from("secret");
-        assert_eq!(format!("{password:?}"), "SinglePassword");
-        let strategy = AuthStrategy::SinglePassword(SinglePassword::from("secret"));
-        assert_eq!(format!("{strategy:?}"), "SinglePassword")
-    }
-
-    #[test]
-    fn test_single_password_eq_identical_values() {
-        assert_eq!(
-            SinglePassword::from("secret"),
-            SinglePassword::from("secret")
-        );
-    }
-
-    #[test]
-    fn test_single_password_eq_both_empty() {
-        assert_eq!(SinglePassword::from(""), SinglePassword::from(""));
-    }
-
-    #[test]
-    fn test_single_password_not_eq_different_values_same_length() {
-        assert_ne!(
-            SinglePassword::from("secret1"),
-            SinglePassword::from("secreu1")
-        );
-    }
-
-    #[test]
-    fn test_single_password_not_eq_different_length() {
-        assert_ne!(
-            SinglePassword::from("secret"),
-            SinglePassword::from("secret-but-longer")
-        );
-        assert_ne!(SinglePassword::from("secret"), SinglePassword::from(""));
-    }
-
-    #[test]
-    fn test_single_password_not_eq_prefix_of_other() {
-        assert_ne!(
-            SinglePassword::from("secret"),
-            SinglePassword::from("secretsecret")
-        );
     }
 }

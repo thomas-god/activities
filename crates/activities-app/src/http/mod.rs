@@ -37,18 +37,20 @@ use tower_http::{
     services::{ServeDir, ServeFile},
 };
 
-use crate::config::{AppMode, BaseConfig};
-use activities_core::domain::{
-    activity::ports::IActivityService, preferences::ports::IPreferencesService,
-    search::ports::ISearchService, training::ports::ITrainingService,
+use crate::config::BaseConfig;
+use activities_core::{
+    domain::{
+        activity::ports::IActivityService, preferences::ports::IPreferencesService,
+        search::ports::ISearchService, training::ports::ITrainingService,
+    },
+    infra::config::MultiUserConfig,
 };
 
 use activities_auth::{
-    auth::{AuthStrategy, MultiUserAuthStrategy, SinglePassword, UserRegistration},
+    auth::MultiUserAuthStrategy,
     infra::http::{add_auth_router, multi_user::handlers::admin::admin_routes},
-    multi_user::{AuthMethods, IMultiUserService, admin::IAdminService},
+    multi_user::{IMultiUserService, admin::IAdminService},
 };
-use activities_core::infra::config::SingleUserConfig;
 
 use crate::http::handlers::{
     get_default_activity_metrics, get_training_metric_templates, upload_bulk_weight_and_nutrition,
@@ -71,19 +73,6 @@ use handlers::{
 mod error_status;
 mod handlers;
 mod shared;
-
-fn auth_strategy_from_mode(value: &AppMode) -> AuthStrategy {
-    match value {
-        AppMode::MultiUser(config) => AuthStrategy::MultiUser(MultiUserAuthStrategy::new(
-            AuthMethods::new(config.email.is_some()),
-            UserRegistration::from(config.allow_registration),
-        )),
-        AppMode::SingleUser(SingleUserConfig {
-            password: Some(pwd),
-        }) => AuthStrategy::SinglePassword(SinglePassword::from(pwd.clone())),
-        AppMode::SingleUser(SingleUserConfig { password: None }) => AuthStrategy::NoAuth,
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct AppState<
@@ -121,7 +110,6 @@ impl<
 {
     #[allow(clippy::too_many_arguments)]
     pub async fn new<SS: ISearchService>(
-        mode: &AppMode,
         activity_service: AS,
         file_parser: PF,
         training_metric_service: TMS,
@@ -130,6 +118,7 @@ impl<
         preferences_service: PS,
         search_service: SS,
         config: BaseConfig,
+        user_config: MultiUserConfig,
     ) -> anyhow::Result<Self> {
         let trace_layer = tower_http::trace::TraceLayer::new_for_http().make_span_with(
             |request: &axum::extract::Request<_>| {
@@ -151,28 +140,17 @@ impl<
             .with_context(|| format!("Not a valid origin {}", config.allow_origin))?;
 
         let api_routes = core_routes(state.clone()).merge(search_routes(search_service));
-        let router = axum::Router::new().nest("/api", api_routes);
+        let mut router = axum::Router::new().nest("/api", api_routes);
 
-        // Admin routes only exist in multi-user mode; the single-user modes carry a disabled admin
-        // service and never mount them.
-        let admin_router = matches!(mode, AppMode::MultiUser(_))
-            .then(|| admin_routes(user_service.clone(), admin_service));
+        router = router.nest("/api", admin_routes(user_service.clone(), admin_service));
 
-        let auth_strategy = auth_strategy_from_mode(mode);
-        tracing::info!(
-            "App starting with authentication strategy: {:?}",
-            &auth_strategy
-        );
         // Mount /health *after* the auth router: `route_layer` inside
         // `add_auth_router` only wraps the routes that already exist when it
         // is called, so mounting afterwards keeps the healthcheck outside the
         // auth middleware.
-        let mut router =
-            add_auth_router(auth_strategy, router, user_service).route("/health", get(health));
-
-        if let Some(admin_router) = admin_router {
-            router = router.nest("/api", admin_router);
-        }
+        let auth_strategy = MultiUserAuthStrategy::from(&user_config);
+        let mut router = add_auth_router(auth_strategy, router, user_service.clone())
+            .route("/health", get(health));
 
         if let Some(static_path) = &config.static_assets_path {
             router = router.fallback_service(StaticFiles::try_new(static_path)?);
@@ -491,12 +469,13 @@ where
 mod tests {
     use super::*;
     use activities_core::domain::shared::UserId;
+    use axum::middleware::from_extractor;
     use axum_test::TestServer;
 
     use crate::parser::test_utils::MockFileParser;
     use activities_auth::{
-        auth::{AuthStrategy, SinglePassword},
-        multi_user::test_utils::MockUserService,
+        auth::{UserRegistration, test_utils::DefaultUserExtractor},
+        multi_user::{AuthMethods, test_utils::MockUserService},
     };
     use activities_core::domain::{
         activity::{models::ActivityId, services::test_utils::MockActivityService},
@@ -504,6 +483,10 @@ mod tests {
         search::ports::{SearchResult, search_test_utils::MockSearchService},
         training::services::test_utils::MockTrainingService,
     };
+
+    fn auth_strategy(email: bool) -> MultiUserAuthStrategy {
+        MultiUserAuthStrategy::new(AuthMethods::new(email), UserRegistration::Allowed)
+    }
 
     #[tokio::test]
     async fn health_returns_ok() {
@@ -525,7 +508,7 @@ mod tests {
         };
 
         let router = add_auth_router(
-            AuthStrategy::SinglePassword(SinglePassword::from("secret")),
+            auth_strategy(true),
             Router::new().nest(
                 "/api",
                 core_routes(state).merge(search_routes(MockSearchService::new())),
@@ -557,15 +540,12 @@ mod tests {
             .withf(|user, pattern| user == &UserId::default() && pattern == "ride")
             .returning(|_, _| Ok(vec![SearchResult::Activity(ActivityId::from("activity-1"))]));
 
-        let router = add_auth_router(
-            AuthStrategy::NoAuth,
-            Router::new().nest(
+        let app = Router::new()
+            .nest(
                 "/api",
                 core_routes(state).merge(search_routes(search_service)),
-            ),
-            MockUserService::new(),
-        );
-        let app = router.route("/health", get(health));
+            )
+            .route_layer(from_extractor::<DefaultUserExtractor>());
         let server = TestServer::new(app);
 
         let response = server.get("/api/search?pattern=ride").await;
@@ -590,7 +570,7 @@ mod tests {
         };
 
         let router = add_auth_router(
-            AuthStrategy::SinglePassword(SinglePassword::from("secret")),
+            auth_strategy(true),
             Router::new().nest("/api", core_routes(state)),
             MockUserService::new(),
         );
@@ -617,11 +597,9 @@ mod tests {
             preferences_service: Arc::new(MockPreferencesService::new()),
         };
 
-        add_auth_router(
-            AuthStrategy::NoAuth,
-            Router::new().nest("/api", core_routes(state)),
-            MockUserService::new(),
-        )
+        Router::new()
+            .nest("/api", core_routes(state))
+            .route_layer(from_extractor::<DefaultUserExtractor>())
     }
 
     fn test_date() -> chrono::NaiveDate {
