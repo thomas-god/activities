@@ -86,13 +86,17 @@ fn auth_strategy_from_mode(value: &AppMode) -> AuthStrategy {
 }
 
 #[derive(Debug, Clone)]
-struct AppState<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, PS: IPreferencesService>
-{
-    activity_service: Arc<AS>,
-    file_parser: Arc<PF>,
-    training_metrics_service: Arc<TMS>,
+pub struct AppState<
+    AS: IActivityService,
+    PF: ParseFile,
+    TMS: ITrainingService,
+    PS: IPreferencesService,
+> {
+    pub activity_service: Arc<AS>,
+    pub file_parser: Arc<PF>,
+    pub training_metrics_service: Arc<TMS>,
     #[allow(dead_code)]
-    preferences_service: Arc<PS>,
+    pub preferences_service: Arc<PS>,
 }
 
 pub struct HttpServer<AS, PF, TMS, UR, PS, AD> {
@@ -221,7 +225,7 @@ impl<
 /// Mounted at the router root (not under `/api`) and *after* the auth router is
 /// applied, so it stays unauthenticated and reachable by infrastructure
 /// probes.
-async fn health() -> impl IntoResponse {
+pub async fn health() -> impl IntoResponse {
     (StatusCode::OK, Json(json!({ "status": "ok" })))
 }
 
@@ -232,12 +236,12 @@ async fn health() -> impl IntoResponse {
 /// (empty) `404` rather than being answered with the SPA shell, so API paths
 /// short-circuit before delegating to `ServeDir`.
 #[derive(Clone)]
-struct StaticFiles {
+pub struct StaticFiles {
     serve_dir: ServeDir<ServeFile>,
 }
 
 impl StaticFiles {
-    fn try_new(static_path: &str) -> anyhow::Result<Self> {
+    pub fn try_new(static_path: &str) -> anyhow::Result<Self> {
         let root = PathBuf::from(static_path);
         anyhow::ensure!(
             root.is_dir(),
@@ -291,7 +295,7 @@ fn is_api_path(path: &str) -> bool {
     path == "/api" || path.starts_with("/api/") || path == "/health"
 }
 
-async fn static_cache_control(request: Request, next: Next) -> Response {
+pub async fn static_cache_control(request: Request, next: Next) -> Response {
     let path = request.uri().path().to_owned();
     let mut response = next.run(request).await;
 
@@ -313,7 +317,7 @@ async fn static_cache_control(request: Request, next: Next) -> Response {
     response
 }
 
-fn compression_layer() -> CompressionLayer<impl Predicate + Clone + Send + Sync + 'static> {
+pub fn compression_layer() -> CompressionLayer<impl Predicate + Clone + Send + Sync + 'static> {
     CompressionLayer::new().compress_when(
         SizeAbove::new(1024)
             .and(NotForContentType::GRPC)
@@ -324,13 +328,13 @@ fn compression_layer() -> CompressionLayer<impl Predicate + Clone + Send + Sync 
     )
 }
 
-fn search_routes<SS: ISearchService>(search_service: SS) -> Router<()> {
+pub fn search_routes<SS: ISearchService>(search_service: SS) -> Router<()> {
     Router::new()
         .route("/search", get(search::<SS>))
         .with_state(Arc::new(search_service))
 }
 
-fn core_routes<
+pub fn core_routes<
     AS: IActivityService,
     PF: ParseFile,
     TS: ITrainingService,

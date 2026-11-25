@@ -37,7 +37,8 @@ RUN cargo chef cook --release --recipe-path recipe.json
 # Compile the workspace crates themselves.
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
-RUN cargo build --release -p activities-app -p activities-cli
+RUN cargo build --release -p activities-app -p activities-cli \
+    && cargo build --release -p activities-app --bin activities-demo
 
 FROM alpine:3
 
@@ -49,6 +50,7 @@ WORKDIR /activities
 
 COPY --from=backend-builder /app/backend/target/release/activities-app ./activities-app
 COPY --from=backend-builder /app/backend/target/release/activities-cli ./activities-cli
+COPY --from=backend-builder /app/backend/target/release/activities-demo ./activities-demo
 COPY --from=frontend-builder /app/frontend/build ./static
 
 ENV SERVER_PORT=80

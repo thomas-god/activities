@@ -1,6 +1,7 @@
 services:
   activities:
     image: ghcr.io/thomas-god/activities:main
+    entrypoint: "/activities/activities-demo"
     labels:
       - "traefik.enable=true"
       - "traefik.http.services.activities-demo.loadbalancer.server.port=80"
