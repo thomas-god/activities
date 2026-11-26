@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use activities_core::infra::config::MultiUserConfig;
+use activities_core::infra::config::UserAuthConfig;
 
 use crate::domain::AuthMethods;
 
@@ -32,12 +32,12 @@ impl From<&UserRegistration> for bool {
 }
 
 #[derive(Clone, Debug)]
-pub struct MultiUserAuthStrategy {
+pub struct UserAuthStrategy {
     auth_methods: AuthMethods,
     registration: UserRegistration,
 }
 
-impl MultiUserAuthStrategy {
+impl UserAuthStrategy {
     pub fn new(auth_methods: AuthMethods, registration: UserRegistration) -> Self {
         Self {
             auth_methods,
@@ -54,8 +54,8 @@ impl MultiUserAuthStrategy {
     }
 }
 
-impl From<&MultiUserConfig> for MultiUserAuthStrategy {
-    fn from(config: &MultiUserConfig) -> Self {
+impl From<&UserAuthConfig> for UserAuthStrategy {
+    fn from(config: &UserAuthConfig) -> Self {
         Self {
             auth_methods: AuthMethods::new(config.email.is_some()),
             registration: config.allow_registration.into(),

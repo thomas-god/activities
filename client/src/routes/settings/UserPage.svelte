@@ -22,11 +22,9 @@
 	const authInfoValue = $derived(isSome(authInfo) && authInfo.value ? authInfo.value : undefined);
 	const emailAuthEnabled = $derived(authInfoValue?.auth_methods?.email ?? false);
 
-	// Account management endpoints only exist for the multi-user strategy.
-	const isMultiUser = $derived(authInfoValue?.strategy === 'MultiUser');
-	// Intentional one-shot redirect at mount time (the strategy is fixed for the session).
+	const isNoAuth = $derived(authInfoValue?.strategy === 'NoAuth');
 	// svelte-ignore state_referenced_locally
-	if (!isMultiUser) {
+	if (isNoAuth) {
 		goto(resolve('/'));
 	}
 
@@ -250,7 +248,7 @@
 	};
 </script>
 
-{#if !isMultiUser}
+{#if isNoAuth}
 	<!-- Redirecting away; nothing to render. -->
 {:else if userInfo === null}
 	<div class="card mx-2 mt-6 rounded-box bg-base-100 p-4 sm:mx-auto sm:w-sm">

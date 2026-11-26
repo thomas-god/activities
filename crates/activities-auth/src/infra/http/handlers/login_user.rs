@@ -7,7 +7,7 @@ use axum::{
 use serde::Deserialize;
 
 use crate::{
-    domain::{EmailAddress, IMultiUserService, Password, UserLoginResult},
+    domain::{EmailAddress, IUserService, Password, UserLoginResult},
     infra::http::handlers::{AuthAppState, extractor::build_session_cookie},
 };
 
@@ -19,7 +19,7 @@ pub struct LoginUserBody {
 }
 
 #[tracing::instrument(skip_all)]
-pub async fn login_user<UR: IMultiUserService>(
+pub async fn login_user<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
     headers: HeaderMap,
     Json(body): Json<LoginUserBody>,

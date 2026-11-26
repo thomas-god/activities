@@ -43,12 +43,12 @@ use activities_core::{
         activity::ports::IActivityService, preferences::ports::IPreferencesService,
         search::ports::ISearchService, training::ports::ITrainingService,
     },
-    infra::config::MultiUserConfig,
+    infra::config::UserAuthConfig,
 };
 
 use activities_auth::{
-    auth::MultiUserAuthStrategy,
-    domain::{IMultiUserService, admin::IAdminService},
+    auth::UserAuthStrategy,
+    domain::{IUserService, admin::IAdminService},
     infra::http::{add_auth_router, handlers::admin::admin_routes},
 };
 
@@ -103,7 +103,7 @@ impl<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    US: IMultiUserService,
+    US: IUserService,
     PS: IPreferencesService,
     AD: IAdminService,
 > HttpServer<AS, PF, TMS, US, PS, AD>
@@ -118,7 +118,7 @@ impl<
         preferences_service: PS,
         search_service: SS,
         config: BaseConfig,
-        user_config: MultiUserConfig,
+        user_config: UserAuthConfig,
     ) -> anyhow::Result<Self> {
         let trace_layer = tower_http::trace::TraceLayer::new_for_http().make_span_with(
             |request: &axum::extract::Request<_>| {
@@ -148,7 +148,7 @@ impl<
         // `add_auth_router` only wraps the routes that already exist when it
         // is called, so mounting afterwards keeps the healthcheck outside the
         // auth middleware.
-        let auth_strategy = MultiUserAuthStrategy::from(&user_config);
+        let auth_strategy = UserAuthStrategy::from(&user_config);
         let mut router = add_auth_router(auth_strategy, router, user_service.clone())
             .route("/health", get(health));
 
@@ -484,8 +484,8 @@ mod tests {
         training::services::test_utils::MockTrainingService,
     };
 
-    fn auth_strategy(email: bool) -> MultiUserAuthStrategy {
-        MultiUserAuthStrategy::new(AuthMethods::new(email), UserRegistration::Allowed)
+    fn auth_strategy(email: bool) -> UserAuthStrategy {
+        UserAuthStrategy::new(AuthMethods::new(email), UserRegistration::Allowed)
     }
 
     #[tokio::test]

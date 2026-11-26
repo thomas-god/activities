@@ -43,7 +43,7 @@
 
 	// Account management (email/password) only exists for the multi-user strategy.
 	let showAccount = $derived(
-		isSome(authInfo) && authInfo.value !== undefined && authInfo.value.strategy === 'MultiUser'
+		isSome(authInfo) && authInfo.value !== undefined && authInfo.value.strategy !== 'NoAuth'
 	);
 
 	let theme = getTheme();

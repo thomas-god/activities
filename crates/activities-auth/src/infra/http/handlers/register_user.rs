@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use crate::{
     domain::{
-        EmailAddress, IMultiUserService, Password, UserRegistrationRequest, UserRegistrationResult,
+        EmailAddress, IUserService, Password, UserRegistrationRequest, UserRegistrationResult,
     },
     infra::http::handlers::{AuthAppState, UserRegistration},
 };
@@ -15,7 +15,7 @@ pub struct RegisterUserBody {
 }
 
 #[tracing::instrument(skip_all)]
-pub async fn register_user<UR: IMultiUserService>(
+pub async fn register_user<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
     Json(body): Json<RegisterUserBody>,
 ) -> StatusCode {

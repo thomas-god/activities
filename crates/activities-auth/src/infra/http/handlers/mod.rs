@@ -7,11 +7,11 @@ use axum::{
 use std::{sync::Arc, time::Duration};
 
 use crate::{
+    domain::IUserService,
     infra::http::{
         CookieConfig,
         rate_limit::{IpRateLimitLayer, RateLimitStore},
     },
-    domain::IMultiUserService,
 };
 
 pub use extractor::cookie_auth_middleware;
@@ -40,7 +40,7 @@ pub mod validate_login;
 pub use crate::auth::UserRegistration;
 
 #[derive(Debug, Clone)]
-pub struct AuthAppState<UR: IMultiUserService> {
+pub struct AuthAppState<UR: IUserService> {
     user_service: Arc<UR>,
     cookie_config: Arc<CookieConfig>,
     registration_mode: UserRegistration,
@@ -48,7 +48,7 @@ pub struct AuthAppState<UR: IMultiUserService> {
 
 impl<US> FromRef<AuthAppState<US>> for Arc<US>
 where
-    US: IMultiUserService,
+    US: IUserService,
 {
     fn from_ref(input: &AuthAppState<US>) -> Self {
         input.user_service.clone()
@@ -57,14 +57,14 @@ where
 
 impl<US> FromRef<AuthAppState<US>> for Arc<CookieConfig>
 where
-    US: IMultiUserService,
+    US: IUserService,
 {
     fn from_ref(input: &AuthAppState<US>) -> Self {
         input.cookie_config.clone()
     }
 }
 
-pub fn multi_user_login_routes<US: IMultiUserService, S>(
+pub fn multi_user_login_routes<US: IUserService, S>(
     mut base_router: Router<S>,
     user_service: US,
     registration_mode: UserRegistration,

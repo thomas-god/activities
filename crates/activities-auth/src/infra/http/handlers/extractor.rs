@@ -9,7 +9,7 @@ use cookie::{Cookie, time::OffsetDateTime};
 use std::{marker::PhantomData, sync::Arc};
 
 use crate::{
-    domain::{GenerateSessionTokenResult, IMultiUserService, SessionToken},
+    domain::{GenerateSessionTokenResult, IUserService, SessionToken},
     infra::http::{AuthenticatedSession, AuthenticatedUser, CookieConfig, SessionRevoked},
 };
 
@@ -20,7 +20,7 @@ pub struct CookieUserExtractor<US>(PhantomData<US>);
 impl<S, US> FromRequestParts<S> for CookieUserExtractor<US>
 where
     S: Send + Sync,
-    US: IMultiUserService,
+    US: IUserService,
     Arc<US>: FromRef<S>,
 {
     type Rejection = StatusCode;
@@ -54,7 +54,7 @@ pub async fn cookie_auth_middleware<US, S>(
     next: Next,
 ) -> Response
 where
-    US: IMultiUserService,
+    US: IUserService,
     S: Clone + Send + Sync + 'static,
     Arc<US>: FromRef<S>,
     Arc<CookieConfig>: FromRef<S>,

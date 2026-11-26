@@ -6,7 +6,7 @@ use axum::{
 };
 
 use crate::{
-    domain::{IMultiUserService, RevokeSessionsResult},
+    domain::{IUserService, RevokeSessionsResult},
     infra::http::{
         AuthenticatedSession, AuthenticatedUser, SessionRevoked, build_removal_cookie,
         handlers::AuthAppState,
@@ -14,7 +14,7 @@ use crate::{
 };
 
 #[tracing::instrument(skip_all)]
-pub async fn revoke_other_sessions<UR: IMultiUserService>(
+pub async fn revoke_other_sessions<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
     Extension(user): Extension<AuthenticatedUser>,
     Extension(session): Extension<AuthenticatedSession>,
@@ -30,7 +30,7 @@ pub async fn revoke_other_sessions<UR: IMultiUserService>(
 }
 
 #[tracing::instrument(skip_all)]
-pub async fn revoke_all_sessions<UR: IMultiUserService>(
+pub async fn revoke_all_sessions<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
     headers: HeaderMap,
     Extension(user): Extension<AuthenticatedUser>,

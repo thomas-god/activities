@@ -17,7 +17,7 @@ pub mod admin_audit;
 pub mod service;
 pub mod session;
 
-pub use service::{DisabledUserService, MultiUserService};
+pub use service::{DisabledUserService, UserService};
 pub use session::{SessionService, spawn_expired_sessions_cleanup};
 
 use activities_core::domain::shared::UserId;
@@ -636,7 +636,7 @@ pub enum AuthLinkValidationResult {
     Invalid,
 }
 
-pub trait IMultiUserService: Clone + Send + Sync + 'static {
+pub trait IUserService: Clone + Send + Sync + 'static {
     fn register_user(
         &self,
         req: UserRegistrationRequest,
@@ -826,7 +826,7 @@ pub mod test_utils {
             fn clone(&self) -> Self;
         }
 
-        impl IMultiUserService for UserService {
+        impl IUserService for UserService {
             async fn register_user(
                 &self,
                 req: UserRegistrationRequest,

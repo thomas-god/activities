@@ -8,7 +8,7 @@ use serde::Deserialize;
 
 use crate::{
     domain::{
-        IMultiUserService, RegisterPasswordRequest, RegisterPasswordResult, UpdatePasswordRequest,
+        IUserService, RegisterPasswordRequest, RegisterPasswordResult, UpdatePasswordRequest,
         UpdatePasswordResult,
     },
     infra::http::{
@@ -45,7 +45,7 @@ fn session_response(
 /// Registers the first password for the authenticated user, who must not have one yet. Once a
 /// password is set, `POST /api/password/change` must be used instead.
 #[tracing::instrument(skip_all)]
-pub async fn register_password<UR: IMultiUserService>(
+pub async fn register_password<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
     Extension(user): Extension<AuthenticatedUser>,
     headers: HeaderMap,
@@ -72,7 +72,7 @@ pub async fn register_password<UR: IMultiUserService>(
 /// password yet, `POST /api/password` (registration flow) must be used instead; no-password and
 /// wrong-password attempts are indistinguishable from the outside.
 #[tracing::instrument(skip_all)]
-pub async fn update_password<UR: IMultiUserService>(
+pub async fn update_password<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
     Extension(user): Extension<AuthenticatedUser>,
     headers: HeaderMap,

@@ -1,12 +1,12 @@
 use axum::{Extension, extract::State, http::StatusCode, response::IntoResponse};
 
 use crate::{
-    domain::{EmailVerificationResult, IMultiUserService},
+    domain::{EmailVerificationResult, IUserService},
     infra::http::{AuthenticatedUser, handlers::AuthAppState},
 };
 
 #[tracing::instrument(skip_all)]
-pub async fn request_email_verification<UR: IMultiUserService>(
+pub async fn request_email_verification<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> impl IntoResponse {

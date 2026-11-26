@@ -21,7 +21,7 @@
 	// The current user only exists in multi-user mode and requires a session: fetch it without
 	// blocking the initial render, so the admin navigation simply stays hidden until it resolves
 	// (and on the login page where the request answers `401`).
-	if (fetchedAuthInfo.strategy === 'MultiUser') {
+	if (fetchedAuthInfo.strategy !== 'NoAuth') {
 		void fetchUserInfo()
 			.then((user) => setInnerValue(currentUser, user))
 			.catch(() => {});

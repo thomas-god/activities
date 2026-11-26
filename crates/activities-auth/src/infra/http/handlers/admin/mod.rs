@@ -21,7 +21,7 @@ use activities_core::domain::shared::UserId;
 
 use crate::{
     domain::{
-        IMultiUserService,
+        IUserService,
         admin::{AdminError, IAdminService},
     },
     infra::http::{
@@ -42,13 +42,13 @@ pub use set_user_password::set_user_password;
 /// State shared by the admin routes: the user service used by the cookie middleware and the admin
 /// service backing the handlers.
 #[derive(Debug, Clone)]
-pub struct AdminAppState<US: IMultiUserService, AS: IAdminService> {
+pub struct AdminAppState<US: IUserService, AS: IAdminService> {
     user_service: Arc<US>,
     admin_service: Arc<AS>,
     cookie_config: Arc<CookieConfig>,
 }
 
-impl<US: IMultiUserService, AS: IAdminService> FromRef<AdminAppState<US, AS>> for Arc<US> {
+impl<US: IUserService, AS: IAdminService> FromRef<AdminAppState<US, AS>> for Arc<US> {
     fn from_ref(input: &AdminAppState<US, AS>) -> Self {
         input.user_service.clone()
     }
@@ -66,7 +66,7 @@ impl<AS: IAdminService> AdminServiceHandle<AS> {
     }
 }
 
-impl<US: IMultiUserService, AS: IAdminService> FromRef<AdminAppState<US, AS>>
+impl<US: IUserService, AS: IAdminService> FromRef<AdminAppState<US, AS>>
     for AdminServiceHandle<AS>
 {
     fn from_ref(input: &AdminAppState<US, AS>) -> Self {
@@ -74,7 +74,7 @@ impl<US: IMultiUserService, AS: IAdminService> FromRef<AdminAppState<US, AS>>
     }
 }
 
-impl<US: IMultiUserService, AS: IAdminService> FromRef<AdminAppState<US, AS>>
+impl<US: IUserService, AS: IAdminService> FromRef<AdminAppState<US, AS>>
     for Arc<CookieConfig>
 {
     fn from_ref(input: &AdminAppState<US, AS>) -> Self {
@@ -127,7 +127,7 @@ pub(crate) fn admin_error_status(err: AdminError) -> StatusCode {
 /// Builds the `/api/admin` router, mounted by the HTTP server under `/api`.
 pub fn admin_routes<US, AS>(user_service: US, admin_service: AS) -> Router
 where
-    US: IMultiUserService,
+    US: IUserService,
     AS: IAdminService,
 {
     let state = AdminAppState {

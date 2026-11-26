@@ -9,22 +9,22 @@ use crate::domain::{
     AuthLink, AuthLinkValidationResult, AuthMethods, AuthToken, CheckSessionResult, EmailAddress,
     EmailChangeFinalizeResult, EmailChangeToken, EmailChangeValidationResult,
     EmailVerificationResult, GenerateAuthLinkRequest, GenerateAuthLinkResult, HashedAuthLink,
-    HashedAuthToken, HashedEmailChangeToken, HashedPassword, HashedSessionToken, IMultiUserService,
-    ISessionService, MailProvider, Password, RegisterPasswordRequest, RegisterPasswordResult,
+    HashedAuthToken, HashedEmailChangeToken, HashedPassword, HashedSessionToken, ISessionService,
+    IUserService, MailProvider, Password, RegisterPasswordRequest, RegisterPasswordResult,
     RevokeSessionsResult, SessionToken, UpdateEmailRequest, UpdateEmailResult,
     UpdatePasswordRequest, UpdatePasswordResult, UserInfo, UserInfoResult, UserLoginResult,
     UserRegistrationRequest, UserRegistrationResult,
 };
 
 #[derive(Debug, Clone, Constructor)]
-pub struct MultiUserService<UR, SS, MP> {
+pub struct UserService<UR, SS, MP> {
     user_repository: Arc<UR>,
     session_service: SS,
     auth_methods: AuthMethods,
     mail_provider: Arc<MP>,
 }
 
-impl<UR, SS, MP> IMultiUserService for MultiUserService<UR, SS, MP>
+impl<UR, SS, MP> IUserService for UserService<UR, SS, MP>
 where
     UR: UserRepository,
     SS: ISessionService,
@@ -289,7 +289,7 @@ where
     }
 }
 
-impl<UR, SS, MP> MultiUserService<UR, SS, MP>
+impl<UR, SS, MP> UserService<UR, SS, MP>
 where
     UR: UserRepository,
     SS: ISessionService,
@@ -792,7 +792,7 @@ mod test_utils {
     pub fn mail_and_password_service(
         user: MockUserRepository,
         mail: MockMailProvider,
-    ) -> MultiUserService<MockUserRepository, MockSessionService, MockMailProvider> {
+    ) -> UserService<MockUserRepository, MockSessionService, MockMailProvider> {
         mail_and_password_service_with_session(user, MockSessionService::new(), mail)
     }
 
@@ -800,8 +800,8 @@ mod test_utils {
         user: MockUserRepository,
         session: MockSessionService,
         mail: MockMailProvider,
-    ) -> MultiUserService<MockUserRepository, MockSessionService, MockMailProvider> {
-        MultiUserService::new(
+    ) -> UserService<MockUserRepository, MockSessionService, MockMailProvider> {
+        UserService::new(
             Arc::new(user),
             session,
             AuthMethods::new(true),
@@ -812,7 +812,7 @@ mod test_utils {
     pub fn password_only_service(
         user: MockUserRepository,
         mail: MockMailProvider,
-    ) -> MultiUserService<MockUserRepository, MockSessionService, MockMailProvider> {
+    ) -> UserService<MockUserRepository, MockSessionService, MockMailProvider> {
         password_only_service_with_session(user, MockSessionService::new(), mail)
     }
 
@@ -820,8 +820,8 @@ mod test_utils {
         user: MockUserRepository,
         session: MockSessionService,
         mail: MockMailProvider,
-    ) -> MultiUserService<MockUserRepository, MockSessionService, MockMailProvider> {
-        MultiUserService::new(
+    ) -> UserService<MockUserRepository, MockSessionService, MockMailProvider> {
+        UserService::new(
             Arc::new(user),
             session,
             AuthMethods::new(false),
@@ -1804,7 +1804,7 @@ mod test_user_service_password_management {
 #[derive(Debug, Clone)]
 pub struct DisabledUserService {}
 
-impl IMultiUserService for DisabledUserService {
+impl IUserService for DisabledUserService {
     async fn check_session_token(&self, _token: &SessionToken) -> Result<CheckSessionResult, ()> {
         panic!("User service is disabled")
     }
@@ -1911,7 +1911,7 @@ mod test_user_service_validate_auth_link {
     fn new_service(
         user: MockUserRepository,
         session: MockSessionService,
-    ) -> MultiUserService<MockUserRepository, MockSessionService, MockMailProvider> {
+    ) -> UserService<MockUserRepository, MockSessionService, MockMailProvider> {
         mail_and_password_service_with_session(user, session, MockMailProvider::new())
     }
 
@@ -2105,7 +2105,7 @@ mod test_user_service_check_session_token {
 
     fn new_service(
         session: MockSessionService,
-    ) -> MultiUserService<MockUserRepository, MockSessionService, MockMailProvider> {
+    ) -> UserService<MockUserRepository, MockSessionService, MockMailProvider> {
         mail_and_password_service_with_session(
             MockUserRepository::new(),
             session,

@@ -4,7 +4,7 @@ use anyhow::{Ok, anyhow};
 
 use activities_auth::{
     domain::{
-        AuthMethods, MultiUserService, SessionService,
+        AuthMethods, SessionService, UserService,
         admin::AdminService,
         service::{
             UserRepository, spawn_expired_auth_links_cleanup,
@@ -25,7 +25,7 @@ use activities_core::{
     infra::{
         backup::BackupService,
         clock::Clock,
-        config::{BackupConfig, BaseConfig, EmailAuthConfig, MultiUserConfig, StdEnvironment},
+        config::{BackupConfig, BaseConfig, EmailAuthConfig, StdEnvironment, UserAuthConfig},
         fs::FilesystemRawDataRepository,
         parser::Parser,
         sqlite::{
@@ -49,7 +49,7 @@ type ActualTrainingService = TrainingService<
     >,
     Clock,
 >;
-type ActualUserService = MultiUserService<
+type ActualUserService = UserService<
     SqliteUsersRepository,
     SessionService<SqliteUsersRepository>,
     MaybeMailProvider<SMTPEmailProvider>,
@@ -80,7 +80,7 @@ pub async fn bootstrap_app() -> anyhow::Result<(
 
     let config = BaseConfig::from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
     let user_config =
-        MultiUserConfig::try_from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
+        UserAuthConfig::try_from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
 
     let activity_notify = Arc::new(tokio::sync::Notify::new());
     let training_notify = Arc::new(tokio::sync::Notify::new());
@@ -230,7 +230,7 @@ fn passwordless_users_warning(count: u64, email_auth_enabled: bool) -> Option<St
 
 async fn build_user_service(
     config: &BaseConfig,
-    mode_config: &MultiUserConfig,
+    mode_config: &UserAuthConfig,
 ) -> anyhow::Result<(ActualUserService, ActualAdminService)> {
     let root_path = PathBuf::from(config.activities_data_path.clone());
     let db_dir = root_path.clone().join("db/");
@@ -295,7 +295,7 @@ async fn build_user_service(
 
     let session_service = SessionService::new(users_repository.clone());
     let auth_methods = AuthMethods::new(mode_config.email.is_some());
-    let user_service = MultiUserService::new(
+    let user_service = UserService::new(
         users_repository,
         session_service,
         auth_methods,
@@ -367,16 +367,16 @@ mod tests {
         }
     }
 
-    fn password_only_config() -> MultiUserConfig {
-        MultiUserConfig {
+    fn password_only_config() -> UserAuthConfig {
+        UserAuthConfig {
             email: None,
             allow_registration: true,
             admin_bootstrap: None,
         }
     }
 
-    fn admin_bootstrap_config(email: &str, password: &str) -> MultiUserConfig {
-        MultiUserConfig {
+    fn admin_bootstrap_config(email: &str, password: &str) -> UserAuthConfig {
+        UserAuthConfig {
             email: None,
             allow_registration: true,
             admin_bootstrap: Some(crate::config::AdminBootstrapConfig {

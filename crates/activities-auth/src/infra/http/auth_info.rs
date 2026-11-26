@@ -2,8 +2,8 @@ use axum::{Json, Router, extract::State, response::IntoResponse, routing::get};
 use serde::Serialize;
 
 use crate::{
-    auth::MultiUserAuthStrategy,
-    domain::{AuthMethods, IMultiUserService},
+    auth::UserAuthStrategy,
+    domain::{AuthMethods, IUserService},
     infra::http::handlers::multi_user_login_routes,
 };
 
@@ -30,8 +30,8 @@ impl From<&AuthMethods> for AuthInfoMethods {
     }
 }
 
-pub fn add_auth_router<S, US: IMultiUserService>(
-    strategy: MultiUserAuthStrategy,
+pub fn add_auth_router<S, US: IUserService>(
+    strategy: UserAuthStrategy,
     base_router: Router<S>,
     user_service: US,
 ) -> Router<S>
@@ -63,20 +63,20 @@ mod tests {
     use axum_test::TestServer;
 
     use crate::{
-        auth::{MultiUserAuthStrategy, UserRegistration},
+        auth::{UserAuthStrategy, UserRegistration},
         domain::{AuthMethods, test_utils::MockUserService},
     };
 
     use super::*;
 
-    fn multi_user_strategy(email: bool, allow_registration: bool) -> MultiUserAuthStrategy {
-        MultiUserAuthStrategy::new(
+    fn multi_user_strategy(email: bool, allow_registration: bool) -> UserAuthStrategy {
+        UserAuthStrategy::new(
             AuthMethods::new(email),
             UserRegistration::from(allow_registration),
         )
     }
 
-    fn build_server(config: MultiUserAuthStrategy, user_service: MockUserService) -> TestServer {
+    fn build_server(config: UserAuthStrategy, user_service: MockUserService) -> TestServer {
         // `add_auth_router` adds a `route_layer`, which panics if the base router has no route
         // yet; give it one so the middleware has something to wrap.
         let base_router = Router::new().route("/", get(|| async { StatusCode::OK }));

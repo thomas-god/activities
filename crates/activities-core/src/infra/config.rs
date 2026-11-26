@@ -315,13 +315,13 @@ impl AdminBootstrapConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct MultiUserConfig {
+pub struct UserAuthConfig {
     pub email: Option<EmailAuthConfig>,
     pub allow_registration: bool,
     pub admin_bootstrap: Option<AdminBootstrapConfig>,
 }
-impl MultiUserConfig {
-    pub fn try_from_env<T: Environment>(env: &T) -> Result<MultiUserConfig, String> {
+impl UserAuthConfig {
+    pub fn try_from_env<T: Environment>(env: &T) -> Result<UserAuthConfig, String> {
         let allow_registration = load_env(env, MULTI_USER_ALLOW_REGISTRATION_KEY).as_string();
 
         let allow_registration = match allow_registration {
@@ -332,7 +332,7 @@ impl MultiUserConfig {
         let email = EmailAuthConfig::try_from_env(env)?;
         let admin_bootstrap = AdminBootstrapConfig::try_from_env(env)?;
 
-        Ok(MultiUserConfig {
+        Ok(UserAuthConfig {
             email,
             allow_registration,
             admin_bootstrap,
@@ -599,7 +599,7 @@ mod test_config {
     fn test_multi_user_config_try_from_env_without_email_is_password_only() {
         let env = MockEnvironment::default();
 
-        let config = MultiUserConfig::try_from_env(&env).unwrap();
+        let config = UserAuthConfig::try_from_env(&env).unwrap();
 
         assert!(config.email.is_none());
         assert!(config.allow_registration);
@@ -629,7 +629,7 @@ mod test_config {
             EnvironmentVariable::Set("example.com".to_string()),
         );
 
-        let config = MultiUserConfig::try_from_env(&env).unwrap();
+        let config = UserAuthConfig::try_from_env(&env).unwrap();
 
         let email = config.email.as_ref().unwrap();
         assert_eq!(email.from, "noreply@example.com");
@@ -668,7 +668,7 @@ mod test_config {
         let mut env = MockEnvironment::default();
         set_full_multi_user_env(&mut env);
 
-        let config = MultiUserConfig::try_from_env(&env).unwrap();
+        let config = UserAuthConfig::try_from_env(&env).unwrap();
 
         assert!(config.allow_registration);
     }
@@ -682,7 +682,7 @@ mod test_config {
             EnvironmentVariable::Set("false".to_string()),
         );
 
-        let config = MultiUserConfig::try_from_env(&env).unwrap();
+        let config = UserAuthConfig::try_from_env(&env).unwrap();
 
         assert!(!config.allow_registration);
     }
@@ -704,7 +704,7 @@ mod test_config {
                 EnvironmentVariable::Set(value.to_string()),
             );
 
-            let config = MultiUserConfig::try_from_env(&env).unwrap();
+            let config = UserAuthConfig::try_from_env(&env).unwrap();
 
             assert_eq!(
                 config.allow_registration, expected,
@@ -722,7 +722,7 @@ mod test_config {
             EnvironmentVariable::Set("banana".to_string()),
         );
 
-        let err = MultiUserConfig::try_from_env(&env).unwrap_err();
+        let err = UserAuthConfig::try_from_env(&env).unwrap_err();
 
         assert!(err.contains(MULTI_USER_ALLOW_REGISTRATION_KEY));
         assert!(err.contains("banana"));
@@ -736,7 +736,7 @@ mod test_config {
             EnvironmentVariable::Set("noreply@example.com".to_string()),
         );
 
-        assert!(MultiUserConfig::try_from_env(&env).is_err());
+        assert!(UserAuthConfig::try_from_env(&env).is_err());
     }
 
     #[test]
@@ -744,7 +744,7 @@ mod test_config {
         let env = MockEnvironment::default();
 
         assert!(
-            MultiUserConfig::try_from_env(&env)
+            UserAuthConfig::try_from_env(&env)
                 .unwrap()
                 .admin_bootstrap
                 .is_none()
@@ -763,7 +763,7 @@ mod test_config {
             EnvironmentVariable::Set("s3cret".to_string()),
         );
 
-        let config = MultiUserConfig::try_from_env(&env)
+        let config = UserAuthConfig::try_from_env(&env)
             .unwrap()
             .admin_bootstrap
             .unwrap();
@@ -786,7 +786,7 @@ mod test_config {
             EnvironmentVariable::Set(tmpfile.path().to_str().unwrap().to_string()),
         );
 
-        let config = MultiUserConfig::try_from_env(&env)
+        let config = UserAuthConfig::try_from_env(&env)
             .unwrap()
             .admin_bootstrap
             .unwrap();
@@ -802,7 +802,7 @@ mod test_config {
             EnvironmentVariable::Set("admin@example.com".to_string()),
         );
 
-        let err = MultiUserConfig::try_from_env(&env).unwrap_err();
+        let err = UserAuthConfig::try_from_env(&env).unwrap_err();
 
         assert!(err.contains(MULTI_USER_BOOTSTRAP_ADMIN_PASSWORD_KEY));
     }
@@ -815,7 +815,7 @@ mod test_config {
             EnvironmentVariable::Set("s3cret".to_string()),
         );
 
-        let err = MultiUserConfig::try_from_env(&env).unwrap_err();
+        let err = UserAuthConfig::try_from_env(&env).unwrap_err();
 
         assert!(err.contains(MULTI_USER_BOOTSTRAP_ADMIN_EMAIL_KEY));
     }
@@ -832,7 +832,7 @@ mod test_config {
             EnvironmentVariable::Set(String::new()),
         );
 
-        let err = MultiUserConfig::try_from_env(&env).unwrap_err();
+        let err = UserAuthConfig::try_from_env(&env).unwrap_err();
 
         assert!(err.contains(MULTI_USER_BOOTSTRAP_ADMIN_PASSWORD_KEY));
     }

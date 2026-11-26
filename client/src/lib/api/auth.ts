@@ -1,6 +1,6 @@
 import { PUBLIC_APP_URL } from '$app/env/public';
 
-export type AuthStrategy = 'NoAuth' | 'MultiUser';
+export type AuthStrategy = 'NoAuth';
 
 /** Authentication methods enabled on a multi-user instance. */
 export interface AuthMethods {
@@ -10,9 +10,7 @@ export interface AuthMethods {
 
 export interface AuthInfo {
 	strategy?: AuthStrategy;
-	/** Whether new users can currently register (only present for the `MultiUser` strategy). */
 	registration_open?: boolean;
-	/** Authentication methods active on the instance (only present for the `MultiUser` strategy). */
 	auth_methods?: AuthMethods;
 }
 
@@ -23,7 +21,7 @@ export interface AuthInfo {
  * it is optional — omitting it (or sending an empty string) falls back to the authentication-link
  * email flow when email-based auth is enabled.
  */
-export interface MultiUserAuthRequest {
+export interface UserAuthRequest {
 	email: string;
 	password?: string;
 }

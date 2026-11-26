@@ -2,7 +2,7 @@ use axum::{Extension, Json, extract::State, http::StatusCode, response::IntoResp
 use serde::Serialize;
 
 use crate::{
-    domain::{IMultiUserService, UserInfo, UserInfoResult},
+    domain::{IUserService, UserInfo, UserInfoResult},
     infra::http::{AuthenticatedUser, handlers::AuthAppState},
 };
 
@@ -31,7 +31,7 @@ impl From<UserInfo> for UserInfoResponse {
 }
 
 #[tracing::instrument(skip_all)]
-pub async fn get_me<UR: IMultiUserService>(
+pub async fn get_me<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
     Extension(user): Extension<AuthenticatedUser>,
 ) -> impl IntoResponse {

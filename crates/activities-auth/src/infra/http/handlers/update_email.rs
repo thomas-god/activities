@@ -4,7 +4,7 @@ use serde_json::json;
 
 use crate::{
     domain::{
-        AuthToken, EmailAddress, EmailChangeValidationResult, IMultiUserService,
+        AuthToken, EmailAddress, EmailChangeValidationResult, IUserService,
         UpdateEmailRequest, UpdateEmailResult,
     },
     infra::http::{AuthenticatedUser, handlers::AuthAppState},
@@ -16,7 +16,7 @@ pub struct UpdateEmailBody {
 }
 
 #[tracing::instrument(skip_all)]
-pub async fn update_email<UR: IMultiUserService>(
+pub async fn update_email<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
     axum::Extension(user): Extension<AuthenticatedUser>,
     Json(body): Json<UpdateEmailBody>,
@@ -48,7 +48,7 @@ pub struct ValidateEmailChangeBody {
 // TODO: reconsider whether an email change should invalidate existing sessions once session
 // revocation is implemented.
 #[tracing::instrument(skip_all)]
-pub async fn validate_email_change<UR: IMultiUserService>(
+pub async fn validate_email_change<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
     Json(body): Json<ValidateEmailChangeBody>,
 ) -> impl IntoResponse {

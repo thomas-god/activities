@@ -6,14 +6,14 @@ use axum::{
 use axum_extra::extract::CookieJar;
 
 use crate::{
-    domain::IMultiUserService,
+    domain::IUserService,
     infra::http::{build_removal_cookie, handlers::AuthAppState},
 };
 
 /// Always succeeds and clears the session cookie, whether or not a session was found: from the
 /// client's point of view logout is idempotent, it just means "no session" afterwards.
 #[tracing::instrument(skip_all)]
-pub async fn logout<UR: IMultiUserService>(
+pub async fn logout<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
     headers: HeaderMap,
     jar: CookieJar,

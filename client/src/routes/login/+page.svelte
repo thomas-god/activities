@@ -5,7 +5,7 @@
 	import { isSome, none, some, type Option } from '#lib/Options.js';
 	import z from 'zod';
 	import { resolve } from '$app/paths';
-	import { fetchAuthInfo, type AuthInfo, type MultiUserAuthRequest } from '#lib/api/index.js';
+	import { fetchAuthInfo, type AuthInfo, type UserAuthRequest } from '#lib/api/index.js';
 
 	let email = $state('');
 	const validator = z.email();
@@ -41,9 +41,9 @@
 	const emailAuthEnabled = authInfo.auth_methods?.email ?? false;
 	const registrationOpen = authInfo.registration_open ?? false;
 
-	let multiUserLoginError: string | null = $state(null);
-	let multiUserLoginInfo: string | null = $state(null);
-	let multiUserRequestPending = $state(false);
+	let userLoginError: string | null = $state(null);
+	let userLoginInfo: string | null = $state(null);
+	let userRequestPending = $state(false);
 
 	const authLinkSentMessage =
 		"You're going to receive an email containing an authentication link to login!";
@@ -59,14 +59,14 @@
 			body: JSON.stringify(body)
 		});
 
-	const submitMultiUser = async (
+	const submitUserLogin = async (
 		path: string,
-		body: MultiUserAuthRequest,
+		body: UserAuthRequest,
 		onSuccess: () => void | Promise<void>
 	): Promise<void> => {
-		multiUserLoginError = null;
-		multiUserLoginInfo = null;
-		multiUserRequestPending = true;
+		userLoginError = null;
+		userLoginInfo = null;
+		userRequestPending = true;
 		try {
 			const res = await postJson(path, body);
 			if (res.status === 200) {
@@ -74,29 +74,29 @@
 			} else if (res.status === 401) {
 				// Single, uniform response for unknown account / wrong password / account without a
 				// password, so the client cannot (and must not) tell them apart.
-				multiUserLoginError = 'Invalid login';
+				userLoginError = 'Invalid login';
 			} else if (res.status === 400) {
-				multiUserLoginError = 'A password is required';
+				userLoginError = 'A password is required';
 			} else if (res.status === 429) {
-				multiUserLoginError = 'Too many attempts, retry later';
+				userLoginError = 'Too many attempts, retry later';
 			} else if (res.status === 503) {
-				multiUserLoginError = 'Service unavailable, retry later';
+				userLoginError = 'Service unavailable, retry later';
 			} else {
-				multiUserLoginError = 'Something went wrong, retry later';
+				userLoginError = 'Something went wrong, retry later';
 			}
 		} catch {
-			multiUserLoginError = 'Something went wrong, retry later';
+			userLoginError = 'Something went wrong, retry later';
 		} finally {
-			multiUserRequestPending = false;
+			userRequestPending = false;
 		}
 	};
 
-	const callbackMultiUserLogin = (): Promise<void> => {
+	const callbackUserLogin = (): Promise<void> => {
 		if (!isEmailValid || password.trim().length === 0) {
 			return Promise.resolve();
 		}
-		const body: MultiUserAuthRequest = { email, password };
-		return submitMultiUser('/api/login', body, () => goto(resolve('/')));
+		const body: UserAuthRequest = { email, password };
+		return submitUserLogin('/api/login', body, () => goto(resolve('/')));
 	};
 
 	// Only reachable when email-based auth is enabled: omitting the password requests an
@@ -105,8 +105,8 @@
 		if (!isEmailValid) {
 			return Promise.resolve();
 		}
-		return submitMultiUser('/api/login', { email } satisfies MultiUserAuthRequest, () => {
-			multiUserLoginInfo = authLinkSentMessage;
+		return submitUserLogin('/api/login', { email } satisfies UserAuthRequest, () => {
+			userLoginInfo = authLinkSentMessage;
 		});
 	};
 
@@ -114,8 +114,8 @@
 		if (!isEmailValid || password.trim().length === 0) {
 			return Promise.resolve();
 		}
-		return submitMultiUser('/api/register', { email, password }, () => {
-			multiUserLoginInfo = emailAuthEnabled
+		return submitUserLogin('/api/register', { email, password }, () => {
+			userLoginInfo = emailAuthEnabled
 				? 'Account created. You can log in with your password, or use the link sent to your inbox.'
 				: 'Account created. You can now log in with your password.';
 		});
@@ -169,7 +169,7 @@
 				bind:value={password}
 				onkeypress={(e) => {
 					if (e.key === 'Enter') {
-						callbackMultiUserLogin();
+						callbackUserLogin();
 					}
 				}}
 			/>
@@ -177,13 +177,13 @@
 			<div class="join mx-auto mt-4 join-horizontal gap-4">
 				<button
 					class="btn join-item rounded-xs btn-primary"
-					disabled={multiUserRequestPending || !isEmailValid || password.trim().length === 0}
-					onclick={callbackMultiUserLogin}>Login</button
+					disabled={userRequestPending || !isEmailValid || password.trim().length === 0}
+					onclick={callbackUserLogin}>Login</button
 				>
 				{#if registrationOpen}
 					<button
 						class="btn join-item rounded-xs btn-secondary"
-						disabled={multiUserRequestPending || !isEmailValid || password.trim().length === 0}
+						disabled={userRequestPending || !isEmailValid || password.trim().length === 0}
 						onclick={callbackRegister}>Register</button
 					>
 				{/if}
@@ -192,21 +192,21 @@
 			{#if emailAuthEnabled}
 				<button
 					class="btn mt-2 w-full btn-ghost btn-sm"
-					disabled={multiUserRequestPending || !isEmailValid}
+					disabled={userRequestPending || !isEmailValid}
 					onclick={callbackRequestAuthLink}>Email me a link instead</button
 				>
 			{/if}
 
-			{#if multiUserRequestPending}
+			{#if userRequestPending}
 				<div class="flex w-full justify-center pt-2">
 					<span class="loading loading-spinner"></span>
 				</div>
 			{/if}
-			{#if multiUserLoginError}
-				<p class="mt-2 text-error">{multiUserLoginError}</p>
+			{#if userLoginError}
+				<p class="mt-2 text-error">{userLoginError}</p>
 			{/if}
-			{#if multiUserLoginInfo}
-				<p class="mt-2">{multiUserLoginInfo}</p>
+			{#if userLoginInfo}
+				<p class="mt-2">{userLoginInfo}</p>
 			{/if}
 		</fieldset>
 	</div>
