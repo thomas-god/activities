@@ -17,7 +17,7 @@ pub mod admin_audit;
 pub mod service;
 pub mod session;
 
-pub use service::{DisabledUserService, UserService};
+pub use service::UserService;
 pub use session::{SessionService, spawn_expired_sessions_cleanup};
 
 use activities_core::domain::shared::UserId;

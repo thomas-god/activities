@@ -409,65 +409,6 @@ impl<AR: AdminRepository, C: IClock> IAdminService for AdminService<AR, C> {
     }
 }
 
-/// No-op admin service for the single-user modes, where the admin role does not exist and the
-/// admin routes are never mounted.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct DisabledAdminService {}
-
-impl IAdminService for DisabledAdminService {
-    async fn is_admin(&self, _user: UserId) -> Result<bool, AdminError> {
-        Err(AdminError::Storage)
-    }
-
-    async fn list_users(&self) -> Result<Vec<AdminUser>, AdminError> {
-        Err(AdminError::Storage)
-    }
-
-    async fn create_user(
-        &self,
-        _actor: &AdminActor,
-        _email: EmailAddress,
-        _password: Password,
-    ) -> Result<CreateUserOutcome, AdminError> {
-        Err(AdminError::Storage)
-    }
-
-    async fn set_user_password(
-        &self,
-        _actor: &AdminActor,
-        _user: UserId,
-        _password: Password,
-    ) -> Result<SetUserPasswordOutcome, AdminError> {
-        Err(AdminError::Storage)
-    }
-
-    async fn set_user_email(
-        &self,
-        _actor: &AdminActor,
-        _user: UserId,
-        _email: EmailAddress,
-    ) -> Result<SetUserEmailOutcome, AdminError> {
-        Err(AdminError::Storage)
-    }
-
-    async fn set_admin(
-        &self,
-        _actor: &AdminActor,
-        _user: UserId,
-        _is_admin: bool,
-    ) -> Result<SetAdminOutcome, AdminError> {
-        Err(AdminError::Storage)
-    }
-
-    async fn revoke_user_sessions(
-        &self,
-        _actor: &AdminActor,
-        _user: UserId,
-    ) -> Result<u64, AdminError> {
-        Err(AdminError::Storage)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use mockall::mock;
