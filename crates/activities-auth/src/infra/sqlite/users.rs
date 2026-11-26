@@ -15,6 +15,10 @@ use crate::domain::{
         BootstrapAdminMode, BootstrapAdminOutcome, CreateUserOutcome, PromoteAdminOutcome,
         RevokeAdminOutcome, SetAdminOutcome, SetUserEmailOutcome, SetUserPasswordOutcome,
     },
+    api_key::{
+        APIKeyActivity, APIKeyError, APIKeyId, APIPermission, HashedAPIKey, HashedAPIKeyValue,
+        IAPIKeyRepository, MaskedAPIKeyValue,
+    },
     service::UserRepository,
     session::SessionRepository,
 };
@@ -1716,6 +1720,247 @@ impl SessionRepository for SqliteUsersRepository {
         .await
         .map(|_| ())
         .map_err(|_| ())
+    }
+}
+
+type ApiKeyRow = (
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    Option<DateTime<Utc>>,
+    Option<DateTime<Utc>>,
+);
+
+fn permission_as_str(permission: &APIPermission) -> &'static str {
+    match permission {
+        APIPermission::Read => "read",
+        APIPermission::Write => "write",
+        APIPermission::Delete => "delete",
+    }
+}
+
+fn permission_from_str(value: &str) -> Result<APIPermission, APIKeyError> {
+    match value {
+        "read" => Ok(APIPermission::Read),
+        "write" => Ok(APIPermission::Write),
+        "delete" => Ok(APIPermission::Delete),
+        other => Err(APIKeyError::StorageError(anyhow!(
+            "Invalid API key permission in database: {other}"
+        ))),
+    }
+}
+
+fn hashed_api_key_from_row(row: ApiKeyRow) -> Result<HashedAPIKey, APIKeyError> {
+    let (user, key_id, name, permission, key_hash, display, expire_at, disabled_at) = row;
+
+    Ok(HashedAPIKey::new(
+        UserId::from(user),
+        APIKeyId::from(key_id),
+        name,
+        permission_from_str(&permission)?,
+        HashedAPIKeyValue::new(key_hash),
+        MaskedAPIKeyValue::new(display),
+        expire_at,
+        disabled_at,
+    ))
+}
+
+impl IAPIKeyRepository for SqliteUsersRepository {
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn save_key(&self, key: HashedAPIKey) -> Result<(), APIKeyError> {
+        let res = sqlx::query(
+            r#"
+        INSERT INTO t_api_keys (
+            key_id, user, name, permission, key_hash, display, expire_at, disabled_at
+        )
+        SELECT ?1, rowid, ?3, ?4, ?5, ?6, ?7, ?8
+        FROM t_users
+        WHERE user_id = ?2
+        ON CONFLICT (key_id) DO UPDATE SET
+            user = excluded.user,
+            name = excluded.name,
+            permission = excluded.permission,
+            key_hash = excluded.key_hash,
+            display = excluded.display,
+            expire_at = excluded.expire_at,
+            disabled_at = excluded.disabled_at
+        ;"#,
+        )
+        .bind(key.id().as_str())
+        .bind(key.user().to_string())
+        .bind(key.name())
+        .bind(permission_as_str(key.permission()))
+        .bind(key.value().as_str())
+        .bind(key.display().as_str())
+        .bind(*key.expire_at())
+        .bind(*key.disabled_at())
+        .execute(&self.writer)
+        .await
+        .map_err(|err| {
+            tracing::warn!("Unable to save API key in database: {}", err);
+            APIKeyError::StorageError(anyhow!(err))
+        })?;
+
+        if res.rows_affected() == 0 {
+            return Err(APIKeyError::StorageError(anyhow!(
+                "Cannot save API key for unknown user"
+            )));
+        }
+
+        Ok(())
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn delete_key(&self, user: &UserId, key: &APIKeyId) -> Result<(), APIKeyError> {
+        let res = sqlx::query(
+            r#"
+        DELETE FROM t_api_keys
+        WHERE
+            key_id = ?1
+            AND user = (SELECT rowid FROM t_users WHERE user_id = ?2)
+        ;"#,
+        )
+        .bind(key.as_str())
+        .bind(user.to_string())
+        .execute(&self.writer)
+        .await
+        .map_err(|err| {
+            tracing::warn!("Unable to delete API key from database: {}", err);
+            APIKeyError::StorageError(anyhow!(err))
+        })?;
+
+        if res.rows_affected() == 0 {
+            return Err(APIKeyError::KeyDoesNotExist);
+        }
+
+        Ok(())
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn get_key_by_id(&self, key: &APIKeyId) -> Result<HashedAPIKey, APIKeyError> {
+        let row: Option<ApiKeyRow> = sqlx::query_as(
+            r#"
+        SELECT
+            u.user_id,
+            k.key_id,
+            k.name,
+            k.permission,
+            k.key_hash,
+            k.display,
+            k.expire_at,
+            k.disabled_at
+        FROM t_api_keys k
+        JOIN t_users u ON u.rowid = k.user
+        WHERE k.key_id = ?1
+        ;"#,
+        )
+        .bind(key.as_str())
+        .fetch_optional(&self.readers)
+        .await
+        .map_err(|err| {
+            tracing::warn!("Unable to fetch API key from database: {}", err);
+            APIKeyError::StorageError(anyhow!(err))
+        })?;
+
+        row.map(hashed_api_key_from_row)
+            .transpose()?
+            .ok_or(APIKeyError::KeyDoesNotExist)
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn get_key_by_hash(&self, hash: &HashedAPIKeyValue) -> Result<HashedAPIKey, APIKeyError> {
+        let row: Option<ApiKeyRow> = sqlx::query_as(
+            r#"
+        SELECT
+            u.user_id,
+            k.key_id,
+            k.name,
+            k.permission,
+            k.key_hash,
+            k.display,
+            k.expire_at,
+            k.disabled_at
+        FROM t_api_keys k
+        JOIN t_users u ON u.rowid = k.user
+        WHERE k.key_hash = ?1
+        ;"#,
+        )
+        .bind(hash.as_str())
+        .fetch_optional(&self.readers)
+        .await
+        .map_err(|err| {
+            tracing::warn!("Unable to fetch API key by hash from database: {}", err);
+            APIKeyError::StorageError(anyhow!(err))
+        })?;
+
+        row.map(hashed_api_key_from_row)
+            .transpose()?
+            .ok_or(APIKeyError::KeyDoesNotExist)
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn save_key_activity(&self, activity: &APIKeyActivity) -> Result<(), APIKeyError> {
+        let res = sqlx::query(
+            r#"
+        INSERT INTO t_api_key_activity (api_key, user, activity, timestamp)
+        SELECT k.rowid, k.user, ?3, ?4
+        FROM t_api_keys k
+        JOIN t_users u ON u.rowid = k.user
+        WHERE k.key_id = ?1 AND u.user_id = ?2
+        ;"#,
+        )
+        .bind(activity.key().as_str())
+        .bind(activity.user().to_string())
+        .bind(activity.activity())
+        .bind(*activity.timestamp())
+        .execute(&self.writer)
+        .await
+        .map_err(|err| {
+            tracing::warn!("Unable to save API key activity in database: {}", err);
+            APIKeyError::StorageError(anyhow!(err))
+        })?;
+
+        if res.rows_affected() == 0 {
+            return Err(APIKeyError::KeyDoesNotExist);
+        }
+
+        Ok(())
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn get_key_activity_logs(
+        &self,
+        user: &UserId,
+        key: &APIKeyId,
+    ) -> Result<Vec<APIKeyActivity>, APIKeyError> {
+        let rows: Vec<(String, String, String, DateTime<Utc>)> = sqlx::query_as(
+            r#"
+        SELECT u.user_id, k.key_id, a.activity, a.timestamp
+        FROM t_api_key_activity a
+        JOIN t_api_keys k ON k.rowid = a.api_key
+        JOIN t_users u ON u.rowid = a.user
+        WHERE k.key_id = ?1 AND u.user_id = ?2
+        ORDER BY a.timestamp, a.id
+        ;"#,
+        )
+        .bind(key.as_str())
+        .bind(user.to_string())
+        .fetch_all(&self.readers)
+        .await
+        .map_err(|err| {
+            tracing::warn!("Unable to fetch API key activity from database: {}", err);
+            APIKeyError::StorageError(anyhow!(err))
+        })?;
+
+        Ok(rows
+            .into_iter()
+            .map(|(user, key, activity, timestamp)| {
+                APIKeyActivity::new(UserId::from(user), APIKeyId::from(key), activity, timestamp)
+            })
+            .collect())
     }
 }
 
@@ -4310,5 +4555,259 @@ mod test_sqlite_users_repository {
                 .unwrap(),
             None
         );
+    }
+}
+
+#[cfg(test)]
+mod test_sqlite_api_key_repository {
+    use chrono::{TimeDelta, Utc};
+    use tempfile::NamedTempFile;
+
+    use crate::domain::{
+        EmailAddress,
+        api_key::{
+            APIKeyActivity, APIKeyError, APIKeyId, APIPermission, HashedAPIKey, HashedAPIKeyValue,
+            IAPIKeyRepository,
+        },
+    };
+
+    use activities_core::domain::shared::UserId;
+
+    use super::*;
+
+    async fn repository_with_test_user() -> (NamedTempFile, SqliteUsersRepository) {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        repository
+            .store_user(
+                &UserId::test_default(),
+                &EmailAddress::try_from("test@mail.test").unwrap(),
+                None,
+            )
+            .await
+            .expect("should have stored user with email");
+
+        (db_file, repository)
+    }
+
+    fn hashed_key(id: &str) -> HashedAPIKey {
+        HashedAPIKey::new(
+            UserId::test_default(),
+            APIKeyId::from(id),
+            "test key".to_string(),
+            APIPermission::Write,
+            HashedAPIKeyValue::new("key-hash".to_string()),
+            MaskedAPIKeyValue::new("abc***xyz".to_string()),
+            Some(Utc::now() + TimeDelta::days(30)),
+            None,
+        )
+    }
+
+    fn activity(key: &APIKeyId, text: &str, timestamp: DateTime<Utc>) -> APIKeyActivity {
+        APIKeyActivity::new(
+            UserId::test_default(),
+            key.clone(),
+            text.to_string(),
+            timestamp,
+        )
+    }
+
+    #[tokio::test]
+    async fn test_save_and_get_key_by_id_round_trip() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let key = hashed_key("key-1");
+
+        repository.save_key(key.clone()).await.unwrap();
+
+        let stored = repository.get_key_by_id(key.id()).await.unwrap();
+        assert_eq!(stored.user(), key.user());
+        assert_eq!(stored.id(), key.id());
+        assert_eq!(stored.name(), key.name());
+        assert!(matches!(stored.permission(), APIPermission::Write));
+        assert_eq!(stored.value(), key.value());
+        assert_eq!(stored.display(), key.display());
+        assert_eq!(stored.expire_at(), key.expire_at());
+        assert_eq!(stored.disabled_at(), key.disabled_at());
+    }
+
+    #[tokio::test]
+    async fn test_save_and_get_key_by_hash_round_trip() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let key = hashed_key("key-1");
+
+        repository.save_key(key.clone()).await.unwrap();
+
+        let stored = repository.get_key_by_hash(key.value()).await.unwrap();
+        assert_eq!(stored.id(), key.id());
+        assert_eq!(stored.value(), key.value());
+    }
+
+    #[tokio::test]
+    async fn test_save_key_updates_existing_key() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let key = hashed_key("key-1");
+        repository.save_key(key.clone()).await.unwrap();
+
+        let disabled_at = Utc::now();
+        repository.save_key(key.disable(disabled_at)).await.unwrap();
+
+        let stored = repository
+            .get_key_by_id(&APIKeyId::from("key-1"))
+            .await
+            .unwrap();
+        assert_eq!(stored.disabled_at(), &Some(disabled_at));
+    }
+
+    #[tokio::test]
+    async fn test_get_unknown_key_by_id_is_not_found() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        let res = repository.get_key_by_id(&APIKeyId::from("unknown")).await;
+
+        assert!(matches!(res, Err(APIKeyError::KeyDoesNotExist)));
+    }
+
+    #[tokio::test]
+    async fn test_get_unknown_key_by_hash_is_not_found() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        let res = repository
+            .get_key_by_hash(&HashedAPIKeyValue::new("unknown".to_string()))
+            .await;
+
+        assert!(matches!(res, Err(APIKeyError::KeyDoesNotExist)));
+    }
+
+    #[tokio::test]
+    async fn test_save_key_for_unknown_user_fails() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let mut key = hashed_key("key-1");
+        key = HashedAPIKey::new(
+            UserId::from("unknown"),
+            key.id().clone(),
+            key.name().to_string(),
+            APIPermission::Read,
+            key.value().clone(),
+            key.display().clone(),
+            *key.expire_at(),
+            *key.disabled_at(),
+        );
+
+        let res = repository.save_key(key).await;
+
+        assert!(matches!(res, Err(APIKeyError::StorageError(_))));
+    }
+
+    #[tokio::test]
+    async fn test_delete_key_removes_it() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let key = hashed_key("key-1");
+        repository.save_key(key.clone()).await.unwrap();
+
+        repository
+            .delete_key(&UserId::test_default(), key.id())
+            .await
+            .unwrap();
+
+        let res = repository.get_key_by_id(key.id()).await;
+        assert!(matches!(res, Err(APIKeyError::KeyDoesNotExist)));
+    }
+
+    #[tokio::test]
+    async fn test_delete_unknown_key_is_not_found() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        let res = repository
+            .delete_key(&UserId::test_default(), &APIKeyId::from("unknown"))
+            .await;
+
+        assert!(matches!(res, Err(APIKeyError::KeyDoesNotExist)));
+    }
+
+    #[tokio::test]
+    async fn test_save_and_get_key_activity_logs() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let key = hashed_key("key-1");
+        repository.save_key(key.clone()).await.unwrap();
+
+        let first = Utc::now();
+        let second = first + TimeDelta::minutes(1);
+        repository
+            .save_key_activity(&activity(key.id(), "first", second))
+            .await
+            .unwrap();
+        repository
+            .save_key_activity(&activity(key.id(), "second", first))
+            .await
+            .unwrap();
+
+        let logs = repository
+            .get_key_activity_logs(&UserId::test_default(), key.id())
+            .await
+            .unwrap();
+
+        assert_eq!(logs.len(), 2);
+        assert_eq!(logs[0].activity(), "second");
+        assert_eq!(logs[0].timestamp(), &first);
+        assert_eq!(logs[1].activity(), "first");
+        assert_eq!(logs[1].timestamp(), &second);
+        assert!(
+            logs.iter()
+                .all(|entry| entry.user() == &UserId::test_default())
+        );
+        assert!(logs.iter().all(|entry| entry.key() == key.id()));
+    }
+
+    #[tokio::test]
+    async fn test_save_activity_for_unknown_key_is_not_found() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        let res = repository
+            .save_key_activity(&activity(
+                &APIKeyId::from("unknown"),
+                "activity",
+                Utc::now(),
+            ))
+            .await;
+
+        assert!(matches!(res, Err(APIKeyError::KeyDoesNotExist)));
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_logs_for_other_user_is_empty() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let key = hashed_key("key-1");
+        repository.save_key(key.clone()).await.unwrap();
+        repository
+            .save_key_activity(&activity(key.id(), "activity", Utc::now()))
+            .await
+            .unwrap();
+
+        let logs = repository
+            .get_key_activity_logs(&UserId::from("other"), key.id())
+            .await
+            .unwrap();
+
+        assert!(logs.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_key_with_invalid_permission_is_a_storage_error() {
+        let (_db_file, repository) = repository_with_test_user().await;
+        let key = hashed_key("key-1");
+        repository.save_key(key.clone()).await.unwrap();
+
+        sqlx::query("UPDATE t_api_keys SET permission = 'bogus' WHERE key_id = ?1;")
+            .bind(key.id().as_str())
+            .execute(&repository.writer)
+            .await
+            .unwrap();
+
+        let res = repository.get_key_by_id(key.id()).await;
+
+        assert!(matches!(res, Err(APIKeyError::StorageError(_))));
     }
 }

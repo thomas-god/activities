@@ -19,10 +19,14 @@ pub enum APIPermission {
 #[derive(Debug, Clone, PartialEq)]
 pub struct APIKeyId(String);
 
-#[allow(clippy::new_without_default)]
 impl APIKeyId {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         uuid::Uuid::new_v4().into()
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
@@ -95,6 +99,22 @@ impl APIKeyValue {
         let start = self.0[..3].to_string();
         let end = self.0[self.0.len() - 3..].to_string();
         MaskedAPIKeyValue::new(format!("{}***{}", start, end))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl HashedAPIKeyValue {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl MaskedAPIKeyValue {
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
