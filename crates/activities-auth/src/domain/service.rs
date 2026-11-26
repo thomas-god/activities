@@ -3,7 +3,7 @@ use std::sync::Arc;
 use chrono::TimeDelta;
 use derive_more::Constructor;
 
-use activities_core::domain::shared::UserId;
+use activities_core::domain::shared::{IClock, UserId};
 
 use crate::domain::{
     AuthLink, AuthLinkValidationResult, AuthMethods, AuthToken, CheckSessionResult, EmailAddress,
@@ -17,18 +17,20 @@ use crate::domain::{
 };
 
 #[derive(Debug, Clone, Constructor)]
-pub struct UserService<UR, SS, MP> {
-    user_repository: Arc<UR>,
+pub struct UserService<UR, SS, MP, C> {
+    pub(crate) user_repository: Arc<UR>,
     session_service: SS,
     auth_methods: AuthMethods,
     mail_provider: Arc<MP>,
+    pub(crate) clock: C,
 }
 
-impl<UR, SS, MP> IUserService for UserService<UR, SS, MP>
+impl<UR, SS, MP, C> IUserService for UserService<UR, SS, MP, C>
 where
     UR: UserRepository,
     SS: ISessionService,
     MP: MailProvider,
+    C: IClock,
 {
     #[tracing::instrument(skip_all)]
     async fn register_user(&self, req: UserRegistrationRequest) -> UserRegistrationResult {
@@ -249,7 +251,7 @@ where
 
         let mut found = None;
 
-        let now = chrono::Utc::now();
+        let now = self.clock.now();
         for stored in tokens {
             if stored.is_expired(&now) {
                 let _ = self
@@ -289,11 +291,12 @@ where
     }
 }
 
-impl<UR, SS, MP> UserService<UR, SS, MP>
+impl<UR, SS, MP, C> UserService<UR, SS, MP, C>
 where
     UR: UserRepository,
     SS: ISessionService,
     MP: MailProvider,
+    C: IClock,
 {
     #[tracing::instrument(skip_all)]
     async fn login_with_email_link(&self, email: EmailAddress) -> UserLoginResult {
@@ -353,7 +356,7 @@ where
             req.user().clone(),
             req.email().clone(),
             auth_token.clone(),
-            chrono::Utc::now() + TimeDelta::minutes(15),
+            self.clock.now() + TimeDelta::minutes(15),
         );
         let Some(hashed_auth_link) = auth_link.as_hash() else {
             return GenerateAuthLinkResult::Retry;
@@ -398,7 +401,7 @@ where
 
         let mut found = None;
 
-        let now = chrono::Utc::now();
+        let now = self.clock.now();
         for link in links {
             if link.is_expired(&now) {
                 let _ = self
@@ -467,7 +470,7 @@ where
             req.user().clone(),
             req.new_email().clone(),
             AuthToken::new(),
-            chrono::Utc::now() + TimeDelta::minutes(15),
+            self.clock.now() + TimeDelta::minutes(15),
         );
         let Some(hashed_token) = token.as_hash() else {
             return UpdateEmailResult::Retry;
@@ -684,6 +687,8 @@ pub fn spawn_expired_email_change_tokens_cleanup<UR: UserRepository>(
 mod test_utils {
     use mockall::mock;
 
+    use activities_core::domain::clock::FakeClock;
+
     use crate::domain::test_utils::MockMailProvider;
 
     use super::{super::test_utils::MockSessionService, *};
@@ -792,7 +797,7 @@ mod test_utils {
     pub fn mail_and_password_service(
         user: MockUserRepository,
         mail: MockMailProvider,
-    ) -> UserService<MockUserRepository, MockSessionService, MockMailProvider> {
+    ) -> UserService<MockUserRepository, MockSessionService, MockMailProvider, FakeClock> {
         mail_and_password_service_with_session(user, MockSessionService::new(), mail)
     }
 
@@ -800,19 +805,20 @@ mod test_utils {
         user: MockUserRepository,
         session: MockSessionService,
         mail: MockMailProvider,
-    ) -> UserService<MockUserRepository, MockSessionService, MockMailProvider> {
+    ) -> UserService<MockUserRepository, MockSessionService, MockMailProvider, FakeClock> {
         UserService::new(
             Arc::new(user),
             session,
             AuthMethods::new(true),
             Arc::new(mail),
+            FakeClock::default(),
         )
     }
 
     pub fn password_only_service(
         user: MockUserRepository,
         mail: MockMailProvider,
-    ) -> UserService<MockUserRepository, MockSessionService, MockMailProvider> {
+    ) -> UserService<MockUserRepository, MockSessionService, MockMailProvider, FakeClock> {
         password_only_service_with_session(user, MockSessionService::new(), mail)
     }
 
@@ -820,12 +826,13 @@ mod test_utils {
         user: MockUserRepository,
         session: MockSessionService,
         mail: MockMailProvider,
-    ) -> UserService<MockUserRepository, MockSessionService, MockMailProvider> {
+    ) -> UserService<MockUserRepository, MockSessionService, MockMailProvider, FakeClock> {
         UserService::new(
             Arc::new(user),
             session,
             AuthMethods::new(false),
             Arc::new(mail),
+            FakeClock::default(),
         )
     }
 
@@ -1837,7 +1844,12 @@ mod test_user_service_validate_auth_link {
     fn new_service(
         user: MockUserRepository,
         session: MockSessionService,
-    ) -> UserService<MockUserRepository, MockSessionService, MockMailProvider> {
+    ) -> UserService<
+        MockUserRepository,
+        MockSessionService,
+        MockMailProvider,
+        activities_core::domain::clock::FakeClock,
+    > {
         mail_and_password_service_with_session(user, session, MockMailProvider::new())
     }
 
@@ -2031,7 +2043,12 @@ mod test_user_service_check_session_token {
 
     fn new_service(
         session: MockSessionService,
-    ) -> UserService<MockUserRepository, MockSessionService, MockMailProvider> {
+    ) -> UserService<
+        MockUserRepository,
+        MockSessionService,
+        MockMailProvider,
+        activities_core::domain::clock::FakeClock,
+    > {
         mail_and_password_service_with_session(
             MockUserRepository::new(),
             session,

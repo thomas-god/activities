@@ -53,6 +53,7 @@ type ActualUserService = UserService<
     SqliteUsersRepository,
     SessionService<SqliteUsersRepository>,
     MaybeMailProvider<SMTPEmailProvider>,
+    Clock,
 >;
 type ActualAdminService = AdminService<SqliteUsersRepository, Clock>;
 type ActualSearchService =
@@ -300,6 +301,7 @@ async fn build_user_service(
         session_service,
         auth_methods,
         Arc::new(mailer),
+        Clock::new(),
     );
 
     Ok((user_service, admin_service))

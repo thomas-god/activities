@@ -14,6 +14,7 @@ use sha2::{Digest, Sha256};
 
 pub mod admin;
 pub mod admin_audit;
+pub mod api_key;
 pub mod service;
 pub mod session;
 
@@ -815,7 +816,14 @@ pub trait MailProvider: Clone + Send + Sync + 'static {
 
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils {
+    use std::time::Duration;
+
     use mockall::mock;
+
+    use crate::domain::api_key::{
+        APIKey, APIKeyActivity, APIKeyError, APIKeyId, APIKeyValue, APIPermission, HashedAPIKey,
+        IAPIKeyService,
+    };
 
     use super::*;
 
@@ -937,6 +945,54 @@ pub mod test_utils {
             ) -> Result<(), ()>;
 
             async fn revoke_all_sessions(&self, user: &UserId) -> Result<(), ()>;
+        }
+    }
+
+    mock! {
+        pub APIKeyService {}
+
+        impl Clone for APIKeyService {
+            fn clone(&self) -> Self;
+        }
+
+        impl IAPIKeyService for APIKeyService {
+            async fn create_key(
+                &self,
+                user: &UserId,
+                permission: APIPermission,
+                name: String,
+                duration: Option<Duration>,
+            ) -> Result<APIKey, APIKeyError>;
+
+            async fn disable_key(
+                &self,
+                user: &UserId,
+                key: &APIKeyId,
+            ) -> Result<(), APIKeyError>;
+
+            async fn delete_key(
+                &self,
+                user: &UserId,
+                key: &APIKeyId,
+            ) -> Result<(), APIKeyError>;
+
+            async fn match_value_to_key(
+                &self,
+                value: APIKeyValue,
+            ) -> Result<HashedAPIKey, APIKeyError>;
+
+            async fn log_key_activity(
+                &self,
+                key: &APIKeyId,
+                activity: String,
+                timestamp: chrono::DateTime<chrono::Utc>
+            ) -> Result<(), APIKeyError>;
+
+            async fn get_key_activity_logs(
+                &self,
+                user: &UserId,
+                key: &APIKeyId,
+            ) -> Result<Vec<APIKeyActivity>, APIKeyError>;
         }
     }
 
