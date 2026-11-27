@@ -48,7 +48,7 @@ use activities_core::{
 
 use activities_auth::{
     auth::UserAuthStrategy,
-    domain::{IUserService, admin::IAdminService},
+    domain::{IUserService, admin::IAdminService, api_key::IAPIKeyService},
     infra::http::{add_auth_router, handlers::admin::admin_routes},
 };
 
@@ -103,7 +103,7 @@ impl<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    US: IUserService,
+    US: IUserService + IAPIKeyService,
     PS: IPreferencesService,
     AD: IAdminService,
 > HttpServer<AS, PF, TMS, US, PS, AD>
@@ -475,7 +475,7 @@ mod tests {
     use crate::parser::test_utils::MockFileParser;
     use activities_auth::{
         auth::{UserRegistration, test_utils::DefaultUserExtractor},
-        domain::{AuthMethods, test_utils::MockUserService},
+        domain::{AuthMethods, test_utils::MockFullUserService},
     };
     use activities_core::domain::{
         activity::{models::ActivityId, services::test_utils::MockActivityService},
@@ -513,7 +513,7 @@ mod tests {
                 "/api",
                 core_routes(state).merge(search_routes(MockSearchService::new())),
             ),
-            MockUserService::new(),
+            MockFullUserService::new(),
         );
         let app = router.route("/health", get(health));
         let server = TestServer::new(app);
@@ -572,7 +572,7 @@ mod tests {
         let router = add_auth_router(
             auth_strategy(true),
             Router::new().nest("/api", core_routes(state)),
-            MockUserService::new(),
+            MockFullUserService::new(),
         );
         let app = router.route("/health", get(health));
         let server = TestServer::new(app);

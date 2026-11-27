@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use crate::{
     auth::UserAuthStrategy,
-    domain::{AuthMethods, IUserService},
+    domain::{AuthMethods, IUserService, api_key::IAPIKeyService},
     infra::http::handlers::multi_user_login_routes,
 };
 
@@ -30,7 +30,7 @@ impl From<&AuthMethods> for AuthInfoMethods {
     }
 }
 
-pub fn add_auth_router<S, US: IUserService>(
+pub fn add_auth_router<S, US: IUserService + IAPIKeyService>(
     strategy: UserAuthStrategy,
     base_router: Router<S>,
     user_service: US,
@@ -64,7 +64,7 @@ mod tests {
 
     use crate::{
         auth::{UserAuthStrategy, UserRegistration},
-        domain::{AuthMethods, test_utils::MockUserService},
+        domain::{AuthMethods, test_utils::MockFullUserService},
     };
 
     use super::*;
@@ -76,7 +76,7 @@ mod tests {
         )
     }
 
-    fn build_server(config: UserAuthStrategy, user_service: MockUserService) -> TestServer {
+    fn build_server(config: UserAuthStrategy, user_service: MockFullUserService) -> TestServer {
         // `add_auth_router` adds a `route_layer`, which panics if the base router has no route
         // yet; give it one so the middleware has something to wrap.
         let base_router = Router::new().route("/", get(|| async { StatusCode::OK }));
@@ -85,7 +85,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_password_only_mode_reports_multi_user_strategy_with_password_method() {
-        let server = build_server(multi_user_strategy(false, false), MockUserService::new());
+        let server = build_server(
+            multi_user_strategy(false, false),
+            MockFullUserService::new(),
+        );
 
         let response = server.get("/api/auth_info").await;
         response.assert_status(StatusCode::OK);
@@ -97,7 +100,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_email_and_password_mode_reports_both_methods() {
-        let server = build_server(multi_user_strategy(true, true), MockUserService::new());
+        let server = build_server(multi_user_strategy(true, true), MockFullUserService::new());
 
         let response = server.get("/api/auth_info").await;
         response.assert_status(StatusCode::OK);

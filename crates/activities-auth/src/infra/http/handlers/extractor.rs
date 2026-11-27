@@ -136,7 +136,7 @@ mod test {
     use crate::{
         domain::{
             CheckSessionResult, GenerateSessionTokenResult, SessionToken,
-            test_utils::MockUserService,
+            test_utils::MockFullUserService,
         },
         infra::http::{
             CookieConfig,
@@ -149,7 +149,7 @@ mod test {
 
     use super::*;
 
-    fn build_test_server(session_service: MockUserService) -> TestServer {
+    fn build_test_server(session_service: MockFullUserService) -> TestServer {
         let state = AuthAppState {
             user_service: Arc::new(session_service),
             cookie_config: Arc::new(CookieConfig::default()),
@@ -166,15 +166,15 @@ mod test {
             Router::new()
                 .route("/", get(test_route))
                 .route_layer(from_extractor_with_state::<
-                    CookieUserExtractor<MockUserService>,
-                    AuthAppState<MockUserService>,
+                    CookieUserExtractor<MockFullUserService>,
+                    AuthAppState<MockFullUserService>,
                 >(state));
         TestServer::new(app)
     }
 
     #[tokio::test]
-    async fn test_cookie_user_extractor_no_sesion_token_cookie() {
-        let sessions = MockUserService::new();
+    async fn test_cookie_user_extractor_no_session_token_cookie() {
+        let sessions = MockFullUserService::new();
         let server = build_test_server(sessions);
 
         let response = server.get("/").await;
@@ -182,8 +182,8 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_cookie_user_extractor_sesion_token_cookie_rejected() {
-        let mut sessions = MockUserService::new();
+    async fn test_cookie_user_extractor_session_token_cookie_rejected() {
+        let mut sessions = MockFullUserService::new();
         sessions.expect_check_session_token().returning(|_| Err(()));
         let server = build_test_server(sessions);
 
@@ -196,7 +196,7 @@ mod test {
 
     #[tokio::test]
     async fn test_cookie_user_extractor_return_user_id() {
-        let mut sessions = MockUserService::new();
+        let mut sessions = MockFullUserService::new();
         sessions
             .expect_check_session_token()
             .returning(|_| Ok(CheckSessionResult::new(UserId::from("a user"), None)));
@@ -211,7 +211,7 @@ mod test {
         assert_eq!(response.text(), UserId::from("a user").to_string());
     }
 
-    fn build_middleware_test_server(session_service: MockUserService) -> TestServer {
+    fn build_middleware_test_server(session_service: MockFullUserService) -> TestServer {
         let state = AuthAppState {
             user_service: Arc::new(session_service),
             cookie_config: Arc::new(CookieConfig::default()),
@@ -228,7 +228,7 @@ mod test {
             .route("/", get(test_route))
             .route_layer(from_fn_with_state(
                 state.clone(),
-                cookie_auth_middleware::<MockUserService, AuthAppState<MockUserService>>,
+                cookie_auth_middleware::<MockFullUserService, AuthAppState<MockFullUserService>>,
             ))
             .with_state(state);
         TestServer::new(app)
@@ -236,7 +236,7 @@ mod test {
 
     #[tokio::test]
     async fn test_cookie_auth_middleware_no_session_token_cookie() {
-        let server = build_middleware_test_server(MockUserService::new());
+        let server = build_middleware_test_server(MockFullUserService::new());
 
         let response = server.get("/").await;
 
@@ -245,7 +245,7 @@ mod test {
 
     #[tokio::test]
     async fn test_cookie_auth_middleware_session_token_rejected() {
-        let mut sessions = MockUserService::new();
+        let mut sessions = MockFullUserService::new();
         sessions.expect_check_session_token().returning(|_| Err(()));
         let server = build_middleware_test_server(sessions);
 
@@ -259,7 +259,7 @@ mod test {
 
     #[tokio::test]
     async fn test_cookie_auth_middleware_valid_session_no_refresh() {
-        let mut sessions = MockUserService::new();
+        let mut sessions = MockFullUserService::new();
         sessions
             .expect_check_session_token()
             .returning(|_| Ok(CheckSessionResult::new(UserId::from("a user"), None)));
@@ -277,7 +277,7 @@ mod test {
 
     #[tokio::test]
     async fn test_cookie_auth_middleware_valid_session_with_refresh() {
-        let mut sessions = MockUserService::new();
+        let mut sessions = MockFullUserService::new();
         sessions.expect_check_session_token().returning(|_| {
             Ok(CheckSessionResult::new(
                 UserId::from("a user"),
@@ -306,7 +306,7 @@ mod test {
     #[tokio::test]
     async fn test_cookie_auth_middleware_refresh_cookie_build_failure_does_not_logout() {
         // build_session_cookie fails when expire_at is out of OffsetDateTime's range (post year 9999)
-        let mut sessions = MockUserService::new();
+        let mut sessions = MockFullUserService::new();
         sessions.expect_check_session_token().returning(|_| {
             Ok(CheckSessionResult::new(
                 UserId::from("a user"),
@@ -329,7 +329,7 @@ mod test {
         assert!(response.headers().get(SET_COOKIE).is_none());
     }
 
-    fn build_middleware_session_hash_server(session_service: MockUserService) -> TestServer {
+    fn build_middleware_session_hash_server(session_service: MockFullUserService) -> TestServer {
         let state = AuthAppState {
             user_service: Arc::new(session_service),
             cookie_config: Arc::new(CookieConfig::default()),
@@ -344,7 +344,7 @@ mod test {
             .route("/", get(test_route))
             .route_layer(from_fn_with_state(
                 state.clone(),
-                cookie_auth_middleware::<MockUserService, AuthAppState<MockUserService>>,
+                cookie_auth_middleware::<MockFullUserService, AuthAppState<MockFullUserService>>,
             ))
             .with_state(state);
         TestServer::new(app)
@@ -352,7 +352,7 @@ mod test {
 
     #[tokio::test]
     async fn test_cookie_auth_middleware_exposes_effective_session_without_refresh() {
-        let mut sessions = MockUserService::new();
+        let mut sessions = MockFullUserService::new();
         sessions
             .expect_check_session_token()
             .returning(|_| Ok(CheckSessionResult::new(UserId::from("a user"), None)));
@@ -372,7 +372,7 @@ mod test {
 
     #[tokio::test]
     async fn test_cookie_auth_middleware_exposes_refreshed_session() {
-        let mut sessions = MockUserService::new();
+        let mut sessions = MockFullUserService::new();
         sessions.expect_check_session_token().returning(|_| {
             Ok(CheckSessionResult::new(
                 UserId::from("a user"),
@@ -396,7 +396,7 @@ mod test {
         );
     }
 
-    fn build_middleware_session_revoked_server(session_service: MockUserService) -> TestServer {
+    fn build_middleware_session_revoked_server(session_service: MockFullUserService) -> TestServer {
         let state = AuthAppState {
             user_service: Arc::new(session_service),
             cookie_config: Arc::new(CookieConfig::default()),
@@ -413,7 +413,7 @@ mod test {
             .route("/", get(test_route))
             .route_layer(from_fn_with_state(
                 state.clone(),
-                cookie_auth_middleware::<MockUserService, AuthAppState<MockUserService>>,
+                cookie_auth_middleware::<MockFullUserService, AuthAppState<MockFullUserService>>,
             ))
             .with_state(state);
         TestServer::new(app)
@@ -421,7 +421,7 @@ mod test {
 
     #[tokio::test]
     async fn test_cookie_auth_middleware_skips_refresh_when_session_revoked() {
-        let mut sessions = MockUserService::new();
+        let mut sessions = MockFullUserService::new();
         sessions.expect_check_session_token().returning(|_| {
             Ok(CheckSessionResult::new(
                 UserId::from("a user"),

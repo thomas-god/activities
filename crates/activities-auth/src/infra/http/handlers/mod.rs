@@ -7,7 +7,7 @@ use axum::{
 use std::{sync::Arc, time::Duration};
 
 use crate::{
-    domain::IUserService,
+    domain::{IUserService, api_key::IAPIKeyService},
     infra::http::{
         CookieConfig,
         rate_limit::{IpRateLimitLayer, RateLimitStore},
@@ -25,7 +25,10 @@ pub use set_password::{register_password, update_password};
 pub use update_email::{update_email, validate_email_change};
 pub use validate_login::validate_login;
 
+pub use api_key::api_key_router;
+
 pub mod admin;
+pub mod api_key;
 pub mod extractor;
 pub mod login_user;
 pub mod logout;
@@ -40,7 +43,7 @@ pub mod validate_login;
 pub use crate::auth::UserRegistration;
 
 #[derive(Debug, Clone)]
-pub struct AuthAppState<UR: IUserService> {
+pub struct AuthAppState<UR> {
     user_service: Arc<UR>,
     cookie_config: Arc<CookieConfig>,
     registration_mode: UserRegistration,
@@ -48,7 +51,7 @@ pub struct AuthAppState<UR: IUserService> {
 
 impl<US> FromRef<AuthAppState<US>> for Arc<US>
 where
-    US: IUserService,
+    US: IUserService + IAPIKeyService,
 {
     fn from_ref(input: &AuthAppState<US>) -> Self {
         input.user_service.clone()
@@ -57,14 +60,14 @@ where
 
 impl<US> FromRef<AuthAppState<US>> for Arc<CookieConfig>
 where
-    US: IUserService,
+    US: IUserService + IAPIKeyService,
 {
     fn from_ref(input: &AuthAppState<US>) -> Self {
         input.cookie_config.clone()
     }
 }
 
-pub fn multi_user_login_routes<US: IUserService, S>(
+pub fn multi_user_login_routes<US: IUserService + IAPIKeyService, S>(
     mut base_router: Router<S>,
     user_service: US,
     registration_mode: UserRegistration,
@@ -137,9 +140,12 @@ where
             Duration::from_secs(60),
         ));
 
+    let api_key_router = api_key_router();
+
     let router = mail_router
         .merge(validate_router)
         .merge(account_router)
+        .merge(api_key_router)
         .with_state(auth_state);
 
     base_router.nest("/api", router)
@@ -161,7 +167,8 @@ mod tests {
 
     use crate::domain::{
         AuthLinkValidationResult, GenerateSessionTokenResult, SessionToken, UserLoginResult,
-        UserRegistrationResult, test_utils::MockUserService,
+        UserRegistrationResult,
+        test_utils::{MockFullUserService},
     };
 
     use super::*;
@@ -179,7 +186,7 @@ mod tests {
     // Adapted from https://github.com/tokio-rs/axum/discussions/748
     impl TestApp {
         async fn new(
-            user_service: MockUserService,
+            user_service: MockFullUserService,
             registration_mode: UserRegistration,
         ) -> TestApp {
             let app = multi_user_login_routes(
@@ -230,7 +237,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_register_is_rejected_when_registration_is_disabled() {
-        let mut user_service = MockUserService::new();
+        let mut user_service = MockFullUserService::new();
         user_service.expect_register_user().times(0);
         let registration_mode = UserRegistration::Closed;
         let app = TestApp::new(user_service, registration_mode).await;
@@ -249,7 +256,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_register_is_rate_limited_after_5_requests_per_minute() {
-        let mut user_service = MockUserService::new();
+        let mut user_service = MockFullUserService::new();
         user_service
             .expect_register_user()
             .returning(|_| UserRegistrationResult::Success);
@@ -285,7 +292,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_register_and_login_share_the_same_rate_limit_bucket() {
-        let mut user_service = MockUserService::new();
+        let mut user_service = MockFullUserService::new();
         user_service
             .expect_register_user()
             .returning(|_| UserRegistrationResult::Success);
@@ -315,7 +322,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_validate_login_has_its_own_higher_rate_limit_bucket() {
-        let mut user_service = MockUserService::new();
+        let mut user_service = MockFullUserService::new();
         user_service
             .expect_register_user()
             .returning(|_| UserRegistrationResult::Success);
@@ -350,7 +357,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_validate_login_is_rate_limited_after_30_requests_per_minute() {
-        let mut user_service = MockUserService::new();
+        let mut user_service = MockFullUserService::new();
         user_service
             .expect_validate_auth_link()
             .returning(|_| Ok(AuthLinkValidationResult::Invalid));
@@ -386,7 +393,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_login_does_not_mark_cookie_secure_over_plain_http() {
-        let mut user_service = MockUserService::new();
+        let mut user_service = MockFullUserService::new();
         user_service.expect_login_user().returning(|_, _| {
             UserLoginResult::Session(GenerateSessionTokenResult::new(
                 SessionToken::from("session-token"),
@@ -416,7 +423,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_login_marks_cookie_secure_when_proxied_over_https() {
-        let mut user_service = MockUserService::new();
+        let mut user_service = MockFullUserService::new();
         user_service.expect_login_user().returning(|_, _| {
             UserLoginResult::Session(GenerateSessionTokenResult::new(
                 SessionToken::from("session-token"),

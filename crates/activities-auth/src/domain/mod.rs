@@ -899,6 +899,116 @@ pub mod test_utils {
     }
 
     mock! {
+        pub FullUserService {}
+
+        impl Clone for FullUserService {
+            fn clone(&self) -> Self;
+        }
+
+        impl IUserService for FullUserService {
+            async fn register_user(
+                &self,
+                req: UserRegistrationRequest,
+            ) -> UserRegistrationResult;
+
+            async fn login_user(
+                &self,
+                email: EmailAddress,
+                password: Option<Password>
+            ) -> UserLoginResult;
+
+            async fn validate_auth_link(
+                &self,
+                token: AuthToken,
+            ) -> Result<AuthLinkValidationResult, ()>;
+
+            async fn check_session_token(
+                &self,
+                _token: &SessionToken
+            ) -> Result<CheckSessionResult, ()>;
+
+            async fn logout(&self, token: &SessionToken) -> Result<(), ()>;
+
+            async fn revoke_other_sessions(
+                &self,
+                user: &UserId,
+                current: &HashedSessionToken,
+            ) -> RevokeSessionsResult;
+
+            async fn revoke_all_sessions(
+                &self,
+                user: &UserId,
+            ) -> RevokeSessionsResult;
+
+            async fn register_password(
+                &self,
+                req: RegisterPasswordRequest,
+            ) -> RegisterPasswordResult;
+
+            async fn update_password(
+                &self,
+                req: UpdatePasswordRequest,
+            ) -> UpdatePasswordResult;
+
+            async fn update_email(
+                &self,
+                req: UpdateEmailRequest,
+            ) -> UpdateEmailResult;
+
+            async fn request_email_verification(
+                &self,
+                user: &UserId,
+            ) -> EmailVerificationResult;
+
+            async fn validate_email_change(
+                &self,
+                token: AuthToken,
+            ) -> Result<EmailChangeValidationResult, ()>;
+
+            async fn get_user_info(&self, user: &UserId) -> UserInfoResult;
+        }
+
+        impl IAPIKeyService for FullUserService {
+            async fn create_key(
+                &self,
+                user: &UserId,
+                permission: APIPermission,
+                name: String,
+                duration: Option<Duration>,
+            ) -> Result<APIKey, APIKeyError>;
+
+            async fn disable_key(
+                &self,
+                user: &UserId,
+                key: &APIKeyId,
+            ) -> Result<(), APIKeyError>;
+
+            async fn delete_key(
+                &self,
+                user: &UserId,
+                key: &APIKeyId,
+            ) -> Result<(), APIKeyError>;
+
+            async fn match_value_to_key(
+                &self,
+                value: APIKeyValue,
+            ) -> Result<HashedAPIKey, APIKeyError>;
+
+            async fn log_key_activity(
+                &self,
+                key: &APIKeyId,
+                activity: String,
+                timestamp: chrono::DateTime<chrono::Utc>
+            ) -> Result<(), APIKeyError>;
+
+            async fn get_key_activity_logs(
+                &self,
+                user: &UserId,
+                key: &APIKeyId,
+            ) -> Result<Vec<APIKeyActivity>, APIKeyError>;
+        }
+    }
+    mock! {
         pub AuthLinkService {}
 
         impl Clone for AuthLinkService {
